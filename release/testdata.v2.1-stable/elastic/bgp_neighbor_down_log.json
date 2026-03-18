@@ -1,0 +1,29 @@
+{
+  "hits": {
+    "hits": [
+      {
+        "_source": {
+          "@timestamp": "2026-03-16T16:41:00Z",
+          "message": "device 10.20.50.6 bgp neighbor 10.20.50.1 changed state to idle",
+          "host": {
+            "name": "SH8-G06-DCI-RT01"
+          },
+          "event": {
+            "kind": "alert",
+            "category": "routing",
+            "outcome": "failure"
+          },
+          "log": {
+            "level": "critical"
+          },
+          "observer": {
+            "vendor": "huawei"
+          },
+          "rule": {
+            "name": "BGPNeighborDownLog"
+          }
+        }
+      }
+    ]
+  }
+}

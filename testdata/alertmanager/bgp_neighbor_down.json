@@ -1,0 +1,22 @@
+{
+  "receiver": "default",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "startsAt": "2026-03-13T18:20:00Z",
+      "labels": {
+        "alertname": "BGPNeighborDown",
+        "severity": "critical",
+        "instance": "10.20.30.40",
+        "job": "snmp",
+        "interface": "Loopback0",
+        "vendor": "huawei"
+      },
+      "annotations": {
+        "summary": "bgp neighbor down",
+        "description": "device 10.20.30.40 bgp neighbor state changed to down"
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "receiver": "default",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "startsAt": "2026-03-13T18:00:00Z",
+      "labels": {
+        "alertname": "InterfaceDown",
+        "severity": "critical",
+        "instance": "10.10.30.4",
+        "job": "snmp",
+        "interface": "GigabitEthernet1/0/4",
+        "vendor": "cisco"
+      },
+      "annotations": {
+        "summary": "interface down",
+        "description": "device 10.10.30.4 interface GigabitEthernet1/0/4 is down"
+      }
+    }
+  ]
+}

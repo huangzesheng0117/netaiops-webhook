@@ -1,0 +1,183 @@
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
+from pathlib import Path
+from datetime import datetime, timezone
+import json
+import re
+import uuid
+
+APP_NAME = "netaiops-webhook"
+BASE_DIR = Path("/opt/netaiops-webhook")
+RAW_DIR = BASE_DIR / "data" / "raw"
+NORMALIZED_DIR = BASE_DIR / "data" / "normalized"
+
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+NORMALIZED_DIR.mkdir(parents=True, exist_ok=True)
+
+app = FastAPI(title=APP_NAME)
+
+
+def now_utc_str() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def file_ts() -> str:
+    return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+
+
+def safe_write_json(path: Path, data: dict) -> None:
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def extract_ip(text: str) -> str:
+    if not text:
+        return ""
+    match = re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", text)
+    return match.group(0) if match else ""
+
+
+def normalize_alertmanager(payload: dict) -> list:
+    results = []
+    alerts = payload.get("alerts", [])
+
+    for alert in alerts:
+        labels = alert.get("labels", {}) or {}
+        annotations = alert.get("annotations", {}) or {}
+
+        raw_text_parts = [
+            labels.get("alertname", ""),
+            annotations.get("summary", ""),
+            annotations.get("description", ""),
+            annotations.get("message", ""),
+        ]
+        raw_text = " | ".join([x for x in raw_text_parts if x]).strip()
+
+        device_ip = (
+            labels.get("device_ip", "")
+            or labels.get("instance", "")
+            or extract_ip(raw_text)
+        )
+
+        event = {
+            "source": "alertmanager",
+            "alarm_type": labels.get("alertname", ""),
+            "severity": labels.get("severity", ""),
+            "hostname": labels.get("hostname", "") or labels.get("instance", ""),
+            "device_ip": device_ip,
+            "vendor": labels.get("vendor", ""),
+            "object_type": labels.get("object_type", ""),
+            "object_name": labels.get("object_name", ""),
+            "timestamp": alert.get("startsAt", "") or now_utc_str(),
+            "raw_text": raw_text,
+            "labels": labels,
+            "annotations": annotations,
+            "time_window": {
+                "start": alert.get("startsAt", ""),
+                "end": alert.get("endsAt", "")
+            }
+        }
+        results.append(event)
+
+    return results
+
+
+def normalize_elastic(payload: dict) -> list:
+    results = []
+
+    # 尽量兼容 Kibana webhook connector 常见结构
+    context = payload.get("context", {}) if isinstance(payload, dict) else {}
+    rule = payload.get("rule", {}) if isinstance(payload, dict) else {}
+
+    raw_text_parts = [
+        str(payload.get("message", "")),
+        str(payload.get("summary", "")),
+        str(context.get("message", "")),
+        str(context.get("reason", "")),
+        str(context.get("alertDetailsUrl", "")),
+    ]
+    raw_text = " | ".join([x for x in raw_text_parts if x]).strip()
+
+    event = {
+        "source": "elastic",
+        "alarm_type": payload.get("alarm_type", "") or rule.get("name", "") or payload.get("rule_name", ""),
+        "severity": payload.get("severity", "") or context.get("severity", ""),
+        "hostname": payload.get("hostname", "") or context.get("host", ""),
+        "device_ip": payload.get("device_ip", "") or context.get("device_ip", "") or extract_ip(raw_text),
+        "vendor": payload.get("vendor", "") or context.get("vendor", ""),
+        "object_type": payload.get("object_type", "") or context.get("object_type", ""),
+        "object_name": payload.get("object_name", "") or context.get("object_name", ""),
+        "timestamp": payload.get("timestamp", "") or payload.get("@timestamp", "") or now_utc_str(),
+        "raw_text": raw_text,
+        "labels": payload.get("labels", {}),
+        "annotations": payload.get("annotations", {}),
+        "time_window": {
+            "start": payload.get("window_start", ""),
+            "end": payload.get("window_end", "")
+        }
+    }
+
+    results.append(event)
+    return results
+
+
+def persist_events(source: str, raw_payload: dict, normalized_events: list) -> dict:
+    req_id = f"{file_ts()}_{uuid.uuid4().hex[:8]}"
+
+    raw_file = RAW_DIR / f"{source}_{req_id}.json"
+    normalized_file = NORMALIZED_DIR / f"{source}_{req_id}.json"
+
+    safe_write_json(raw_file, raw_payload)
+    safe_write_json(normalized_file, {"events": normalized_events})
+
+    return {
+        "request_id": req_id,
+        "raw_file": str(raw_file),
+        "normalized_file": str(normalized_file),
+        "event_count": len(normalized_events),
+    }
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "app": APP_NAME, "time": now_utc_str()}
+
+
+@app.post("/webhook/alertmanager")
+async def webhook_alertmanager(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid json payload")
+
+    normalized_events = normalize_alertmanager(payload)
+    result = persist_events("alertmanager", payload, normalized_events)
+
+    return JSONResponse(
+        status_code=202,
+        content={
+            "status": "accepted",
+            "source": "alertmanager",
+            **result
+        }
+    )
+
+
+@app.post("/webhook/elastic")
+async def webhook_elastic(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid json payload")
+
+    normalized_events = normalize_elastic(payload)
+    result = persist_events("elastic", payload, normalized_events)
+
+    return JSONResponse(
+        status_code=202,
+        content={
+            "status": "accepted",
+            "source": "elastic",
+            **result
+        }
+    )

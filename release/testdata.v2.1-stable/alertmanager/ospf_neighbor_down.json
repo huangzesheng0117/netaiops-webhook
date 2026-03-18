@@ -1,0 +1,22 @@
+{
+  "receiver": "default",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "startsAt": "2026-03-13T18:10:00Z",
+      "labels": {
+        "alertname": "OSPFNeighborDown",
+        "severity": "critical",
+        "instance": "10.10.20.3",
+        "job": "snmp",
+        "interface": "Vlan100",
+        "vendor": "huawei"
+      },
+      "annotations": {
+        "summary": "ospf neighbor down",
+        "description": "device 10.10.20.3 ospf neighbor on Vlan100 is down"
+      }
+    }
+  ]
+}

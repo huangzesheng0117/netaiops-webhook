@@ -1,0 +1,29 @@
+{
+  "hits": {
+    "hits": [
+      {
+        "_source": {
+          "@timestamp": "2026-03-16T16:40:00Z",
+          "message": "device 10.10.40.5 interface GigabitEthernet1/0/5 changed state to down",
+          "host": {
+            "name": "SH16-G05-ACC-SW01"
+          },
+          "event": {
+            "kind": "alert",
+            "category": "network",
+            "outcome": "failure"
+          },
+          "log": {
+            "level": "critical"
+          },
+          "observer": {
+            "vendor": "cisco"
+          },
+          "rule": {
+            "name": "InterfaceDownLog"
+          }
+        }
+      }
+    ]
+  }
+}
