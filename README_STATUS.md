@@ -1,44 +1,106 @@
 # NetAIOps Webhook - Current Status
 
 ## Current Version
-webhook_v2.1-stable
+webhook_v3
 
-## Current Capabilities
+## Current Architecture
+The service now supports the following lifecycle:
+
+webhook -> raw -> normalized -> analysis -> plan -> confirm -> execution -> review -> summary
+
+## Implemented Capabilities
+
+### 1. Webhook Ingestion
 - Accept Alertmanager webhook
 - Accept Elastic webhook
-- Normalize incoming events
-- Save raw / normalized / analysis JSON files
-- Run async analysis in background task
-- Support mock LLM mode
-- Support replay analysis by request_id
-- Support query latest analysis
-- Support query analysis by request_id
-- Support config flags:
-  - analysis.save_prompt
-  - analysis.save_result
-- Support rotating log file
-- Provide regression test samples and test script
 
-## Current Endpoints
+### 2. Data Persistence
+- Save raw webhook payload
+- Save normalized event data
+- Save analysis result
+- Save plan result
+- Save execution result
+- Save review result
+
+### 3. Analysis Layer
+- Async analysis processing
+- Query latest analysis
+- Query analysis by request_id
+- Replay analysis by request_id
+
+### 4. Plan Layer
+- Generate plan from analysis
+- Query latest plan
+- Query plan by request_id
+- Guard readonly commands
+- Confirm safe readonly plan
+
+### 5. Execution Layer
+- Create execution record from confirmed plan
+- Dispatch execution
+- Complete execution
+- Fail execution
+- External execution result callback
+
+### 6. Review Layer
+- Generate review from execution result
+- Query latest review
+- Query review by request_id
+
+### 7. Summary Layer
+- Query one request_id across:
+  - analysis
+  - plan
+  - execution
+  - review
+
+## Current API Endpoints
+
+### Health
 - GET /health
+
+### Analysis
 - GET /analysis/latest
 - GET /analysis/{request_id}
 - POST /analysis/replay/{request_id}
-- POST /webhook/alertmanager
-- POST /webhook/elastic
 
-## Current Test Samples
-### Alertmanager
-- interface_down.json
-- ospf_neighbor_down.json
-- bgp_neighbor_down.json
+### Plan
+- GET /plan/latest
+- GET /plan/{request_id}
+- POST /plan/generate/{request_id}
+- POST /plan/confirm/{request_id}
+- POST /plan/execute/{request_id}
 
-### Elastic
-- interface_down_log.json
-- bgp_neighbor_down_log.json
+### Execution
+- GET /execution/latest
+- GET /execution/{request_id}
+- POST /execution/dispatch/{request_id}
+- POST /execution/complete/{request_id}
+- POST /execution/fail/{request_id}
+- POST /execution/result/{request_id}
 
-## Next Phase
-- Connect real LLM endpoint
-- Validate JSON output stability
-- Tune prompt and model selection
-- Prepare command_plan field for future mcp-netmiko integration
+### Review
+- GET /review/latest
+- GET /review/{request_id}
+- POST /review/generate/{request_id}
+
+### Summary
+- GET /request/{request_id}/summary
+
+## Data Directories
+
+- data/raw/
+- data/normalized/
+- data/analysis/
+- data/plans/
+- data/execution/
+- data/reviews/
+
+## Current Execution Mode
+Execution is currently stub-based.
+No real mcp-netmiko dispatch is connected yet.
+
+## Recommended Next Phase
+- Connect execution dispatcher to mcp-netmiko
+- Return real command outputs into /execution/result/{request_id}
+- Optionally add second-round LLM review based on execution evidence

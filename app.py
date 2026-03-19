@@ -6,25 +6,50 @@ from pathlib import Path
 import yaml
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 
+from netaiops.executor import (
+    complete_execution_for_request_id,
+    create_execution_for_request_id,
+    dispatch_execution_for_request_id,
+    fail_execution_for_request_id,
+    get_execution_by_request_id,
+    get_latest_execution,
+    update_execution_results_for_request_id,
+)
 from netaiops.logger import setup_logger
-from netaiops.processor import process_event_async
+from netaiops.request_summary import get_request_summary
+from netaiops.review_builder import (
+    generate_review_for_request_id,
+    get_latest_review,
+    get_review_by_request_id,
+)
 from netaiops.normalizers import normalize_alertmanager, normalize_elastic
-
+from netaiops.plan_builder import (
+    confirm_plan_for_request_id,
+    generate_plan_for_request_id,
+    get_latest_plan,
+    get_plan_by_request_id,
+)
+from netaiops.processor import process_event_async
 
 BASE_DIR = Path("/opt/netaiops-webhook")
 DATA_DIR = BASE_DIR / "data"
 RAW_DIR = DATA_DIR / "raw"
 NORMALIZED_DIR = DATA_DIR / "normalized"
 ANALYSIS_DIR = DATA_DIR / "analysis"
+PLAN_DIR = DATA_DIR / "plans"
+EXECUTION_DIR = DATA_DIR / "execution"
+REVIEW_DIR = DATA_DIR / "reviews"
 CONFIG_FILE = BASE_DIR / "config.yaml"
 
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 NORMALIZED_DIR.mkdir(parents=True, exist_ok=True)
 ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+PLAN_DIR.mkdir(parents=True, exist_ok=True)
+EXECUTION_DIR.mkdir(parents=True, exist_ok=True)
+REVIEW_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = setup_logger()
-
-app = FastAPI(title="NetAIOps Webhook", version="2.0-c")
+app = FastAPI(title="NetAIOps Webhook", version="3.0-a")
 
 
 def load_config() -> dict:
@@ -35,6 +60,16 @@ def load_config() -> dict:
 
 
 CONFIG = load_config()
+
+
+def load_version() -> str:
+    version_file = BASE_DIR / "VERSION"
+    if version_file.exists():
+        return version_file.read_text(encoding="utf-8").strip()
+    return "3.0.0-v3"
+
+
+APP_VERSION = load_version()
 
 
 def now_utc_str() -> str:
@@ -53,7 +88,6 @@ def safe_write_json(path: Path, data: dict) -> None:
 
 def persist_events(source: str, raw_payload: dict, normalized_events: list) -> dict:
     request_id = file_ts()
-
     raw_file = RAW_DIR / f"{source}_{request_id}.json"
     normalized_file = NORMALIZED_DIR / f"{source}_{request_id}.json"
 
@@ -108,9 +142,21 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "netaiops-webhook",
-        "version": "2.0-c",
+        "version": APP_VERSION,
         "time": now_utc_str(),
     }
+
+
+@app.get("/request/{request_id}/summary")
+async def get_request_summary_api(request_id: str) -> dict:
+    try:
+        data = get_request_summary(request_id)
+        return {
+            "status": "ok",
+            "data": data,
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @app.get("/analysis/latest")
@@ -158,7 +204,6 @@ async def replay_analysis(request_id: str, background_tasks: BackgroundTasks) ->
         raise HTTPException(status_code=400, detail="normalized file missing events")
 
     replay_request_id = file_ts()
-
     logger.info(
         "replay analysis original_request_id=%s replay_request_id=%s source=%s event_count=%s",
         request_id,
@@ -178,6 +223,236 @@ async def replay_analysis(request_id: str, background_tasks: BackgroundTasks) ->
         "source": source,
         "event_count": len(events),
     }
+
+
+@app.get("/plan/latest")
+async def get_latest_plan_api() -> dict:
+    try:
+        result = get_latest_plan()
+        return {
+            "status": "ok",
+            "file": result["plan_file"],
+            "data": result["plan_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.get("/plan/{request_id}")
+async def get_plan_by_request_id_api(request_id: str) -> dict:
+    try:
+        result = get_plan_by_request_id(request_id)
+        return {
+            "status": "ok",
+            "file": result["plan_file"],
+            "data": result["plan_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.post("/plan/generate/{request_id}")
+async def generate_plan_api(request_id: str) -> dict:
+    try:
+        result = generate_plan_for_request_id(request_id)
+        return {
+            "status": "ok",
+            "action": "generate_plan",
+            "request_id": request_id,
+            "file": result["plan_file"],
+            "data": result["plan_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/plan/confirm/{request_id}")
+async def confirm_plan_api(request_id: str) -> dict:
+    try:
+        result = confirm_plan_for_request_id(request_id)
+        return {
+            "status": "ok",
+            "action": "confirm_plan",
+            "request_id": request_id,
+            "file": result["plan_file"],
+            "data": result["plan_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/plan/execute/{request_id}")
+async def execute_plan_api(request_id: str) -> dict:
+    try:
+        result = create_execution_for_request_id(request_id)
+        return {
+            "status": "ok",
+            "action": "create_execution",
+            "request_id": request_id,
+            "file": result["execution_file"],
+            "data": result["execution_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/execution/dispatch/{request_id}")
+async def dispatch_execution_api(request_id: str) -> dict:
+    try:
+        result = dispatch_execution_for_request_id(request_id)
+        return {
+            "status": "ok",
+            "action": "dispatch_execution",
+            "request_id": request_id,
+            "file": result["execution_file"],
+            "data": result["execution_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/execution/complete/{request_id}")
+async def complete_execution_api(request_id: str) -> dict:
+    try:
+        result = complete_execution_for_request_id(request_id)
+        return {
+            "status": "ok",
+            "action": "complete_execution",
+            "request_id": request_id,
+            "file": result["execution_file"],
+            "data": result["execution_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/execution/fail/{request_id}")
+async def fail_execution_api(request_id: str, request: Request) -> dict:
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    message = payload.get("message", "execution failed")
+
+    try:
+        result = fail_execution_for_request_id(request_id, message)
+        return {
+            "status": "ok",
+            "action": "fail_execution",
+            "request_id": request_id,
+            "file": result["execution_file"],
+            "data": result["execution_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/execution/result/{request_id}")
+async def update_execution_result_api(request_id: str, request: Request) -> dict:
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid json payload")
+
+    command_results = payload.get("command_results", [])
+    if not isinstance(command_results, list):
+        raise HTTPException(status_code=400, detail="command_results must be a list")
+
+    try:
+        result = update_execution_results_for_request_id(request_id, command_results)
+        return {
+            "status": "ok",
+            "action": "update_execution_result",
+            "request_id": request_id,
+            "file": result["execution_file"],
+            "data": result["execution_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/execution/latest")
+async def get_latest_execution_api() -> dict:
+    try:
+        result = get_latest_execution()
+        return {
+            "status": "ok",
+            "file": result["execution_file"],
+            "data": result["execution_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.get("/execution/{request_id}")
+async def get_execution_by_request_id_api(request_id: str) -> dict:
+    try:
+        result = get_execution_by_request_id(request_id)
+        return {
+            "status": "ok",
+            "file": result["execution_file"],
+            "data": result["execution_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.get("/review/latest")
+async def get_latest_review_api() -> dict:
+    try:
+        result = get_latest_review()
+        return {
+            "status": "ok",
+            "file": result["review_file"],
+            "data": result["review_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.get("/review/{request_id}")
+async def get_review_by_request_id_api(request_id: str) -> dict:
+    try:
+        result = get_review_by_request_id(request_id)
+        return {
+            "status": "ok",
+            "file": result["review_file"],
+            "data": result["review_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.post("/review/generate/{request_id}")
+async def generate_review_api(request_id: str) -> dict:
+    try:
+        result = generate_review_for_request_id(request_id)
+        return {
+            "status": "ok",
+            "action": "generate_review",
+            "request_id": request_id,
+            "file": result["review_file"],
+            "data": result["review_data"],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.post("/webhook/alertmanager")
