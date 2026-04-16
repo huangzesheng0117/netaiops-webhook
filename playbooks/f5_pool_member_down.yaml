@@ -1,0 +1,24 @@
+playbook_id: f5_pool_member_down
+
+match:
+  vendor: f5
+  playbook_type: f5_pool_member_down
+
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_rounds: 1
+  max_commands: 5
+  commands:
+    - "tmsh show ltm pool"
+    - "tmsh show ltm pool members"
+    - "tmsh list ltm pool"
+    - "tmsh show sys connection"
+    - "tmsh show sys performance system"
+
+review:
+  expected_findings:
+    - "available"
+    - "offline"
+    - "disabled"
+    - "monitor"

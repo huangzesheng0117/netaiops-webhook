@@ -2,9 +2,9 @@ import json
 import os
 from datetime import datetime, timezone
 
-from netaiops.prompts import PROMPT_VERSION, build_analysis_prompt
 from netaiops.llm_client import call_llm
 from netaiops.logger import setup_logger
+from netaiops.prompts import PROMPT_VERSION, build_analysis_prompt
 
 
 logger = setup_logger()
@@ -27,6 +27,52 @@ def classify_error(exc: Exception) -> str:
         return "connection_error"
 
     return "unknown_error"
+
+
+def maybe_run_v4_pipeline(request_id: str, config: dict | None = None) -> dict | None:
+    config = config or {}
+    pipeline_cfg = config.get("pipeline", {}) or {}
+
+    enabled = bool(pipeline_cfg.get("enabled", False))
+    auto_confirm = bool(pipeline_cfg.get("auto_confirm", True))
+    auto_dispatch = bool(pipeline_cfg.get("auto_dispatch", True))
+
+    if not enabled:
+        logger.info("v4 pipeline disabled request_id=%s", request_id)
+        return None
+
+    try:
+        from netaiops.pipeline import run_pipeline_safe
+
+        result = run_pipeline_safe(
+            request_id=request_id,
+            auto_confirm=auto_confirm,
+            auto_dispatch=auto_dispatch,
+        )
+
+        if result.get("ok"):
+            logger.info(
+                "v4 pipeline completed request_id=%s auto_confirm=%s auto_dispatch=%s",
+                request_id,
+                auto_confirm,
+                auto_dispatch,
+            )
+        else:
+            logger.error(
+                "v4 pipeline failed request_id=%s error=%s",
+                request_id,
+                result.get("error"),
+            )
+
+        return result
+    except Exception as exc:
+        logger.exception("unexpected v4 pipeline error request_id=%s", request_id)
+        return {
+            "ok": False,
+            "request_id": request_id,
+            "result": None,
+            "error": str(exc),
+        }
 
 
 def process_event_async(source: str, request_id: str, event: dict, config: dict | None = None) -> None:
@@ -53,7 +99,7 @@ def process_event_async(source: str, request_id: str, event: dict, config: dict 
         "llm_model_requested": llm_cfg.get("model", ""),
         "error_type": "",
         "event": event,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     if save_prompt:
@@ -82,3 +128,25 @@ def process_event_async(source: str, request_id: str, event: dict, config: dict 
         json.dump(output, f, ensure_ascii=False, indent=2)
 
     logger.info("analysis file saved path=%s", filepath)
+
+    if output.get("analysis_status") == "success":
+        pipeline_result = maybe_run_v4_pipeline(request_id, config=config)
+
+        pipeline_meta_path = os.path.join(
+            analysis_dir,
+            f"{source}_{request_id}.pipeline.json",
+        )
+        with open(pipeline_meta_path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "request_id": request_id,
+                    "source": source,
+                    "pipeline_result": pipeline_result,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                },
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        logger.info("pipeline metadata saved path=%s", pipeline_meta_path)

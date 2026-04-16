@@ -509,3 +509,88 @@ async def webhook_elastic(request: Request, background_tasks: BackgroundTasks) -
         "request_id": request_id,
         "event_count": len(normalized_events),
     }
+
+
+# =========================
+# v4 routes
+# =========================
+
+@app.post("/v4/pipeline/run/{request_id}")
+def v4_pipeline_run(request_id: str):
+    from netaiops.pipeline import run_pipeline_for_request_id
+
+    result = run_pipeline_for_request_id(
+        request_id=request_id,
+        auto_confirm=True,
+        auto_dispatch=True,
+    )
+
+    return {
+        "status": "ok",
+        "stage": "v4_pipeline_run",
+        "request_id": request_id,
+        "result": result,
+    }
+
+
+@app.post("/v4/execution/result/{request_id}")
+def v4_execution_result(request_id: str, payload: dict):
+    from netaiops.execution_callback import handle_execution_result_callback
+    from netaiops.review_builder import generate_review_for_request_id
+    from netaiops.request_summary import get_request_summary
+    from netaiops.notifier import send_notification
+
+    callback_result = handle_execution_result_callback(request_id, payload)
+    review_result = generate_review_for_request_id(request_id)
+    summary = get_request_summary(request_id)
+    notify_result = send_notification(request_id)
+
+    return {
+        "status": "ok",
+        "stage": "v4_execution_result",
+        "request_id": request_id,
+        "callback_result": callback_result,
+        "review_result": review_result,
+        "summary": summary,
+        "notify_result": notify_result,
+    }
+
+
+@app.get("/v4/request/{request_id}/summary")
+def v4_request_summary(request_id: str):
+    from netaiops.request_summary import get_request_summary
+
+    return {
+        "status": "ok",
+        "request_id": request_id,
+        "summary": get_request_summary(request_id),
+    }
+
+
+@app.get("/v4/dispatch/{request_id}")
+def v4_dispatch_record(request_id: str):
+    from netaiops.dispatcher import get_dispatch_record
+
+    return {
+        "status": "ok",
+        "request_id": request_id,
+        "dispatch": get_dispatch_record(request_id),
+    }
+
+
+@app.post("/v4/internal/auto-pipeline/{request_id}")
+def v4_internal_auto_pipeline(request_id: str):
+    from netaiops.pipeline import run_pipeline_safe
+
+    result = run_pipeline_safe(
+        request_id=request_id,
+        auto_confirm=True,
+        auto_dispatch=True,
+    )
+
+    return {
+        "status": "ok" if result.get("ok") else "error",
+        "stage": "v4_internal_auto_pipeline",
+        "request_id": request_id,
+        "result": result,
+    }

@@ -1,0 +1,28 @@
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# virtualenv
+venv/
+.venv/
+
+# local config / secrets
+config.yaml
+
+# runtime outputs
+logs/
+data/
+backup/
+input/
+
+# generated catalogs / local artifacts
+catalogs/three_layer/
+*.log
+
+# temp / local validation files
+watch_webhook_724.sh.bak_*
+notification_payload.py.bak_*
+notifier.py.bak_*
+*.bak_*

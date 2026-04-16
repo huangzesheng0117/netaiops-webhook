@@ -1,0 +1,41 @@
+playbook_id: cisco_interface_or_link_traffic_drop
+match:
+  vendor: cisco
+  playbook_type: interface_or_link_traffic_drop
+execution:
+  commands:
+  - show interface {interface}
+  - show interface {interface} counters errors
+  - show port-channel summary
+  - show lacp neighbor
+  - show logging last 50
+  readonly_only: true
+  auto_execute_allowed: true
+commands:
+- order: 1
+  command: show interface {interface}
+  reason: check interface state/rate/counters
+  risk: low
+  readonly: true
+- order: 2
+  command: show interface {interface} counters errors
+  reason: check error/discard counters
+  risk: low
+  readonly: true
+- order: 3
+  command: show port-channel summary
+  reason: check port-channel/member status
+  risk: low
+  readonly: true
+- order: 4
+  command: show lacp neighbor
+  reason: check LACP peer state
+  risk: low
+  readonly: true
+- order: 5
+  command: show logging last 50
+  reason: check recent flap/error logs
+  risk: low
+  readonly: true
+readonly_only: true
+auto_execute_allowed: true

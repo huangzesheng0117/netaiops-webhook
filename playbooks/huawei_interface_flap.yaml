@@ -1,0 +1,25 @@
+playbook_id: huawei_interface_flap
+
+match:
+  vendor: huawei
+  playbook_type: interface_flap
+
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_rounds: 1
+  max_commands: 5
+  commands:
+    - "display interface {interface}"
+    - "display interface brief"
+    - "display transceiver interface {interface} verbose"
+    - "display logbuffer | include {interface}"
+    - "display mac-address interface {interface}"
+
+review:
+  expected_findings:
+    - "up"
+    - "down"
+    - "error"
+    - "CRC"
+    - "flap"

@@ -1,0 +1,16 @@
+playbook_id: cisco_nxos_basic_readonly
+match:
+  vendor: cisco
+  playbook_type: cisco_nxos_basic_readonly
+
+execution:
+  max_rounds: 1
+  readonly_only: true
+  commands:
+    - "show clock"
+    - "show ip interface brief"
+
+review:
+  expected_findings:
+    - "Time source is NTP"
+    - "protocol-up/link-up/admin-up"

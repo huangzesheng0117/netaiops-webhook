@@ -1,0 +1,25 @@
+playbook_id: huawei_ospf_neighbor_down
+
+match:
+  vendor: huawei
+  playbook_type: ospf_neighbor_down
+
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_rounds: 1
+  max_commands: 5
+  commands:
+    - "display ospf peer"
+    - "display ospf interface"
+    - "display ip routing-table protocol ospf"
+    - "display interface brief"
+    - "display logbuffer | include OSPF"
+
+review:
+  expected_findings:
+    - "Down"
+    - "Init"
+    - "2-Way"
+    - "ExStart"
+    - "Full"

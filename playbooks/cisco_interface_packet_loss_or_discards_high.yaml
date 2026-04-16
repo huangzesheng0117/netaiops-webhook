@@ -1,0 +1,11 @@
+playbook_id: cisco_interface_packet_loss_or_discards_high
+match:
+  vendor: cisco
+  playbook_type: interface_packet_loss_or_discards_high
+execution:
+  commands:
+    - "show interface {interface_each}"
+    - "show interface {interface_each} counters errors"
+    - "show interface description | include {interface_each}"
+    - "show logging | include {interface_each}|CRC|error|discard"
+    - "show processes cpu sort"

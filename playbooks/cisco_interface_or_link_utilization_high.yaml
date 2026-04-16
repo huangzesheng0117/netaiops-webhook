@@ -1,0 +1,11 @@
+playbook_id: cisco_interface_or_link_utilization_high
+match:
+  vendor: cisco
+  playbook_type: interface_or_link_utilization_high
+execution:
+  commands:
+    - "show interface {interface_each}"
+    - "show interface {interface_each} counters"
+    - "show interface description | include {interface_each}"
+    - "show logging | include {interface_each}|LINK|LINEPROTO"
+    - "show processes cpu sort"

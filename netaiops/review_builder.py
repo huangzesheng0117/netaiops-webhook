@@ -1,6 +1,8 @@
 import json
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Dict, List
 
 
 BASE_DIR = Path("/opt/netaiops-webhook")
@@ -33,119 +35,115 @@ def execution_file_by_request_id(request_id: str) -> Path:
 
 def review_file_by_request_id(request_id: str) -> Path:
     files = list(REVIEW_DIR.glob(f"*_{request_id}.review.json"))
-    if not files:
-        raise FileNotFoundError(f"review file not found for request_id={request_id}")
-    return files[0]
+    if files:
+        return files[0]
+
+    execution_path = execution_file_by_request_id(request_id)
+    source = execution_path.name.split("_", 1)[0]
+    return REVIEW_DIR / f"{source}_{request_id}.review.json"
 
 
-def latest_review_file() -> Path:
-    files = sorted(REVIEW_DIR.glob("*.review.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not files:
-        raise FileNotFoundError("no review files found")
-    return files[0]
+def extract_key_findings(command_results: List[Dict[str, Any]]) -> List[str]:
+    findings = []
 
-
-def build_review_from_execution(execution: dict) -> dict:
-    commands = execution.get("commands", []) or []
-    target_scope = execution.get("target_scope", {}) or {}
-
-    completed = []
-    failed = []
-    pending = []
-
-    evidence = []
-
-    for item in commands:
-        entry = {
-            "order": item.get("order"),
-            "command": item.get("command"),
-            "dispatch_status": item.get("dispatch_status"),
-            "output": item.get("output"),
-            "error": item.get("error"),
-        }
-
-        status = item.get("dispatch_status")
-        if status == "completed":
-            completed.append(entry)
-            if item.get("output"):
-                evidence.append(
-                    {
-                        "order": item.get("order"),
-                        "command": item.get("command"),
-                        "finding": item.get("output"),
-                    }
-                )
-        elif status == "failed":
-            failed.append(entry)
-        else:
-            pending.append(entry)
-
-    if failed:
-        review_status = "needs_attention"
-    elif pending:
-        review_status = "partial"
-    else:
-        review_status = "completed"
-
-    conclusion_parts = []
-
-    if completed:
-        conclusion_parts.append(f"已完成 {len(completed)} 条取证命令。")
-    if failed:
-        conclusion_parts.append(f"有 {len(failed)} 条命令执行失败。")
-    if pending:
-        conclusion_parts.append(f"仍有 {len(pending)} 条命令未完成。")
-
-    if evidence:
-        first_finding = evidence[0].get("finding", "")
-        if first_finding:
-            conclusion_parts.append(f"关键发现：{first_finding}")
-
-    conclusion = " ".join(conclusion_parts).strip()
-    if not conclusion:
-        conclusion = "暂无明确执行结论。"
-
-    next_steps = []
-
-    for item in failed:
+    for item in command_results:
         cmd = item.get("command", "")
-        err = item.get("error", "")
-        next_steps.append(f"重新检查命令执行失败原因：{cmd}；错误：{err}")
+        status = item.get("dispatch_status", "")
+        output = item.get("output", "")
 
-    if not next_steps and evidence:
-        next_steps.append("根据已回传证据，建议进入二次根因分析。")
+        if status == "completed":
+            findings.append(f"Command completed successfully: {cmd}")
+        else:
+            findings.append(f"Command status={status}: {cmd}")
 
-    if not next_steps:
-        next_steps.append("补充执行结果后再生成 review。")
+        if output:
+            short_output = str(output).strip().replace("\n", " ")
+            if len(short_output) > 160:
+                short_output = short_output[:160] + "..."
+            findings.append(f"Output snippet: {short_output}")
+
+    return findings[:10]
+
+
+def build_recommendations(execution_data: Dict[str, Any]) -> List[str]:
+    classification = execution_data.get("classification", {}) or {}
+    playbook = execution_data.get("playbook", {}) or {}
+    execution_status = execution_data.get("execution_status", "")
+
+    playbook_id = playbook.get("playbook_id", "")
+    playbook_type = classification.get("playbook_type", "")
+
+    recommendations = []
+
+    if execution_status == "completed":
+        recommendations.append("Review collected evidence and correlate with alarm timeline.")
+    else:
+        recommendations.append("Investigate failed or partial commands before drawing conclusions.")
+
+    if playbook_id == "huawei_bgp_neighbor_down" or playbook_type == "bgp_neighbor_down":
+        recommendations.append("Check BGP peer reachability and peer state transition history.")
+        recommendations.append("Compare routing state and interface health on both ends.")
+
+    elif playbook_id == "huawei_ospf_neighbor_down" or playbook_type == "ospf_neighbor_down":
+        recommendations.append("Check OSPF adjacency state, interface status, and log timeline.")
+        recommendations.append("Verify whether routing changes align with adjacency loss.")
+
+    elif playbook_id == "huawei_interface_flap" or playbook_type == "interface_flap":
+        recommendations.append("Check interface error counters, optics, and recent flap logs.")
+        recommendations.append("Verify peer side stability and physical link quality.")
+
+    elif playbook_id == "f5_pool_member_down" or playbook_type == "f5_pool_member_down":
+        recommendations.append("Check pool member monitor state and backend reachability.")
+        recommendations.append("Verify application-side health and recent connection behavior.")
+
+    else:
+        recommendations.append("Review command outputs and refine the playbook if needed.")
+
+    return recommendations[:6]
+
+
+def build_review_from_execution_data(execution_data: Dict[str, Any]) -> Dict[str, Any]:
+    request_id = execution_data.get("request_id", "")
+    command_results = execution_data.get("command_results", []) or []
+    stats = execution_data.get("stats", {}) or {}
+
+    execution_status = execution_data.get("execution_status", "")
+    if execution_status == "completed":
+        review_status = "completed"
+        conclusion = "Readonly evidence collection completed successfully."
+    elif execution_status == "partial":
+        review_status = "partial"
+        conclusion = "Readonly evidence collection partially completed."
+    else:
+        review_status = "needs_attention"
+        conclusion = "Evidence collection failed or requires manual attention."
 
     review = {
-        "request_id": execution.get("request_id"),
-        "execution_id": execution.get("execution_id"),
-        "source": execution.get("source"),
+        "request_id": request_id,
+        "review_id": f"review_{uuid.uuid4().hex[:12]}",
         "review_status": review_status,
-        "target_scope": target_scope,
-        "execution_status": execution.get("execution_status"),
-        "summary": conclusion,
-        "evidence": evidence,
-        "completed_commands": completed,
-        "failed_commands": failed,
-        "pending_commands": pending,
-        "next_steps": next_steps,
-        "execution_file": "",
+        "conclusion": conclusion,
+        "execution_status": execution_status,
+        "target_scope": execution_data.get("target_scope", {}),
+        "classification": execution_data.get("classification", {}),
+        "playbook": execution_data.get("playbook", {}),
+        "stats": stats,
+        "key_findings": extract_key_findings(command_results),
+        "recommendations": build_recommendations(execution_data),
         "generated_at": now_utc_str(),
+        "source_execution_file": "",
     }
     return review
 
 
-def generate_review_for_request_id(request_id: str) -> dict:
+def generate_review_for_request_id(request_id: str) -> Dict[str, Any]:
     execution_path = execution_file_by_request_id(request_id)
-    execution = read_json_file(execution_path)
+    execution_data = read_json_file(execution_path)
 
-    review = build_review_from_execution(execution)
-    review["execution_file"] = str(execution_path)
+    review = build_review_from_execution_data(execution_data)
+    review["source_execution_file"] = str(execution_path)
 
-    source = execution.get("source", "unknown")
-    review_path = REVIEW_DIR / f"{source}_{request_id}.review.json"
+    review_path = review_file_by_request_id(request_id)
     safe_write_json(review_path, review)
 
     return {
@@ -154,16 +152,23 @@ def generate_review_for_request_id(request_id: str) -> dict:
     }
 
 
-def get_review_by_request_id(request_id: str) -> dict:
-    path = review_file_by_request_id(request_id)
+def get_review_by_request_id(request_id: str) -> Dict[str, Any]:
+    review_path = review_file_by_request_id(request_id)
+    if not review_path.exists():
+        raise FileNotFoundError(f"review file not found for request_id={request_id}")
+
     return {
-        "review_file": str(path),
-        "review_data": read_json_file(path),
+        "review_file": str(review_path),
+        "review_data": read_json_file(review_path),
     }
 
 
-def get_latest_review() -> dict:
-    path = latest_review_file()
+def get_latest_review() -> Dict[str, Any]:
+    files = sorted(REVIEW_DIR.glob("*.review.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not files:
+        raise FileNotFoundError("no review files found")
+
+    path = files[0]
     return {
         "review_file": str(path),
         "review_data": read_json_file(path),

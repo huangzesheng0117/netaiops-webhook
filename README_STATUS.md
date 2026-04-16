@@ -104,3 +104,16 @@ No real mcp-netmiko dispatch is connected yet.
 - Connect execution dispatcher to mcp-netmiko
 - Return real command outputs into /execution/result/{request_id}
 - Optionally add second-round LLM review based on execution evidence
+
+---
+
+## v4 Development Status
+Current target: connect v3 lifecycle to:
+- playbook-based classification
+- auto-confirm policy engine
+- dispatcher
+- external agent runner
+- real MCP execution callback
+
+Current phase:
+- scaffolding initialization

@@ -1,0 +1,11 @@
+playbook_id: h3c_interface_or_link_utilization_high
+match:
+  vendor: h3c
+  playbook_type: interface_or_link_utilization_high
+execution:
+  commands:
+    - "display interface {interface_each}"
+    - "display interface brief | include {interface_each}"
+    - "display current-configuration interface {interface_each}"
+    - "display logbuffer | include {interface_each}"
+    - "display cpu-usage"

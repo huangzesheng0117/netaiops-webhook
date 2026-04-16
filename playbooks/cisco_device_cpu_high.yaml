@@ -1,0 +1,10 @@
+playbook_id: cisco_device_cpu_high
+match:
+  vendor: cisco
+  playbook_type: device_cpu_high
+execution:
+  commands:
+    - "show processes cpu sort"
+    - "show processes cpu history"
+    - "show system resources"
+    - "show logging | include CPU|HOG|Process"

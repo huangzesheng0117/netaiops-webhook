@@ -1,0 +1,25 @@
+playbook_id: huawei_bgp_neighbor_down
+
+match:
+  vendor: huawei
+  playbook_type: bgp_neighbor_down
+
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_rounds: 1
+  max_commands: 5
+  commands:
+    - "display bgp peer {peer_ip} verbose"
+    - "display ip routing-table {peer_ip}"
+    - "ping -a {device_ip} {peer_ip}"
+    - "display interface brief"
+    - "display current-configuration | include bgp"
+
+review:
+  expected_findings:
+    - "Idle"
+    - "Active"
+    - "Connect"
+    - "Established"
+    - "Hold timer expired"

@@ -1,17 +1,16 @@
 import re
 from datetime import datetime, timezone
 
+from netaiops.context_catalog import enrich_event_from_catalog
 
 def now_utc_str() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-
 def extract_ip(text: str) -> str:
     if not text:
         return ""
-    match = re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", text)
+    match = re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", str(text))
     return match.group(0) if match else ""
-
 
 def normalize_alertmanager(payload: dict) -> list:
     events = []
@@ -42,7 +41,7 @@ def normalize_alertmanager(payload: dict) -> list:
             "severity": merged_labels.get("severity", ""),
             "status": alert.get("status", payload.get("status", "")),
             "hostname": merged_labels.get("instance", "") or merged_labels.get("hostname", ""),
-            "device_ip": extract_ip(
+            "device_ip": merged_labels.get("ip", "") or extract_ip(
                 merged_labels.get("instance", "") or merged_annotations.get("description", "") or raw_text
             ),
             "vendor": merged_labels.get("vendor", ""),
@@ -51,11 +50,13 @@ def normalize_alertmanager(payload: dict) -> list:
             "raw_text": raw_text,
             "labels": merged_labels,
             "annotations": merged_annotations,
+            "generator_url": alert.get("generatorURL", ""),
+            "expression": alert.get("expression", ""),
         }
+        event = enrich_event_from_catalog(event)
         events.append(event)
 
     return events
-
 
 def normalize_elastic(payload: dict) -> list:
     events = []
@@ -108,18 +109,21 @@ def normalize_elastic(payload: dict) -> list:
         event = {
             "source": "elastic",
             "timestamp": source_data.get("@timestamp", now_utc_str()),
-            "alarm_type": event_obj.get("kind", ""),
+            "alarm_type": event_obj.get("kind", "") or rule_obj.get("name", ""),
             "severity": log_obj.get("level", ""),
             "status": event_obj.get("outcome", ""),
             "hostname": hostname,
-            "device_ip": extract_ip(message),
+            "device_ip": source_data.get("ip", "") or extract_ip(message),
             "vendor": vendor,
             "object_type": event_obj.get("category", ""),
             "object_name": rule_obj.get("name", ""),
             "raw_text": message,
             "labels": source_data,
             "annotations": {},
+            "expression": "",
+            "generator_url": "",
         }
+        event = enrich_event_from_catalog(event)
         events.append(event)
 
     return events

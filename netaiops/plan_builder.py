@@ -2,6 +2,14 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Dict, List
+
+from netaiops.classifier import classify_event
+from netaiops.playbook_loader import (
+    build_execution_candidates_from_playbook,
+    find_best_playbook,
+)
+from netaiops.policy_engine import evaluate_auto_confirm_policy
 
 
 BASE_DIR = Path("/opt/netaiops-webhook")
@@ -100,7 +108,7 @@ def command_is_readonly(command: str) -> bool:
     return False
 
 
-def build_guard_result(execution_candidates: list) -> dict:
+def build_guard_result(execution_candidates: List[Dict[str, Any]]) -> dict:
     blocked_commands = []
     allowed_commands = []
 
@@ -148,6 +156,20 @@ def normalize_execution_candidates(command_plan: list, suggested_commands: list)
     return candidates
 
 
+def _build_target_scope(event: Dict[str, Any]) -> Dict[str, Any]:
+    vendor = event.get("vendor", "")
+    hostname = event.get("hostname", "")
+    device_ip = event.get("device_ip", "") or event.get("ip", "") or event.get("host_ip", "")
+    alarm_type = event.get("alarm_type", "") or event.get("event_type", "")
+
+    return {
+        "vendor": vendor,
+        "hostname": hostname,
+        "device_ip": device_ip,
+        "alarm_type": alarm_type,
+    }
+
+
 def build_plan_from_analysis_data(analysis_data: dict) -> dict:
     result = analysis_data.get("result", {}) or {}
     event = analysis_data.get("event", {}) or {}
@@ -160,13 +182,24 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
     suggested_commands = result.get("suggested_commands", []) or []
     confidence = result.get("confidence", "low")
 
-    execution_candidates = normalize_execution_candidates(command_plan, suggested_commands)
-    guard_result = build_guard_result(execution_candidates)
+    classification = classify_event(
+        {
+            **event,
+            "source": source,
+        }
+    )
 
-    vendor = event.get("vendor", "")
-    hostname = event.get("hostname", "")
-    device_ip = event.get("device_ip", "") or event.get("ip", "") or event.get("host_ip", "")
-    alarm_type = event.get("alarm_type", "") or event.get("event_type", "")
+    playbook = find_best_playbook(event, classification)
+
+    if playbook:
+        execution_candidates = build_execution_candidates_from_playbook(playbook, event)
+        execution_source = "playbook"
+    else:
+        execution_candidates = normalize_execution_candidates(command_plan, suggested_commands)
+        execution_source = "analysis"
+
+    guard_result = build_guard_result(execution_candidates)
+    target_scope = _build_target_scope(event)
 
     plan = {
         "request_id": request_id,
@@ -179,18 +212,33 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
         "confidence": confidence,
         "summary": summary,
         "recommended_next_step": recommended_next_step,
-        "target_scope": {
-            "vendor": vendor,
-            "hostname": hostname,
-            "device_ip": device_ip,
-            "alarm_type": alarm_type,
-        },
+        "target_scope": target_scope,
         "execution_candidates": execution_candidates,
         "guard_result": guard_result,
         "analysis_file": "",
         "generated_at": now_utc_str(),
         "confirmed_at": None,
+        "classification": classification,
+        "playbook": {
+            "matched": bool(playbook),
+            "playbook_id": (playbook or {}).get("playbook_id", ""),
+            "playbook_file": (playbook or {}).get("_file", ""),
+        },
+        "execution_source": execution_source,
+        "auto_confirm_recommended": False,
+        "policy_result": {
+            "auto_confirm_allowed": False,
+            "reasons": ["policy_not_evaluated"],
+            "policy_summary": "not_evaluated",
+            "checked_items": {},
+        },
     }
+
+    if playbook:
+        policy_result = evaluate_auto_confirm_policy(plan, classification, playbook)
+        plan["policy_result"] = policy_result
+        plan["auto_confirm_recommended"] = policy_result.get("auto_confirm_allowed", False)
+
     return plan
 
 

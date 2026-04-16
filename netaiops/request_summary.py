@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Dict
 
 
 BASE_DIR = Path("/opt/netaiops-webhook")
@@ -15,57 +16,56 @@ def read_json_file(path: Path) -> dict:
         return json.load(f)
 
 
-def find_single_file(directory: Path, pattern: str) -> Path | None:
-    files = list(directory.glob(pattern))
-    if not files:
-        return None
-    return files[0]
+def find_optional_file(directory: Path, request_id: str, suffix: str):
+    files = list(directory.glob(f"*_{request_id}.{suffix}"))
+    return files[0] if files else None
 
 
-def get_request_summary(request_id: str) -> dict:
-    analysis_path = find_single_file(ANALYSIS_DIR, f"*_{request_id}.analysis.json")
-    plan_path = find_single_file(PLAN_DIR, f"*_{request_id}.plan.json")
-    execution_path = find_single_file(EXECUTION_DIR, f"*_{request_id}.execution.json")
-    review_path = find_single_file(REVIEW_DIR, f"*_{request_id}.review.json")
+def build_request_summary(request_id: str) -> Dict:
+    analysis_file = find_optional_file(ANALYSIS_DIR, request_id, "analysis.json")
+    plan_file = find_optional_file(PLAN_DIR, request_id, "plan.json")
+    execution_file = find_optional_file(EXECUTION_DIR, request_id, "execution.json")
+    review_file = find_optional_file(REVIEW_DIR, request_id, "review.json")
 
-    if not any([analysis_path, plan_path, execution_path, review_path]):
-        raise FileNotFoundError(f"no records found for request_id={request_id}")
-
-    analysis_data = read_json_file(analysis_path) if analysis_path else None
-    plan_data = read_json_file(plan_path) if plan_path else None
-    execution_data = read_json_file(execution_path) if execution_path else None
-    review_data = read_json_file(review_path) if review_path else None
+    analysis_data = read_json_file(analysis_file) if analysis_file else None
+    plan_data = read_json_file(plan_file) if plan_file else None
+    execution_data = read_json_file(execution_file) if execution_file else None
+    review_data = read_json_file(review_file) if review_file else None
 
     return {
         "request_id": request_id,
         "analysis": {
-            "exists": analysis_data is not None,
-            "file": str(analysis_path) if analysis_path else None,
-            "status": analysis_data.get("analysis_status") if analysis_data else None,
-            "summary": ((analysis_data or {}).get("result") or {}).get("summary") if analysis_data else None,
-            "recommended_next_step": ((analysis_data or {}).get("result") or {}).get("recommended_next_step") if analysis_data else None,
+            "exists": bool(analysis_file),
+            "file": str(analysis_file) if analysis_file else None,
+            "status": (analysis_data or {}).get("analysis_status"),
+            "summary": ((analysis_data or {}).get("result", {}) or {}).get("summary"),
         },
         "plan": {
-            "exists": plan_data is not None,
-            "file": str(plan_path) if plan_path else None,
-            "status": plan_data.get("plan_status") if plan_data else None,
-            "readonly_only": plan_data.get("readonly_only") if plan_data else None,
-            "requires_confirmation": plan_data.get("requires_confirmation") if plan_data else None,
-            "command_count": len((plan_data or {}).get("execution_candidates", []) or []) if plan_data else 0,
+            "exists": bool(plan_file),
+            "file": str(plan_file) if plan_file else None,
+            "status": (plan_data or {}).get("plan_status"),
+            "readonly_only": (plan_data or {}).get("readonly_only"),
+            "execution_source": (plan_data or {}).get("execution_source"),
+            "auto_confirm_recommended": (plan_data or {}).get("auto_confirm_recommended"),
+            "playbook": (plan_data or {}).get("playbook"),
+            "policy_result": (plan_data or {}).get("policy_result"),
         },
         "execution": {
-            "exists": execution_data is not None,
-            "file": str(execution_path) if execution_path else None,
-            "status": execution_data.get("execution_status") if execution_data else None,
-            "command_count": len((execution_data or {}).get("commands", []) or []) if execution_data else 0,
-            "dispatched_at": execution_data.get("dispatched_at") if execution_data else None,
-            "completed_at": execution_data.get("completed_at") if execution_data else None,
+            "exists": bool(execution_file),
+            "file": str(execution_file) if execution_file else None,
+            "status": (execution_data or {}).get("execution_status"),
+            "mode": (execution_data or {}).get("execution_mode"),
+            "stats": (execution_data or {}).get("stats"),
         },
         "review": {
-            "exists": review_data is not None,
-            "file": str(review_path) if review_path else None,
-            "status": review_data.get("review_status") if review_data else None,
-            "summary": review_data.get("summary") if review_data else None,
-            "next_steps": review_data.get("next_steps") if review_data else None,
+            "exists": bool(review_file),
+            "file": str(review_file) if review_file else None,
+            "status": (review_data or {}).get("review_status"),
+            "conclusion": (review_data or {}).get("conclusion"),
+            "recommendations": (review_data or {}).get("recommendations"),
         },
     }
+
+
+def get_request_summary(request_id: str) -> Dict:
+    return build_request_summary(request_id)
