@@ -4,7 +4,7 @@ __pycache__/
 *.pyo
 *.pyd
 
-# virtualenv
+# virtual env
 venv/
 .venv/
 
@@ -17,12 +17,8 @@ data/
 backup/
 input/
 
-# generated catalogs / local artifacts
+# generated catalogs
 catalogs/three_layer/
-*.log
 
-# temp / local validation files
-watch_webhook_724.sh.bak_*
-notification_payload.py.bak_*
-notifier.py.bak_*
+# temp / backup files
 *.bak_*
