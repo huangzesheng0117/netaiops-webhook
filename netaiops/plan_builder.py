@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from netaiops.classifier import classify_event
+from netaiops.family_registry import classify_family
+from netaiops.capability_registry import build_capability_plan
+from netaiops.platform_command_matrix import resolve_execution_candidates
 from netaiops.playbook_loader import (
     build_execution_candidates_from_playbook,
     find_best_playbook,
@@ -156,17 +159,38 @@ def normalize_execution_candidates(command_plan: list, suggested_commands: list)
     return candidates
 
 
-def _build_target_scope(event: Dict[str, Any]) -> Dict[str, Any]:
+def _build_target_scope(event: Dict[str, Any], family_result: Dict[str, Any]) -> Dict[str, Any]:
     vendor = event.get("vendor", "")
+    platform = event.get("platform", "")
     hostname = event.get("hostname", "")
     device_ip = event.get("device_ip", "") or event.get("ip", "") or event.get("host_ip", "")
     alarm_type = event.get("alarm_type", "") or event.get("event_type", "")
 
-    return {
+    scope = {
         "vendor": vendor,
+        "platform": platform,
         "hostname": hostname,
         "device_ip": device_ip,
         "alarm_type": alarm_type,
+    }
+
+    family_scope = dict((family_result or {}).get("target_scope", {}) or {})
+    for key, value in family_scope.items():
+        if value not in (None, "", [], {}):
+            scope[key] = value
+
+    return scope
+
+
+def _build_registry_policy_playbook(family_result: Dict[str, Any], capability_plan: Dict[str, Any]) -> Dict[str, Any]:
+    selected = capability_plan.get("selected_capabilities", []) or []
+    return {
+        "playbook_id": family_result.get("legacy_playbook_type") or family_result.get("family") or "capability_registry",
+        "execution": {
+            "readonly_only": bool(capability_plan.get("readonly_only", True)),
+            "auto_execute_allowed": bool(family_result.get("auto_execute_allowed", False)),
+            "max_commands": max(len(selected), 5),
+        },
     }
 
 
@@ -182,24 +206,62 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
     suggested_commands = result.get("suggested_commands", []) or []
     confidence = result.get("confidence", "low")
 
-    classification = classify_event(
-        {
-            **event,
-            "source": source,
-        }
+    event_for_plan = {
+        **event,
+        "source": source,
+    }
+
+    family_result = classify_family(event_for_plan)
+    classification = classify_event(event_for_plan)
+
+    capability_plan = build_capability_plan(event_for_plan, family_result)
+    registry_execution_candidates = resolve_execution_candidates(
+        event_for_plan,
+        family_result,
+        capability_plan,
     )
 
-    playbook = find_best_playbook(event, classification)
+    playbook = find_best_playbook(event_for_plan, classification)
+    policy_playbook = None
+    playbook_meta = {
+        "matched": False,
+        "playbook_id": "",
+        "playbook_file": "",
+        "mode": "",
+    }
 
-    if playbook:
-        execution_candidates = build_execution_candidates_from_playbook(playbook, event)
+    if registry_execution_candidates:
+        execution_candidates = registry_execution_candidates
+        execution_source = "capability_registry"
+        policy_playbook = _build_registry_policy_playbook(family_result, capability_plan)
+        playbook_meta = {
+            "matched": True,
+            "playbook_id": family_result.get("legacy_playbook_type") or family_result.get("family", ""),
+            "playbook_file": "",
+            "mode": "capability_registry",
+        }
+    elif playbook:
+        execution_candidates = build_execution_candidates_from_playbook(playbook, event_for_plan)
         execution_source = "playbook"
+        policy_playbook = playbook
+        playbook_meta = {
+            "matched": True,
+            "playbook_id": (playbook or {}).get("playbook_id", ""),
+            "playbook_file": (playbook or {}).get("_file", ""),
+            "mode": "legacy_playbook",
+        }
     else:
         execution_candidates = normalize_execution_candidates(command_plan, suggested_commands)
         execution_source = "analysis"
+        playbook_meta = {
+            "matched": False,
+            "playbook_id": "",
+            "playbook_file": "",
+            "mode": "analysis_fallback",
+        }
 
     guard_result = build_guard_result(execution_candidates)
-    target_scope = _build_target_scope(event)
+    target_scope = _build_target_scope(event_for_plan, family_result)
 
     plan = {
         "request_id": request_id,
@@ -219,11 +281,9 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
         "generated_at": now_utc_str(),
         "confirmed_at": None,
         "classification": classification,
-        "playbook": {
-            "matched": bool(playbook),
-            "playbook_id": (playbook or {}).get("playbook_id", ""),
-            "playbook_file": (playbook or {}).get("_file", ""),
-        },
+        "family_result": family_result,
+        "capability_plan": capability_plan,
+        "playbook": playbook_meta,
         "execution_source": execution_source,
         "auto_confirm_recommended": False,
         "policy_result": {
@@ -234,8 +294,8 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
         },
     }
 
-    if playbook:
-        policy_result = evaluate_auto_confirm_policy(plan, classification, playbook)
+    if policy_playbook:
+        policy_result = evaluate_auto_confirm_policy(plan, classification, policy_playbook)
         plan["policy_result"] = policy_result
         plan["auto_confirm_recommended"] = policy_result.get("auto_confirm_allowed", False)
 

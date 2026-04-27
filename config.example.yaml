@@ -1,0 +1,44 @@
+# NetAIOps Webhook 示例配置
+# 使用时复制为 config.yaml，并按实际环境修改。
+# 不要把真实 config.yaml 提交到 Git。
+
+listen_host: "0.0.0.0"
+listen_port: 18080
+
+external_base_url: "http://127.0.0.1:18080"
+
+pipeline:
+  enabled: true
+  auto_confirm: true
+  auto_dispatch: true
+  auto_review: true
+  auto_notify: true
+
+llm:
+  provider: "openai_compatible"
+  base_url: "http://127.0.0.1:8000/v1"
+  api_key_env: "NETAIOPS_LLM_API_KEY"
+  model: "replace-with-your-model"
+  timeout: 60
+
+runner:
+  backend: "mcp"
+  max_commands: 5
+  command_timeout: 30
+  readonly_only: true
+
+mcp:
+  wrapper_cmd_env: "MCP_WRAPPER_CMD"
+  timeout_env: "MCP_TIMEOUT"
+
+notify:
+  enabled: false
+  provider: "dingtalk"
+  webhook_url_env: "NETAIOPS_DINGTALK_WEBHOOK"
+  secret_env: "NETAIOPS_DINGTALK_SECRET"
+
+data:
+  base_dir: "/opt/netaiops-webhook/data"
+
+catalogs:
+  three_layer_dir: "/opt/netaiops-webhook/catalogs/three_layer"

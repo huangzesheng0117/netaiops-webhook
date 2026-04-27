@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from netaiops.request_summary import get_request_summary
+from netaiops.target_resolver import resolve_device_display
 
 
 BASE_DIR = Path("/opt/netaiops-webhook")
@@ -153,6 +154,59 @@ def build_alarm_content(analysis_data: Dict[str, Any], plan_data: Dict[str, Any]
     return "无"
 
 
+def build_capability_display(item: Dict[str, Any]) -> str:
+    capability = safe_text(item.get("capability"))
+    command = safe_text(item.get("command"))
+
+    if capability and command:
+        return f"{capability} -> {command}"
+    if capability:
+        return capability
+    if command:
+        return command
+    return "未知命令"
+
+
+def build_command_result_line(item: Dict[str, Any], line_index: int) -> str:
+    display = build_capability_display(item)
+    status = safe_text(item.get("dispatch_status"))
+    judge = (item.get("judge") or {}) if isinstance(item.get("judge"), dict) else {}
+    hard_error = bool(judge.get("hard_error", False))
+    judge_reason = safe_text(judge.get("judge_reason"))
+    matched_rule_id = safe_text(judge.get("matched_rule_id"))
+    matched_text = safe_text(judge.get("matched_text"))
+
+    prefix = f"{line_index}. 通过MCP执行 {display}"
+    if status:
+        prefix += f"（状态：{status}）"
+
+    if hard_error:
+        extra = []
+        if matched_rule_id:
+            extra.append(f"规则={matched_rule_id}")
+        if matched_text:
+            extra.append(f"命中={matched_text}")
+        detail = "；".join(extra) if extra else "设备返回硬错误"
+        return f"{prefix}，设备返回硬错误：{detail}"
+
+    output = shorten_text(extract_result_text_from_nested_output(item.get("output")), 140)
+    if output:
+        if judge_reason and judge_reason not in ("no_hard_fail_pattern_matched", "ignore_pattern_matched_only"):
+            return f"{prefix}，返回要点：{output}（判定：{judge_reason}）"
+        return f"{prefix}，返回要点：{output}"
+
+    err = shorten_text(safe_text(item.get("error")), 140)
+    if err:
+        if judge_reason and judge_reason not in ("no_hard_fail_pattern_matched", "ignore_pattern_matched_only"):
+            return f"{prefix}，报错：{err}（判定：{judge_reason}）"
+        return f"{prefix}，报错：{err}"
+
+    if judge_reason and judge_reason not in ("no_hard_fail_pattern_matched", "ignore_pattern_matched_only"):
+        return f"{prefix}，判定：{judge_reason}"
+
+    return prefix
+
+
 def build_analysis_process(
     analysis_data: Dict[str, Any],
     execution_data: Dict[str, Any],
@@ -163,35 +217,55 @@ def build_analysis_process(
     analysis_result = (analysis_data or {}).get("result", {}) or {}
     command_results = (execution_data or {}).get("command_results", []) or []
     review_conclusion = safe_text((review_data or {}).get("conclusion"))
+    evidence_summary = (review_data or {}).get("evidence_summary", {}) or {}
 
-    alarm_interpretation = safe_text(analysis_result.get("alarm_interpretation"))
     summary_text = safe_text(analysis_result.get("summary"))
 
     if summary_text:
         lines.append(f"1. 根据告警内容初步判断：{summary_text}")
+
+    if evidence_summary.get("has_facts"):
+        completed_count = 0
+        failed_count = 0
+        partial_count = 0
+
+        for item in command_results:
+            status = safe_text(item.get("dispatch_status")).lower()
+            if status == "completed":
+                completed_count += 1
+            elif status == "failed":
+                failed_count += 1
+            else:
+                partial_count += 1
+
+        if command_results:
+            lines.append(
+                f"{len(lines) + 1}. 已完成MCP只读取证：共执行 {len(command_results)} 条只读命令，"
+                f"成功 {completed_count} 条，失败 {failed_count} 条，部分完成 {partial_count} 条。"
+            )
+
+        notify_lines = evidence_summary.get("notify_lines", []) or []
+        for item in notify_lines:
+            text = safe_text(item)
+            if text:
+                lines.append(f"{len(lines) + 1}. 取证事实：{text}")
+
+        if review_conclusion:
+            lines.append(f"{len(lines) + 1}. 综合执行结果判断：{review_conclusion}")
+
+        if not lines:
+            return "无"
+
+        return "\n".join(lines)
+
+    alarm_interpretation = safe_text(analysis_result.get("alarm_interpretation"))
     if alarm_interpretation:
-        lines.append(f"2. 告警含义分析：{alarm_interpretation}")
+        lines.append(f"{len(lines) + 1}. 告警含义分析：{alarm_interpretation}")
 
     base_index = len(lines)
 
     for idx, item in enumerate(command_results, start=1):
-        cmd = safe_text(item.get("command"))
-        status = safe_text(item.get("dispatch_status"))
-        output = extract_result_text_from_nested_output(item.get("output"))
-        output = shorten_text(output, 140)
-
-        prefix = f"{base_index + idx}. 通过MCP执行命令 {cmd}"
-        if status:
-            prefix += f"（状态：{status}）"
-
-        if output:
-            lines.append(f"{prefix}，返回要点：{output}")
-        else:
-            err = shorten_text(safe_text(item.get("error")), 140)
-            if err:
-                lines.append(f"{prefix}，报错：{err}")
-            else:
-                lines.append(prefix)
+        lines.append(build_command_result_line(item, base_index + idx))
 
     if review_conclusion:
         lines.append(f"{len(lines) + 1}. 综合执行结果判断：{review_conclusion}")
@@ -201,7 +275,6 @@ def build_analysis_process(
 
     return "\n".join(lines)
 
-
 def build_recommendations(
     analysis_data: Dict[str, Any],
     review_data: Dict[str, Any],
@@ -209,33 +282,38 @@ def build_recommendations(
     lines: List[str] = []
 
     review_recommendations = (review_data or {}).get("recommendations", []) or []
+    evidence_summary = (review_data or {}).get("evidence_summary", {}) or {}
     suggested_checks = (((analysis_data or {}).get("result", {}) or {}).get("suggested_checks", [])) or []
     possible_causes = (((analysis_data or {}).get("result", {}) or {}).get("possible_causes", [])) or []
 
-    index = 1
+    seen = set()
+
+    def add_line(text: Any) -> None:
+        value = safe_text(text)
+        if not value:
+            return
+        if value in seen:
+            return
+        seen.add(value)
+        lines.append(value)
 
     for item in review_recommendations:
-        text = safe_text(item)
-        if text:
-            lines.append(f"{index}. {text}")
-            index += 1
+        add_line(item)
 
-    for item in suggested_checks:
-        text = safe_text(item)
-        if text and text not in [x.split(". ", 1)[-1] for x in lines]:
-            lines.append(f"{index}. {text}")
-            index += 1
+    if not evidence_summary.get("has_facts"):
+        for item in suggested_checks:
+            add_line(item)
 
-    if possible_causes:
-        cause_text = "、".join([safe_text(x) for x in possible_causes if safe_text(x)])
-        if cause_text:
-            lines.append(f"{index}. 重点核查可能原因：{cause_text}")
+        if possible_causes:
+            cause_text = "、".join([safe_text(x) for x in possible_causes if safe_text(x)])
+            if cause_text:
+                add_line(f"重点核查可能原因：{cause_text}")
 
     if not lines:
         return "1. 暂无明确建议，请登录设备结合现场情况进一步排查。"
 
-    return "\n".join(lines)
-
+    max_items = 5 if evidence_summary.get("has_facts") else 6
+    return "\n".join([f"{idx}. {item}" for idx, item in enumerate(lines[:max_items], start=1)])
 
 def build_notification_payload(request_id: str) -> Dict[str, Any]:
     ctx = get_full_request_context(request_id)
@@ -270,25 +348,28 @@ def build_notification_payload(request_id: str) -> Dict[str, Any]:
         if mcp_name:
             break
 
-    device_text = ""
-    if mcp_name and device_ip:
-        device_text = f"{mcp_name}（{device_ip}）"
-    elif mcp_name:
-        device_text = mcp_name
-    elif hostname and device_ip:
-        device_text = f"{hostname}（{device_ip}）"
-    elif hostname:
-        device_text = hostname
-    elif device_ip:
-        device_text = device_ip
+    device_text = resolve_device_display(target_scope, fallback_mcp_name=mcp_name)
 
     alarm_content = build_alarm_content(analysis_data, plan_data, summary_data)
     analysis_process = build_analysis_process(analysis_data, execution_data, review_data)
     recommendations = build_recommendations(analysis_data, review_data)
 
+    family = first_non_empty(
+        ((plan_data or {}).get("family_result") or {}).get("family"),
+        ((plan_data or {}).get("classification") or {}).get("family"),
+    )
+    execution_source = first_non_empty(
+        (plan_data or {}).get("execution_source"),
+        execution_summary.get("mode"),
+    )
+    playbook_id = first_non_empty(
+        ((plan_data or {}).get("playbook") or {}).get("playbook_id"),
+        ((plan_summary.get("playbook") or {}).get("playbook_id")),
+    )
+
     payload = {
         "request_id": request_id,
-        "title": f"NetAIOps AI分析结果 - {request_id}",
+        "title": f"NetAIOps分析结果-{safe_text(request_id)[:8]}-{safe_text(request_id)[9:13]}",
         "status": {
             "analysis_status": analysis_summary.get("status"),
             "plan_status": plan_summary.get("status"),
@@ -296,8 +377,10 @@ def build_notification_payload(request_id: str) -> Dict[str, Any]:
             "review_status": review_summary.get("status"),
         },
         "target": {
-            "playbook_id": ((plan_summary.get("playbook") or {}).get("playbook_id")) or "",
+            "playbook_id": playbook_id,
             "execution_mode": execution_summary.get("mode") or "",
+            "execution_source": execution_source,
+            "family": family,
         },
         "target_scope": target_scope,
         "summary": {
@@ -329,6 +412,7 @@ def generate_notification_payload(request_id: str) -> Dict[str, Any]:
 def build_notification_text(payload: dict) -> str:
     notify_view = payload.get("notify_view", {}) or {}
     query_urls = payload.get("query_urls", {}) or {}
+    target = payload.get("target", {}) or {}
 
     device = safe_text(notify_view.get("device")) or "无"
     alarm_content = safe_text(notify_view.get("alarm_content")) or "无"
@@ -336,8 +420,13 @@ def build_notification_text(payload: dict) -> str:
     recommendations_text = safe_text(notify_view.get("recommendations_text")) or "无"
     summary_url = safe_text(query_urls.get("summary_url"))
 
+    family = safe_text(target.get("family"))
+    execution_source = safe_text(target.get("execution_source"))
+    playbook_id = safe_text(target.get("playbook_id"))
+
     lines = []
     lines.append(f"设备：{device}")
+
     lines.append("")
     lines.append("告警内容：")
     lines.append(alarm_content)
@@ -347,11 +436,6 @@ def build_notification_text(payload: dict) -> str:
     lines.append("")
     lines.append("建议：")
     lines.append(recommendations_text)
-
-    if summary_url:
-        lines.append("")
-        lines.append("详情：")
-        lines.append(summary_url)
 
     return "\n".join(lines)
 

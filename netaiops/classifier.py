@@ -1,108 +1,49 @@
 from typing import Any, Dict
 
 from netaiops.context_catalog import classify_event_by_catalog
+from netaiops.family_registry import classify_family, to_legacy_classification
+
 
 def _safe_lower(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip().lower()
 
+
 def classify_event(event: Dict[str, Any]) -> Dict[str, Any]:
+    family_result = classify_family(event)
+    legacy_result = to_legacy_classification(family_result, event)
+
     catalog_result = classify_event_by_catalog(event)
-    if catalog_result:
-        return catalog_result
+    if not catalog_result:
+        return legacy_result
 
-    vendor = _safe_lower(event.get("vendor"))
-    alarm_type = _safe_lower(event.get("alarm_type") or event.get("event_type"))
-    severity = _safe_lower(event.get("severity"))
-    metric_name = _safe_lower(event.get("metric_name"))
-    source = _safe_lower(event.get("source"))
+    merged = dict(catalog_result)
 
-    object_type = _safe_lower(event.get("object_type"))
-    object_name = _safe_lower(event.get("object_name"))
-    raw_text = _safe_lower(event.get("raw_text"))
-    status = _safe_lower(event.get("status"))
+    merged.setdefault("vendor", _safe_lower(event.get("vendor")))
+    merged.setdefault("source", _safe_lower(event.get("source")))
+    merged.setdefault("alarm_type", _safe_lower(event.get("alarm_type") or event.get("event_type")))
+    merged.setdefault("severity", _safe_lower(event.get("severity")))
+    merged.setdefault("metric_name", _safe_lower(event.get("metric_name")))
+    merged.setdefault("object_type", _safe_lower(event.get("object_type")))
+    merged.setdefault("object_name", _safe_lower(event.get("object_name")))
 
-    playbook_type = "generic_network_readonly"
-    confidence = "low"
-    auto_execute_allowed = False
-    prompt_profile = "quick"
-    match_reason = "default_generic"
+    if family_result.get("legacy_playbook_type"):
+        merged["playbook_type"] = family_result.get("legacy_playbook_type")
 
-    if "bgp" in alarm_type and ("down" in alarm_type or "peer" in alarm_type):
-        playbook_type = "bgp_neighbor_down"
-        confidence = "high"
-        auto_execute_allowed = True
-        match_reason = "matched_alarm_type_bgp_neighbor_down"
+    merged["prompt_profile"] = legacy_result.get("prompt_profile", merged.get("prompt_profile", "quick"))
+    merged["auto_execute_allowed"] = bool(
+        merged.get("auto_execute_allowed", legacy_result.get("auto_execute_allowed", False))
+    )
+    merged["classification_confidence"] = merged.get(
+        "classification_confidence",
+        legacy_result.get("classification_confidence", "low"),
+    )
+    merged["match_reason"] = merged.get("match_reason") or legacy_result.get("match_reason", "")
+    merged["family"] = family_result.get("family", "generic_network_readonly")
+    merged["legacy_playbook_type"] = family_result.get(
+        "legacy_playbook_type",
+        merged.get("playbook_type", "generic_network_readonly"),
+    )
 
-    elif "ospf" in alarm_type and "down" in alarm_type:
-        playbook_type = "ospf_neighbor_down"
-        confidence = "high"
-        auto_execute_allowed = True
-        match_reason = "matched_alarm_type_ospf_neighbor_down"
-
-    elif "bfd" in alarm_type and ("down" in alarm_type or "neighbor" in alarm_type):
-        playbook_type = "routing_neighbor_down"
-        confidence = "high"
-        auto_execute_allowed = True
-        match_reason = "matched_alarm_type_bfd_neighbor_down"
-
-    elif "interface" in alarm_type and ("flap" in alarm_type or "down" in alarm_type):
-        playbook_type = "interface_flap"
-        confidence = "medium"
-        auto_execute_allowed = True
-        match_reason = "matched_alarm_type_interface_flap"
-
-    elif "pool" in alarm_type and "down" in alarm_type:
-        playbook_type = "f5_pool_member_down"
-        confidence = "medium"
-        auto_execute_allowed = True
-        match_reason = "matched_alarm_type_f5_pool_member_down"
-
-    elif "bgp" in raw_text and ("idle" in raw_text or "down" in raw_text):
-        playbook_type = "bgp_neighbor_down"
-        confidence = "medium"
-        auto_execute_allowed = True
-        match_reason = "matched_raw_text_bgp_neighbor_down"
-
-    elif "ospf" in raw_text and ("down" in raw_text or "neighbor" in raw_text):
-        playbook_type = "ospf_neighbor_down"
-        confidence = "medium"
-        auto_execute_allowed = True
-        match_reason = "matched_raw_text_ospf"
-
-    elif "interface" in raw_text and ("down" in raw_text or "flap" in raw_text):
-        playbook_type = "interface_flap"
-        confidence = "medium"
-        auto_execute_allowed = True
-        match_reason = "matched_raw_text_interface"
-
-    elif "pool member" in raw_text and "down" in raw_text:
-        playbook_type = "f5_pool_member_down"
-        confidence = "medium"
-        auto_execute_allowed = True
-        match_reason = "matched_raw_text_pool_member_down"
-
-    if status == "resolved":
-        auto_execute_allowed = False
-        match_reason = f"{match_reason}_resolved"
-
-    if severity in ("critical", "major", "error"):
-        prompt_profile = "detailed"
-    elif severity in ("warning", "minor"):
-        prompt_profile = "quick"
-
-    return {
-        "vendor": vendor,
-        "source": source,
-        "alarm_type": alarm_type,
-        "severity": severity,
-        "metric_name": metric_name,
-        "object_type": object_type,
-        "object_name": object_name,
-        "playbook_type": playbook_type,
-        "prompt_profile": prompt_profile,
-        "auto_execute_allowed": auto_execute_allowed,
-        "classification_confidence": confidence,
-        "match_reason": match_reason,
-    }
+    return merged
