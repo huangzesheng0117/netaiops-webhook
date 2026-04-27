@@ -1,24 +1,47 @@
-# python
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
-*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# virtual env
+# Virtual environments
 venv/
 .venv/
+env/
+ENV/
 
-# local config / secrets
-config.yaml
-
-# runtime outputs
-logs/
+# Runtime data
 data/
+logs/
 backup/
 input/
+*.log
 
-# generated catalogs
+# Local configs and secrets
+config.yaml
+config.real-llm.yaml
+.env
+.env.*
+*.secret
+*.key
+*.pem
+
+# Local generated catalogs / inventory artifacts
 catalogs/three_layer/
 
-# temp / backup files
+# Temporary files
+*.bak
 *.bak_*
+*.tmp
+*.swp
+*~
+
+# Local wrappers / scratch
+mcp_wrapper_stub.py
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/

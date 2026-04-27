@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
-from agent_runner.executors import run_commands
+from agent_runner.executors import execute_commands
 
 
 BASE_DIR = Path("/opt/netaiops-webhook")
@@ -32,6 +32,12 @@ def get_runner_backend() -> str:
     return os.getenv("RUNNER_BACKEND", "stub").strip().lower()
 
 
+def normalize_mcp_mode(backend: str) -> str:
+    if backend == "stub":
+        return "stub"
+    return "placeholder"
+
+
 def run_dispatch_request(request_id: str) -> Dict[str, Any]:
     dispatch_file = DISPATCH_DIR / f"{request_id}.dispatch.request.json"
     if not dispatch_file.exists():
@@ -42,9 +48,9 @@ def run_dispatch_request(request_id: str) -> Dict[str, Any]:
     target_scope = dispatch_payload.get("target_scope", {}) or {}
 
     backend = get_runner_backend()
+    os.environ["MCP_MODE"] = normalize_mcp_mode(backend)
 
-    command_results = run_commands(
-        backend=backend,
+    command_results = execute_commands(
         request_id=request_id,
         target_scope=target_scope,
         execution_candidates=execution_candidates,
@@ -54,14 +60,22 @@ def run_dispatch_request(request_id: str) -> Dict[str, Any]:
         "request_id": request_id,
         "runner_mode": backend,
         "target_scope": target_scope,
+        "classification": dispatch_payload.get("classification", {}),
+        "playbook": dispatch_payload.get("playbook", {}),
+        "family_result": dispatch_payload.get("family_result", {}),
+        "capability_plan": dispatch_payload.get("capability_plan", {}),
+        "execution_source": dispatch_payload.get("execution_source", ""),
+        "readonly_only": dispatch_payload.get("readonly_only"),
+        "policy_result": dispatch_payload.get("policy_result", {}),
+        "guard_result": dispatch_payload.get("guard_result", {}),
         "command_results": command_results,
         "completed_at": now_utc_str(),
+        "source_dispatch_file": str(dispatch_file),
     }
 
     callback_file = CALLBACK_DIR / f"{request_id}.runner.result.json"
     safe_write_json(callback_file, result)
     result["callback_file"] = str(callback_file)
-
     return result
 
 

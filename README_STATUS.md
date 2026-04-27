@@ -1,119 +1,202 @@
-# NetAIOps Webhook - Current Status
+# NetAIOps Webhook 当前状态
 
-## Current Version
-webhook_v3
+## 当前版本
 
-## Current Architecture
-The service now supports the following lifecycle:
+5.0.0-v5-batch1
 
-webhook -> raw -> normalized -> analysis -> plan -> confirm -> execution -> review -> summary
+## 当前阶段
 
-## Implemented Capabilities
+webhook_v5 第一批闭环已完成。
 
-### 1. Webhook Ingestion
-- Accept Alertmanager webhook
-- Accept Elastic webhook
+当前系统已经从 v4 的 playbook / 字符串命令编排，升级为以“告警家族 -> 能力选择 -> 平台命令矩阵 -> MCP只读取证 -> 输出判错 -> 事实提炼 -> 复核结论 -> 咚咚通知”为主线的能力级只读取证闭环。
 
-### 2. Data Persistence
-- Save raw webhook payload
-- Save normalized event data
-- Save analysis result
-- Save plan result
-- Save execution result
-- Save review result
+## 已完成能力
 
-### 3. Analysis Layer
-- Async analysis processing
-- Query latest analysis
-- Query analysis by request_id
-- Replay analysis by request_id
+### 1. 告警接入
 
-### 4. Plan Layer
-- Generate plan from analysis
-- Query latest plan
-- Query plan by request_id
-- Guard readonly commands
-- Confirm safe readonly plan
+- 支持 Alertmanager Webhook。
+- 支持 Elastic Webhook。
+- 支持 raw payload 落盘。
+- 支持 normalized event 落盘。
 
-### 5. Execution Layer
-- Create execution record from confirmed plan
-- Dispatch execution
-- Complete execution
-- Fail execution
-- External execution result callback
+### 2. 三层上下文增强
 
-### 6. Review Layer
-- Generate review from execution result
-- Query latest review
-- Query review by request_id
+当前继续沿用已有 three-layer 增强产物：
 
-### 7. Summary Layer
-- Query one request_id across:
-  - analysis
-  - plan
-  - execution
-  - review
+- layer1_alert_families.enhanced.yaml
+- layer2_classifier_mapping.enhanced.yaml
+- layer3_context_enrichment.enhanced.yaml
+- device_inventory.normalized.yaml
+- target_lookup.yaml
+- config_interface_index.json
 
-## Current API Endpoints
+### 3. 告警家族识别
 
-### Health
-- GET /health
+新增模块：
 
-### Analysis
-- GET /analysis/latest
-- GET /analysis/{request_id}
-- POST /analysis/replay/{request_id}
+- netaiops/family_registry.py
 
-### Plan
-- GET /plan/latest
-- GET /plan/{request_id}
-- POST /plan/generate/{request_id}
-- POST /plan/confirm/{request_id}
-- POST /plan/execute/{request_id}
+当前第一批支持：
 
-### Execution
-- GET /execution/latest
-- GET /execution/{request_id}
-- POST /execution/dispatch/{request_id}
-- POST /execution/complete/{request_id}
-- POST /execution/fail/{request_id}
-- POST /execution/result/{request_id}
+- interface_or_link_utilization_high
+- interface_or_link_traffic_drop
+- interface_packet_loss_or_discards_high
+- interface_status_or_flap
+- bgp_neighbor_down
+- ospf_neighbor_down
+- routing_neighbor_down
+- device_cpu_high
+- device_memory_high
+- f5_pool_member_down
+- generic_network_readonly
 
-### Review
-- GET /review/latest
-- GET /review/{request_id}
-- POST /review/generate/{request_id}
+### 4. 能力注册表
 
-### Summary
-- GET /request/{request_id}/summary
+新增模块：
 
-## Data Directories
+- netaiops/capability_registry.py
 
-- data/raw/
-- data/normalized/
-- data/analysis/
-- data/plans/
-- data/execution/
-- data/reviews/
+作用：
 
-## Current Execution Mode
-Execution is currently stub-based.
-No real mcp-netmiko dispatch is connected yet.
+- 将告警家族转换为可执行的只读能力。
+- 每个能力声明所需参数、是否只读、判错规则类型。
+- 后续不再依赖模型直接自由生成命令。
 
-## Recommended Next Phase
-- Connect execution dispatcher to mcp-netmiko
-- Return real command outputs into /execution/result/{request_id}
-- Optionally add second-round LLM review based on execution evidence
+### 5. 平台命令矩阵
 
----
+新增模块：
 
-## v4 Development Status
-Current target: connect v3 lifecycle to:
-- playbook-based classification
-- auto-confirm policy engine
-- dispatcher
-- external agent runner
-- real MCP execution callback
+- netaiops/platform_command_matrix.py
 
-Current phase:
-- scaffolding initialization
+当前支持的平台键：
+
+- cisco_nxos
+- cisco_iosxe
+- huawei_vrp
+- h3c_comware
+- f5_tmsh
+- generic_network
+
+已验证 Cisco ACI / NX-OS 设备不会再误走 IOS-XE 命令。
+
+### 6. 输出判错
+
+新增模块：
+
+- netaiops/output_judger.py
+
+可以识别：
+
+- invalid command
+- incorrect command
+- ambiguous command
+- incomplete command
+- unknown command
+- syntax error
+- shell command not found
+- no device named
+- authentication failed
+- permission denied
+- timeout
+- traceback
+- validation error
+
+同时避免把正常接口计数里的 CRC / input error / output error 误判为命令执行失败。
+
+### 7. 设备名解析
+
+新增模块：
+
+- netaiops/target_resolver.py
+
+作用：
+
+- 将 exporter endpoint 展示名转换为真实设备名。
+- 例如将 10.191.96.43:9116 展示为 SH8-K10-ACI-1107（10.192.250.107）。
+
+### 8. 取证事实提炼
+
+新增模块：
+
+- netaiops/evidence_facts.py
+
+当前已支持接口类告警事实提炼：
+
+- 接口 oper/admin 状态
+- 接口描述/对端信息
+- 实时 input/output rate
+- port-channel 归属关系
+- 聚合口状态
+- 成员口状态
+- CRC / input error / output error
+- output discard / output drops
+- 最近链路抖动时间
+
+### 9. MCP只读取证闭环
+
+已接通链路：
+
+- plan_builder
+- agent_client
+- agent_runner
+- execution_callback
+- review_builder
+- request_summary
+- notification_payload
+
+当前系统可以对真实 firing 告警自动执行只读命令，并基于返回结果生成复核结论。
+
+## 已验证真实告警
+
+request_id：
+
+20260419_011059_145604_a7900a1a
+
+验证结果：
+
+- 设备：SH8-K10-ACI-1107（10.192.250.107）
+- 告警家族：interface_or_link_utilization_high
+- 执行来源：capability_registry
+- 执行模式：mcp
+- 执行命令数：3
+- 执行状态：completed
+- 复核状态：completed
+- 已提取事实：接口状态、实时速率、聚合关系、output drops 等。
+
+## 当前安全边界
+
+- 只允许只读命令。
+- 不执行配置修改。
+- 不执行自动恢复。
+- 不执行 shutdown / no shutdown。
+- 不执行 clear / reset / reload。
+- resolved 告警默认不自动执行。
+- 所有自动执行都必须通过 readonly guard 和 auto-confirm policy。
+
+## 当前咚咚通知格式
+
+当前通知正文只保留：
+
+- 设备
+- 告警内容
+- MCP只读取证统计
+- 取证事实
+- 综合判断
+- 建议
+
+已删除：
+
+- 分析上下文
+- 详情链接
+- 每条命令的大段原始输出
+
+## 后续方向
+
+1. 补充 Prometheus 指标窗口证据。
+2. 补充 Elastic 日志窗口证据。
+3. 扩展更多告警家族的 evidence_facts。
+4. 增加平台命令矩阵回归测试。
+5. 增加 output_judger 回归测试。
+6. 引入 capability-level LLM planner。
+7. 增加告警去重、节流、冷却时间。
+8. 后续考虑将运行元数据迁移到 SQLite 或 PostgreSQL。

@@ -26,6 +26,12 @@ def safe_write_json(path: Path, data: dict) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def safe_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 def plan_file_by_request_id(request_id: str) -> Path:
     files = list(PLAN_DIR.glob(f"*_{request_id}.plan.json"))
     if not files:
@@ -48,15 +54,21 @@ def summarize_command_results(command_results: List[Dict[str, Any]]) -> Dict[str
     completed = 0
     failed = 0
     partial = 0
+    hard_error_count = 0
 
     for item in command_results:
-        status = str(item.get("dispatch_status", "")).strip().lower()
+        status = safe_text(item.get("dispatch_status")).lower()
+        judge = item.get("judge", {}) if isinstance(item.get("judge"), dict) else {}
+
         if status == "completed":
             completed += 1
         elif status == "failed":
             failed += 1
         else:
             partial += 1
+
+        if bool(judge.get("hard_error", False)):
+            hard_error_count += 1
 
     if total == 0:
         execution_status = "failed"
@@ -73,6 +85,7 @@ def summarize_command_results(command_results: List[Dict[str, Any]]) -> Dict[str
         "completed_commands": completed,
         "failed_commands": failed,
         "partial_commands": partial,
+        "hard_error_count": hard_error_count,
     }
 
 
@@ -91,11 +104,18 @@ def build_execution_record_from_callback(request_id: str, payload: Dict[str, Any
         "target_scope": plan_data.get("target_scope", {}),
         "playbook": plan_data.get("playbook", {}),
         "classification": plan_data.get("classification", {}),
+        "family_result": plan_data.get("family_result", {}),
+        "capability_plan": plan_data.get("capability_plan", {}),
+        "execution_source": plan_data.get("execution_source", ""),
+        "readonly_only": plan_data.get("readonly_only"),
+        "policy_result": plan_data.get("policy_result", {}),
+        "guard_result": plan_data.get("guard_result", {}),
         "command_results": command_results,
         "stats": summary,
         "received_at": now_utc_str(),
         "source_plan_file": str(plan_path),
     }
+
     return record
 
 

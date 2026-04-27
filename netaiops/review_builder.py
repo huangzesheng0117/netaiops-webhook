@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
+from netaiops.evidence_facts import build_interface_evidence_summary
+
 
 BASE_DIR = Path("/opt/netaiops-webhook")
 DATA_DIR = BASE_DIR / "data"
@@ -43,96 +45,287 @@ def review_file_by_request_id(request_id: str) -> Path:
     return REVIEW_DIR / f"{source}_{request_id}.review.json"
 
 
-def extract_key_findings(command_results: List[Dict[str, Any]]) -> List[str]:
-    findings = []
+def safe_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def shorten_text(text: str, limit: int = 180) -> str:
+    text = safe_text(text).replace("\r", " ").replace("\n", " ")
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3] + "..."
+
+
+def extract_output_text(value: Any) -> str:
+    if value is None:
+        return ""
+
+    if isinstance(value, dict):
+        structured = value.get("structuredContent") or {}
+        result = structured.get("result")
+        if result:
+            return safe_text(result)
+
+        nested_output = value.get("output")
+        if nested_output:
+            return extract_output_text(nested_output)
+
+        content = value.get("content") or []
+        if isinstance(content, list):
+            parts: List[str] = []
+            for item in content:
+                if isinstance(item, dict):
+                    txt = safe_text(item.get("text"))
+                    if txt:
+                        parts.append(txt)
+            if parts:
+                return "\n".join(parts)
+
+        return safe_text(value)
+
+    if isinstance(value, list):
+        parts = [extract_output_text(item) for item in value]
+        parts = [x for x in parts if x]
+        return "\n".join(parts)
+
+    text = safe_text(value)
+    if not text:
+        return ""
+
+    try:
+        parsed = json.loads(text)
+        return extract_output_text(parsed)
+    except Exception:
+        return text
+
+
+def get_family(execution_data: Dict[str, Any]) -> str:
+    family_result = execution_data.get("family_result", {}) or {}
+    classification = execution_data.get("classification", {}) or {}
+    playbook = execution_data.get("playbook", {}) or {}
+
+    for value in [
+        family_result.get("family"),
+        classification.get("family"),
+        classification.get("playbook_type"),
+        playbook.get("playbook_id"),
+    ]:
+        text = safe_text(value)
+        if text:
+            return text
+
+    return "generic_network_readonly"
+
+
+def collect_command_stats(command_results: List[Dict[str, Any]]) -> Dict[str, int]:
+    total = len(command_results)
+    completed = 0
+    failed = 0
+    partial = 0
+    hard_error = 0
 
     for item in command_results:
-        cmd = item.get("command", "")
-        status = item.get("dispatch_status", "")
-        output = item.get("output", "")
+        status = safe_text(item.get("dispatch_status")).lower()
+        judge = item.get("judge", {}) if isinstance(item.get("judge"), dict) else {}
+        if status == "completed":
+            completed += 1
+        elif status == "failed":
+            failed += 1
+        elif status == "partial":
+            partial += 1
+
+        if bool(judge.get("hard_error", False)):
+            hard_error += 1
+
+    return {
+        "total": total,
+        "completed": completed,
+        "failed": failed,
+        "partial": partial,
+        "hard_error": hard_error,
+    }
+
+
+def build_conclusion(execution_data: Dict[str, Any], stats: Dict[str, int], family: str) -> Dict[str, str]:
+    execution_status = safe_text(execution_data.get("execution_status")).lower()
+    hard_error_count = stats.get("hard_error", 0)
+    failed_count = stats.get("failed", 0)
+    completed_count = stats.get("completed", 0)
+    total = stats.get("total", 0)
+
+    if total == 0:
+        return {
+            "review_status": "needs_attention",
+            "conclusion": "未采集到有效执行结果，当前无法形成可靠结论。",
+        }
+
+    if hard_error_count > 0:
+        return {
+            "review_status": "needs_attention",
+            "conclusion": f"本次证据采集中存在 {hard_error_count} 条设备侧硬错误，需优先核对平台命令映射或设备侧可执行性后再判断故障结论。",
+        }
+
+    if execution_status == "completed" and completed_count == total:
+        if family in ("bgp_neighbor_down", "routing_neighbor_down"):
+            conclusion = "关键信息采集完成，可继续围绕邻居状态、路由可达性和链路侧证据判断原因。"
+        elif family == "ospf_neighbor_down":
+            conclusion = "关键信息采集完成，可继续围绕邻接状态、接口状态和日志时间线判断原因。"
+        elif family in ("interface_or_link_traffic_drop", "interface_or_link_utilization_high", "interface_packet_loss_or_discards_high", "interface_status_or_flap"):
+            conclusion = "接口侧关键信息采集完成，可继续结合流量、错包、聚合和日志判断链路异常类型。"
+        elif family == "f5_pool_member_down":
+            conclusion = "F5 侧关键信息采集完成，可继续围绕 pool/member 状态与后端可达性判断原因。"
+        else:
+            conclusion = "只读证据采集完成，可以继续结合输出内容进行人工复核与结论归纳。"
+
+        return {
+            "review_status": "completed",
+            "conclusion": conclusion,
+        }
+
+    if completed_count > 0 and (failed_count > 0 or execution_status == "partial"):
+        return {
+            "review_status": "partial",
+            "conclusion": "部分关键证据已采集完成，但仍存在失败或未完成项，当前结论需保留不确定性。",
+        }
+
+    return {
+        "review_status": "needs_attention",
+        "conclusion": "本次证据采集失败或有效结果不足，建议先处理执行异常后再继续分析。",
+    }
+
+
+def extract_key_findings(command_results: List[Dict[str, Any]]) -> List[str]:
+    findings: List[str] = []
+
+    for item in command_results:
+        capability = safe_text(item.get("capability"))
+        command = safe_text(item.get("command"))
+        status = safe_text(item.get("dispatch_status"))
+        judge = item.get("judge", {}) if isinstance(item.get("judge"), dict) else {}
+        hard_error = bool(judge.get("hard_error", False))
+        matched_rule_id = safe_text(judge.get("matched_rule_id"))
+        matched_text = safe_text(judge.get("matched_text"))
+
+        display = capability if capability else command
+        if capability and command:
+            display = f"{capability} -> {command}"
+
+        if hard_error:
+            detail = []
+            if matched_rule_id:
+                detail.append(f"规则={matched_rule_id}")
+            if matched_text:
+                detail.append(f"命中={matched_text}")
+            detail_text = "；".join(detail) if detail else "设备返回硬错误"
+            findings.append(f"{display} 执行失败，设备返回硬错误：{detail_text}")
+            continue
+
+        output_text = shorten_text(extract_output_text(item.get("output")), 160)
+        error_text = shorten_text(safe_text(item.get("error")), 160)
 
         if status == "completed":
-            findings.append(f"Command completed successfully: {cmd}")
+            if output_text:
+                findings.append(f"{display} 执行成功，返回要点：{output_text}")
+            else:
+                findings.append(f"{display} 执行成功。")
+        elif status == "partial":
+            if output_text:
+                findings.append(f"{display} 部分完成，返回要点：{output_text}")
+            else:
+                findings.append(f"{display} 部分完成。")
         else:
-            findings.append(f"Command status={status}: {cmd}")
-
-        if output:
-            short_output = str(output).strip().replace("\n", " ")
-            if len(short_output) > 160:
-                short_output = short_output[:160] + "..."
-            findings.append(f"Output snippet: {short_output}")
+            if error_text:
+                findings.append(f"{display} 执行失败，报错：{error_text}")
+            elif output_text:
+                findings.append(f"{display} 执行失败，返回要点：{output_text}")
+            else:
+                findings.append(f"{display} 执行失败。")
 
     return findings[:10]
 
 
-def build_recommendations(execution_data: Dict[str, Any]) -> List[str]:
-    classification = execution_data.get("classification", {}) or {}
-    playbook = execution_data.get("playbook", {}) or {}
-    execution_status = execution_data.get("execution_status", "")
+def build_recommendations(execution_data: Dict[str, Any], stats: Dict[str, int], family: str) -> List[str]:
+    recommendations: List[str] = []
 
-    playbook_id = playbook.get("playbook_id", "")
-    playbook_type = classification.get("playbook_type", "")
+    if stats.get("hard_error", 0) > 0:
+        recommendations.append("优先核对 capability 与平台命令映射是否正确，并确认当前设备平台类型识别是否准确。")
+        recommendations.append("结合硬错误命中规则，检查是否存在厂商命令差异、对象不存在或权限不足。")
 
-    recommendations = []
-
-    if execution_status == "completed":
-        recommendations.append("Review collected evidence and correlate with alarm timeline.")
+    if family in ("bgp_neighbor_down", "routing_neighbor_down"):
+        recommendations.append("继续核查对端邻居状态、路由可达性以及链路两端是否存在同步异常。")
+        recommendations.append("对照近期网络变更、BGP/BFD 配置调整和链路事件时间线。")
+    elif family == "ospf_neighbor_down":
+        recommendations.append("继续核查 OSPF 邻接状态、接口状态与 Hello/Dead 定时相关配置。")
+        recommendations.append("对照近期路由策略或接口配置变更，确认是否存在邻接重建失败。")
+    elif family in ("interface_or_link_traffic_drop", "interface_or_link_utilization_high", "interface_packet_loss_or_discards_high", "interface_status_or_flap"):
+        recommendations.append("继续核查接口错包、物理层状态、聚合成员一致性及对端端口健康情况。")
+        recommendations.append("结合日志时间线确认是否存在接口抖动、模块异常或链路切换。")
+    elif family == "device_cpu_high":
+        recommendations.append("继续核查高 CPU 是否由异常流量、控制面事件或日志抖动引起。")
+    elif family == "device_memory_high":
+        recommendations.append("继续核查内存占用变化趋势及是否存在异常进程或会话堆积。")
+    elif family == "f5_pool_member_down":
+        recommendations.append("继续核查 pool member 监控状态、后端服务可达性及应用健康检查结果。")
     else:
-        recommendations.append("Investigate failed or partial commands before drawing conclusions.")
+        recommendations.append("结合已采集输出继续人工复核，并评估是否需要补充更多诊断命令。")
 
-    if playbook_id == "huawei_bgp_neighbor_down" or playbook_type == "bgp_neighbor_down":
-        recommendations.append("Check BGP peer reachability and peer state transition history.")
-        recommendations.append("Compare routing state and interface health on both ends.")
+    if stats.get("failed", 0) > 0 and stats.get("hard_error", 0) == 0:
+        recommendations.append("对失败命令逐条复核执行环境、参数对象和设备可达性，再继续形成最终结论。")
 
-    elif playbook_id == "huawei_ospf_neighbor_down" or playbook_type == "ospf_neighbor_down":
-        recommendations.append("Check OSPF adjacency state, interface status, and log timeline.")
-        recommendations.append("Verify whether routing changes align with adjacency loss.")
+    deduped: List[str] = []
+    for item in recommendations:
+        text = safe_text(item)
+        if text and text not in deduped:
+            deduped.append(text)
 
-    elif playbook_id == "huawei_interface_flap" or playbook_type == "interface_flap":
-        recommendations.append("Check interface error counters, optics, and recent flap logs.")
-        recommendations.append("Verify peer side stability and physical link quality.")
-
-    elif playbook_id == "f5_pool_member_down" or playbook_type == "f5_pool_member_down":
-        recommendations.append("Check pool member monitor state and backend reachability.")
-        recommendations.append("Verify application-side health and recent connection behavior.")
-
-    else:
-        recommendations.append("Review command outputs and refine the playbook if needed.")
-
-    return recommendations[:6]
+    return deduped[:6]
 
 
 def build_review_from_execution_data(execution_data: Dict[str, Any]) -> Dict[str, Any]:
     request_id = execution_data.get("request_id", "")
     command_results = execution_data.get("command_results", []) or []
-    stats = execution_data.get("stats", {}) or {}
+    execution_status = execution_data.get("execution_status", "") or ""
+    family = get_family(execution_data)
 
-    execution_status = execution_data.get("execution_status", "")
-    if execution_status == "completed":
-        review_status = "completed"
-        conclusion = "Readonly evidence collection completed successfully."
-    elif execution_status == "partial":
-        review_status = "partial"
-        conclusion = "Readonly evidence collection partially completed."
-    else:
-        review_status = "needs_attention"
-        conclusion = "Evidence collection failed or requires manual attention."
+    stats = execution_data.get("stats", {}) or {}
+    derived_stats = collect_command_stats(command_results)
+    merged_stats = {
+        **stats,
+        "command_total": derived_stats.get("total", 0),
+        "command_completed": derived_stats.get("completed", 0),
+        "command_failed": derived_stats.get("failed", 0),
+        "command_partial": derived_stats.get("partial", 0),
+        "hard_error_count": derived_stats.get("hard_error", 0),
+    }
+
+    conclusion_bundle = build_conclusion(execution_data, derived_stats, family)
+
+    evidence_summary = build_interface_evidence_summary(execution_data)
 
     review = {
         "request_id": request_id,
         "review_id": f"review_{uuid.uuid4().hex[:12]}",
-        "review_status": review_status,
-        "conclusion": conclusion,
+        "review_status": conclusion_bundle["review_status"],
+        "conclusion": evidence_summary.get("conclusion") or conclusion_bundle["conclusion"],
         "execution_status": execution_status,
+        "family": family,
+        "evidence_summary": evidence_summary,
         "target_scope": execution_data.get("target_scope", {}),
         "classification": execution_data.get("classification", {}),
+        "family_result": execution_data.get("family_result", {}),
         "playbook": execution_data.get("playbook", {}),
-        "stats": stats,
-        "key_findings": extract_key_findings(command_results),
-        "recommendations": build_recommendations(execution_data),
+        "execution_source": execution_data.get("execution_source", ""),
+        "capability_plan": execution_data.get("capability_plan", {}),
+        "stats": merged_stats,
+        "key_findings": (evidence_summary.get("key_findings") or []) + extract_key_findings(command_results),
+        "recommendations": (evidence_summary.get("recommendations") or []) + build_recommendations(execution_data, derived_stats, family),
         "generated_at": now_utc_str(),
         "source_execution_file": "",
     }
+
     return review
 
 

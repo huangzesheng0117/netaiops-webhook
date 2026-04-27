@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
@@ -19,10 +20,16 @@ def safe_write_json(path: Path, data: dict) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def get_dispatch_mode() -> str:
+    return os.getenv("RUNNER_BACKEND", "stub").strip().lower()
+
+
 def submit_to_agent_runner(request_id: str, plan_data: Dict[str, Any]) -> Dict[str, Any]:
     classification = plan_data.get("classification", {}) or {}
     playbook = plan_data.get("playbook", {}) or {}
     execution_candidates = plan_data.get("execution_candidates", []) or []
+
+    dispatch_mode = get_dispatch_mode()
 
     dispatch_payload = {
         "request_id": request_id,
@@ -33,25 +40,32 @@ def submit_to_agent_runner(request_id: str, plan_data: Dict[str, Any]) -> Dict[s
         "execution_source": plan_data.get("execution_source", ""),
         "target_scope": plan_data.get("target_scope", {}),
         "execution_candidates": execution_candidates,
+        "classification": classification,
+        "playbook": playbook,
+        "family_result": plan_data.get("family_result", {}),
+        "capability_plan": plan_data.get("capability_plan", {}),
+        "readonly_only": plan_data.get("readonly_only"),
+        "policy_result": plan_data.get("policy_result", {}),
+        "guard_result": plan_data.get("guard_result", {}),
         "submitted_at": now_utc_str(),
-        "dispatch_mode": "stub",
+        "dispatch_mode": dispatch_mode,
     }
 
     dispatch_file = DISPATCH_DIR / f"{request_id}.dispatch.request.json"
     safe_write_json(dispatch_file, dispatch_payload)
 
-    stub_response = {
+    response = {
         "request_id": request_id,
         "dispatch_status": "accepted",
-        "dispatch_mode": "stub",
+        "dispatch_mode": dispatch_mode,
         "agent_job_id": f"job_{request_id}",
         "dispatch_file": str(dispatch_file),
         "submitted_at": now_utc_str(),
-        "message": "stub agent runner accepted dispatch payload",
+        "message": "agent runner accepted dispatch payload",
         "command_count": len(execution_candidates),
     }
 
     response_file = DISPATCH_DIR / f"{request_id}.dispatch.response.json"
-    safe_write_json(response_file, stub_response)
+    safe_write_json(response_file, response)
 
-    return stub_response
+    return response
