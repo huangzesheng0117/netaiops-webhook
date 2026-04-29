@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
-from netaiops.evidence_facts import build_interface_evidence_summary
+from netaiops.family_evidence import build_family_evidence_summary
+from netaiops.evidence_bundle import build_evidence_bundle
 
 
 BASE_DIR = Path("/opt/netaiops-webhook")
@@ -303,10 +304,18 @@ def build_review_from_execution_data(execution_data: Dict[str, Any]) -> Dict[str
 
     conclusion_bundle = build_conclusion(execution_data, derived_stats, family)
 
-    evidence_summary = build_interface_evidence_summary(execution_data)
+    evidence_summary = build_family_evidence_summary(execution_data)
+
+    evidence_bundle = build_evidence_bundle(
+        request_id=request_id,
+        execution_data=execution_data,
+        review_data={},
+        evidence_summary=evidence_summary,
+    )
 
     review = {
         "request_id": request_id,
+        "evidence_bundle": evidence_bundle,
         "review_id": f"review_{uuid.uuid4().hex[:12]}",
         "review_status": conclusion_bundle["review_status"],
         "conclusion": evidence_summary.get("conclusion") or conclusion_bundle["conclusion"],
@@ -338,6 +347,12 @@ def generate_review_for_request_id(request_id: str) -> Dict[str, Any]:
 
     review_path = review_file_by_request_id(request_id)
     safe_write_json(review_path, review)
+
+    try:
+        from netaiops.storage_index import index_request
+        index_request(request_id)
+    except Exception:
+        pass
 
     return {
         "review_file": str(review_path),

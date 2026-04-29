@@ -42,3 +42,118 @@ data:
 
 catalogs:
   three_layer_dir: "/opt/netaiops-webhook/catalogs/three_layer"
+
+
+prometheus:
+  enabled: false
+  base_url: "http://127.0.0.1:9090"
+  timeout: 10
+  lookback_minutes: 15
+  lookahead_minutes: 5
+  step: "60s"
+  high_threshold_percent: 80
+  recovered_threshold_percent: 20
+  queries:
+    # 按你的 Prometheus 实际指标名调整。
+    # 可用变量：
+    # {device_ip} {hostname} {interface} {if_alias} {job} {instance} {alarm_type}
+    interface_output_utilization_percent: ""
+    interface_output_bps: ""
+
+
+capability_planner:
+  enabled: false
+  provider: "openai_compatible"
+  base_url: ""
+  api_key_env: "NETAIOPS_LLM_API_KEY"
+  model: ""
+  timeout: 45
+  temperature: 0.1
+  max_tokens: 800
+  fallback_on_error: true
+  families_enabled:
+    - interface_or_link_utilization_high
+    - interface_packet_loss_or_discards_high
+    - interface_or_link_traffic_drop
+    - interface_status_or_flap
+    - bgp_neighbor_down
+    - ospf_neighbor_down
+    - device_cpu_high
+    - device_memory_high
+    - f5_pool_member_down
+
+
+alert_throttle:
+  enabled: true
+  cooldown_minutes: 10
+  active_window_minutes: 5
+  resolved_disable_auto_execute: true
+  same_device_concurrency_limit: 1
+
+
+safety_policy:
+  enabled: true
+  readonly_only: true
+  max_commands_per_request: 5
+  command_timeout_sec: 30
+  audit_enabled: true
+
+  # 命中这些设备时，只生成 plan，不自动执行。
+  high_risk_devices: []
+
+  allowed_capabilities:
+    - show_interface_detail
+    - show_interface_error_counters
+    - show_interface_brief
+    - show_portchannel_summary
+    - show_lacp_neighbor
+    - show_recent_logs
+    - show_bgp_peer_detail
+    - show_route_to_peer
+    - ping_peer
+    - show_bgp_config_snippet
+    - show_ospf_peer_detail
+    - show_device_cpu
+    - show_device_memory
+    - show_f5_pool_list
+    - show_f5_pool_members
+    - show_f5_pool_config
+    - show_f5_connections
+    - show_f5_performance
+
+  allowed_command_prefixes:
+    - "show "
+    - "display "
+    - "get "
+    - "diagnose hardware deviceinfo "
+    - "diagnose netlink "
+    - "get router info "
+    - "get system "
+    - "get log "
+    - "ping "
+    - "traceroute "
+    - "tmsh show "
+    - "tmsh list "
+
+  deny_command_patterns:
+    - "^\s*conf(?:ig(?:ure)?)?\b"
+    - "^\s*configure\b"
+    - "^\s*set\s+"
+    - "^\s*delete\s+"
+    - "^\s*clear\s+"
+    - "^\s*reset\s+"
+    - "^\s*reload\b"
+    - "^\s*reboot\b"
+    - "^\s*shutdown\b"
+    - "^\s*no\s+shutdown\b"
+    - "^\s*write\b"
+    - "^\s*copy\s+"
+    - "^\s*commit\b"
+    - "^\s*save\b"
+    - "^\s*erase\b"
+    - "^\s*bash\b"
+    - "^\s*python\b"
+    - "^\s*sudo\b"
+    - ";"
+    - "&&"
+    - "\|\|"

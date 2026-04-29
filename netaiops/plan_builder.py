@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 from netaiops.classifier import classify_event
 from netaiops.family_registry import classify_family
 from netaiops.capability_registry import build_capability_plan
+from netaiops.capability_planner import refine_capability_plan
 from netaiops.platform_command_matrix import resolve_execution_candidates
 from netaiops.playbook_loader import (
     build_execution_candidates_from_playbook,
@@ -215,6 +216,7 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
     classification = classify_event(event_for_plan)
 
     capability_plan = build_capability_plan(event_for_plan, family_result)
+    capability_plan = refine_capability_plan(event_for_plan, family_result, capability_plan)
     registry_execution_candidates = resolve_execution_candidates(
         event_for_plan,
         family_result,
@@ -357,3 +359,75 @@ def confirm_plan_for_request_id(request_id: str) -> dict:
         "plan_file": str(path),
         "plan_data": plan,
     }
+
+
+# ===== v5 alert throttle wrapper begin =====
+# 说明：
+# 原 generate_plan_for_request_id 保持不改，在其外层增加节流/去重策略。
+# 这样可以避免强依赖 plan_builder.py 内部 safe_write_json 的具体写法。
+try:
+    _v5_original_generate_plan_for_request_id = generate_plan_for_request_id
+
+    def generate_plan_for_request_id(request_id: str):
+        from pathlib import Path as _Path
+        from netaiops.alert_throttle import apply_throttle_to_plan as _apply_throttle_to_plan
+
+        result = _v5_original_generate_plan_for_request_id(request_id)
+
+        if not isinstance(result, dict):
+            return result
+
+        plan_data = result.get("plan_data")
+        plan_file = result.get("plan_file")
+
+        if not isinstance(plan_data, dict):
+            return result
+
+        plan_data = _apply_throttle_to_plan(plan_data)
+        result["plan_data"] = plan_data
+
+        if plan_file:
+            safe_write_json(_Path(plan_file), plan_data)
+
+        return result
+
+except NameError:
+    # 如果未来文件结构变化导致 generate_plan_for_request_id 尚未定义，
+    # 则不在 import 阶段阻断服务启动。
+    pass
+# ===== v5 alert throttle wrapper end =====
+
+
+# ===== v5 safety policy wrapper begin =====
+# 在现有 generate_plan_for_request_id 外层增加最终安全策略。
+# 执行顺序位于 family/capability/platform/throttle 之后，确保最终渲染命令也会被检查。
+try:
+    _v5_safety_original_generate_plan_for_request_id = generate_plan_for_request_id
+
+    def generate_plan_for_request_id(request_id: str):
+        from pathlib import Path as _Path
+        from netaiops.safety_policy import apply_safety_policy_to_plan as _apply_safety_policy_to_plan
+
+        result = _v5_safety_original_generate_plan_for_request_id(request_id)
+
+        if not isinstance(result, dict):
+            return result
+
+        plan_data = result.get("plan_data")
+        plan_file = result.get("plan_file")
+
+        if not isinstance(plan_data, dict):
+            return result
+
+        plan_data = _apply_safety_policy_to_plan(plan_data)
+        result["plan_data"] = plan_data
+
+        if plan_file:
+            safe_write_json(_Path(plan_file), plan_data)
+
+        return result
+
+except NameError:
+    pass
+# ===== v5 safety policy wrapper end =====
+

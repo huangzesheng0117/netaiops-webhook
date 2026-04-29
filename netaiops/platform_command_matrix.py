@@ -17,14 +17,35 @@ PLATFORM_ALIASES: Dict[str, str] = {
     "nexus": "cisco_nxos",
     "n9k": "cisco_nxos",
     "aci": "cisco_nxos",
+    "apic": "cisco_nxos",
+
     "ios-xe": "cisco_iosxe",
     "iosxe": "cisco_iosxe",
     "ios xe": "cisco_iosxe",
+    "ios": "cisco_iosxe",
+
     "vrp": "huawei_vrp",
+    "huawei": "huawei_vrp",
     "huawei_vrp": "huawei_vrp",
+
     "comware": "h3c_comware",
+    "h3c": "h3c_comware",
+    "h3c_comware": "h3c_comware",
+
     "tmsh": "f5_tmsh",
     "f5": "f5_tmsh",
+    "big-ip": "f5_tmsh",
+    "bigip": "f5_tmsh",
+
+    "fortigate": "fortigate_fortios",
+    "fortios": "fortigate_fortios",
+    "fortinet": "fortigate_fortios",
+    "fg": "fortigate_fortios",
+    "fgt": "fortigate_fortios",
+
+    "hillstone": "hillstone_stoneos",
+    "stoneos": "hillstone_stoneos",
+    "sg6000": "hillstone_stoneos",
 }
 
 
@@ -35,45 +56,54 @@ PLATFORM_COMMAND_MATRIX: Dict[str, Dict[str, str]] = {
         "show_interface_brief": "show interface brief",
         "show_portchannel_summary": "show port-channel summary",
         "show_lacp_neighbor": "show lacp neighbor",
-        "show_recent_logs": "show logging logfile | last 50",
+        "show_recent_logs": "show logging last 50",
+
         "show_bgp_peer_detail": "show bgp ipv4 unicast neighbors {peer_ip}",
         "show_route_to_peer": "show ip route {peer_ip}",
         "ping_peer": "ping {peer_ip}",
         "show_bgp_config_snippet": "show running-config bgp",
         "show_ospf_peer_detail": "show ip ospf neighbors",
+
         "show_device_cpu": "show system resources",
         "show_device_memory": "show system resources",
     },
+
     "cisco_iosxe": {
         "show_interface_detail": "show interfaces {interface}",
         "show_interface_error_counters": "show interfaces {interface} counters errors",
         "show_interface_brief": "show ip interface brief",
         "show_portchannel_summary": "show etherchannel summary",
         "show_lacp_neighbor": "show lacp neighbor",
-        "show_recent_logs": "show logging | tail 50",
+        "show_recent_logs": "show logging",
+
         "show_bgp_peer_detail": "show bgp ipv4 unicast neighbors {peer_ip}",
         "show_route_to_peer": "show ip route {peer_ip}",
         "ping_peer": "ping {peer_ip}",
         "show_bgp_config_snippet": "show running-config | section bgp",
         "show_ospf_peer_detail": "show ip ospf neighbor",
+
         "show_device_cpu": "show processes cpu sorted",
         "show_device_memory": "show processes memory sorted",
     },
+
     "huawei_vrp": {
         "show_interface_detail": "display interface {interface}",
         "show_interface_error_counters": "display interface {interface}",
         "show_interface_brief": "display interface brief",
         "show_portchannel_summary": "display eth-trunk",
         "show_lacp_neighbor": "display lacp peer",
-        "show_recent_logs": "display logbuffer | tail 50",
+        "show_recent_logs": "display logbuffer",
+
         "show_bgp_peer_detail": "display bgp peer {peer_ip} verbose",
         "show_route_to_peer": "display ip routing-table {peer_ip}",
         "ping_peer": "ping {peer_ip}",
         "show_bgp_config_snippet": "display current-configuration | include bgp",
         "show_ospf_peer_detail": "display ospf peer",
+
         "show_device_cpu": "display cpu-usage",
         "show_device_memory": "display memory-usage",
     },
+
     "h3c_comware": {
         "show_interface_detail": "display interface {interface}",
         "show_interface_error_counters": "display interface {interface}",
@@ -81,14 +111,52 @@ PLATFORM_COMMAND_MATRIX: Dict[str, Dict[str, str]] = {
         "show_portchannel_summary": "display link-aggregation summary",
         "show_lacp_neighbor": "display link-aggregation verbose",
         "show_recent_logs": "display logbuffer",
+
         "show_bgp_peer_detail": "display bgp peer {peer_ip} verbose",
         "show_route_to_peer": "display ip routing-table {peer_ip}",
         "ping_peer": "ping {peer_ip}",
         "show_bgp_config_snippet": "display current-configuration | include bgp",
         "show_ospf_peer_detail": "display ospf peer",
+
         "show_device_cpu": "display cpu-usage",
         "show_device_memory": "display memory",
     },
+
+    "fortigate_fortios": {
+        "show_interface_detail": "diagnose hardware deviceinfo nic {interface}",
+        "show_interface_error_counters": "diagnose hardware deviceinfo nic {interface}",
+        "show_interface_brief": "get system interface physical",
+        "show_portchannel_summary": "diagnose netlink aggregate list",
+        "show_lacp_neighbor": "diagnose netlink aggregate list",
+        "show_recent_logs": "get log event",
+
+        "show_bgp_peer_detail": "get router info bgp neighbors {peer_ip}",
+        "show_route_to_peer": "get router info routing-table details {peer_ip}",
+        "show_bgp_config_snippet": "show router bgp",
+        "show_ospf_peer_detail": "get router info ospf neighbor",
+
+        "show_device_cpu": "get system performance status",
+        "show_device_memory": "get system performance status",
+    },
+
+    "hillstone_stoneos": {
+        "show_interface_detail": "show interface {interface}",
+        "show_interface_error_counters": "show interface {interface}",
+        "show_interface_brief": "show interface",
+        "show_portchannel_summary": "show link-aggregation",
+        "show_lacp_neighbor": "show lacp",
+        "show_recent_logs": "show log event",
+
+        "show_bgp_peer_detail": "show ip bgp neighbors {peer_ip}",
+        "show_route_to_peer": "show ip route {peer_ip}",
+        "ping_peer": "ping {peer_ip}",
+        "show_bgp_config_snippet": "show configuration bgp",
+        "show_ospf_peer_detail": "show ip ospf neighbor",
+
+        "show_device_cpu": "show cpu",
+        "show_device_memory": "show memory",
+    },
+
     "f5_tmsh": {
         "show_recent_logs": "tmsh show sys log",
         "show_f5_pool_list": "tmsh show ltm pool",
@@ -96,9 +164,15 @@ PLATFORM_COMMAND_MATRIX: Dict[str, Dict[str, str]] = {
         "show_f5_pool_config": "tmsh list ltm pool",
         "show_f5_connections": "tmsh show sys connection",
         "show_f5_performance": "tmsh show sys performance system",
+
+        "show_device_cpu": "tmsh show sys performance system",
+        "show_device_memory": "tmsh show sys memory",
     },
+
     "generic_network": {
         "show_recent_logs": "show logging",
+        "show_interface_detail": "show interface {interface}",
+        "show_interface_error_counters": "show interface {interface}",
         "show_interface_brief": "show ip interface brief",
         "show_device_cpu": "show processes cpu",
         "show_device_memory": "show processes memory",
@@ -150,8 +224,10 @@ def _platform_from_value(value: Any) -> str:
     text = _safe_lower(value)
     if not text:
         return ""
+
     if text in PLATFORM_ALIASES:
         return PLATFORM_ALIASES[text]
+
     if "aci" in text or "nx-os" in text or "nxos" in text or "nexus" in text or "n9k" in text:
         return "cisco_nxos"
     if "ios-xe" in text or "iosxe" in text or "ios xe" in text:
@@ -160,8 +236,13 @@ def _platform_from_value(value: Any) -> str:
         return "huawei_vrp"
     if "h3c" in text or "comware" in text:
         return "h3c_comware"
-    if "f5" in text or "tmsh" in text or "big-ip" in text:
+    if "f5" in text or "tmsh" in text or "big-ip" in text or "bigip" in text:
         return "f5_tmsh"
+    if "fortigate" in text or "fortinet" in text or "fortios" in text:
+        return "fortigate_fortios"
+    if "hillstone" in text or "stoneos" in text or "sg6000" in text:
+        return "hillstone_stoneos"
+
     return ""
 
 
@@ -199,14 +280,16 @@ def detect_platform(event: Dict[str, Any]) -> str:
         event.get("platform"),
         event.get("os_family"),
         event.get("vendor_os"),
+        event.get("netmiko_device_type"),
     ]
+
     for value in explicit_candidates:
         platform_key = _platform_from_value(value)
         if platform_key:
             return platform_key
 
     record = _match_inventory_record(event)
-    for key in ("os_family", "platform", "os", "vendor_os"):
+    for key in ("os_family", "platform", "os", "vendor_os", "netmiko_device_type"):
         platform_key = _platform_from_value(record.get(key))
         if platform_key:
             return platform_key
@@ -222,21 +305,28 @@ def detect_platform(event: Dict[str, Any]) -> str:
             _safe_text(record.get("hostname")),
             _safe_text(record.get("sysname")),
             _safe_text(record.get("os_family")),
+            _safe_text(record.get("platform")),
         ]
     ).lower()
 
-    if "aci" in combined or "nx-os" in combined or "nxos" in combined or "nexus" in combined or "n9k" in combined:
-        return "cisco_nxos"
+    platform_key = _platform_from_value(combined)
+    if platform_key:
+        return platform_key
 
     vendor = _safe_lower(event.get("vendor") or record.get("vendor"))
-    if "f5" in vendor or "big-ip" in combined:
-        return "f5_tmsh"
+
+    if "cisco" in vendor:
+        return "cisco_iosxe"
     if "huawei" in vendor:
         return "huawei_vrp"
     if "h3c" in vendor:
         return "h3c_comware"
-    if "cisco" in vendor:
-        return "cisco_iosxe"
+    if "f5" in vendor:
+        return "f5_tmsh"
+    if "fortigate" in vendor or "fortinet" in vendor:
+        return "fortigate_fortios"
+    if "hillstone" in vendor:
+        return "hillstone_stoneos"
 
     return "generic_network"
 

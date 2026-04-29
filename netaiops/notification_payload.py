@@ -457,3 +457,23 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ===== v5 notify template wrapper begin =====
+# 将通知正文渲染入口拆到 netaiops.notify_templates。
+# 当前接口类告警仍保持原有已验证格式，后续不同 family 可独立优化模板。
+try:
+    _v5_original_build_notification_text = build_notification_text
+
+    def build_notification_text(payload):
+        from netaiops.notify_templates import render_notification_text as _render_notification_text
+
+        return _render_notification_text(
+            payload,
+            fallback_renderer=_v5_original_build_notification_text,
+        )
+
+except NameError:
+    pass
+# ===== v5 notify template wrapper end =====
+

@@ -1,0 +1,1 @@
+Incorrect command "show interfaces Ethernet1/1"
