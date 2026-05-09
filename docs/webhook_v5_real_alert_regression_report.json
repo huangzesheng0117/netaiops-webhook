@@ -1,14 +1,14 @@
 {
-  "generated_at": "2026-05-09T07:38:13.679298+00:00",
+  "generated_at": "2026-05-09T08:59:14.367940+00:00",
   "rebuild_index": {
     "db_path": "/opt/netaiops-webhook/data/index/netaiops_meta.sqlite3",
-    "total_seen": 3626,
-    "indexed": 3626,
+    "total_seen": 3646,
+    "indexed": 3646,
     "failed": []
   },
   "family_counts": {
-    "interface_status_or_flap": 1589,
-    "interface_or_link_utilization_high": 1006,
+    "interface_status_or_flap": 1605,
+    "interface_or_link_utilization_high": 1010,
     "interface_packet_loss_or_discards_high": 344,
     "generic_network_readonly": 322,
     "connection_or_session_anomaly": 236,
@@ -22,7 +22,7 @@
     "manual_real_mcp_test": 1
   },
   "family_execution_counts": {
-    "interface_status_or_flap": 668,
+    "interface_status_or_flap": 674,
     "interface_or_link_utilization_high": 259,
     "interface_packet_loss_or_discards_high": 226,
     "bgp_neighbor_down": 9,
@@ -160,7 +160,7 @@
       "evidence_family": "interface_packet_loss_or_discards_high",
       "bundle_schema_version": "1.0",
       "bundle_confidence": "medium",
-      "bundle_fact_count": 38,
+      "bundle_fact_count": 14,
       "bundle_metric_count": 0,
       "bundle_log_count": 0,
       "bundle_device_output_count": 3,
@@ -172,10 +172,10 @@
       "notify_has_removed_context": false,
       "notify_has_removed_detail": false,
       "notify_has_command_detail": true,
-      "notify_text_len": 1278
+      "notify_text_len": 765
     },
     {
-      "request_id": "20260509_152542_719620_de540f58",
+      "request_id": "20260509_165043_044145_e941d97c",
       "family": "interface_status_or_flap",
       "device_ip": "10.187.250.212",
       "hostname": "10.186.96.51:9116",
@@ -192,11 +192,11 @@
       "evidence_family": "interface_status_or_flap",
       "bundle_schema_version": "1.0",
       "bundle_confidence": "medium_low",
-      "bundle_fact_count": 21,
+      "bundle_fact_count": 11,
       "bundle_metric_count": 0,
       "bundle_log_count": 0,
       "bundle_device_output_count": 3,
-      "notify_title": "NetAIOps分析结果-20260509-1525",
+      "notify_title": "NetAIOps分析结果-20260509-1650",
       "notify_has_device": true,
       "notify_has_alarm": true,
       "notify_has_analysis": true,
@@ -204,7 +204,7 @@
       "notify_has_removed_context": false,
       "notify_has_removed_detail": false,
       "notify_has_command_detail": true,
-      "notify_text_len": 819
+      "notify_text_len": 682
     },
     {
       "request_id": "summarytest01",
@@ -236,7 +236,7 @@
       "notify_has_removed_context": false,
       "notify_has_removed_detail": false,
       "notify_has_command_detail": false,
-      "notify_text_len": 128
+      "notify_text_len": 295
     }
   ],
   "failed_items": [],

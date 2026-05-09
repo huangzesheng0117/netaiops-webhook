@@ -560,3 +560,274 @@ try:
 except NameError:
     pass
 # ===== v5 notify template wrapper end =====
+
+# ===== v5 notification non-traffic interface recommendation final filter begin =====
+# 兜底修复：
+# 非流量/利用率类接口告警，不允许在最终咚咚通知中出现
+# “高利用率、速率曲线、瞬时峰值、Prometheus窗口、指标曲线、流量来源”等流量类建议。
+#
+# 该过滤发生在 notification_payload 最终出口，不改变 MCP 执行逻辑。
+
+import re as _v11n_re
+
+try:
+    _v11n_original_build_notification_payload = build_notification_payload
+except NameError:
+    _v11n_original_build_notification_payload = None
+
+try:
+    _v11n_original_build_notification_text = build_notification_text
+except NameError:
+    _v11n_original_build_notification_text = None
+
+
+V11N_TRAFFIC_FAMILIES = {
+    "interface_or_link_utilization_high",
+    "interface_or_link_traffic_drop",
+}
+
+
+V11N_TRAFFIC_WORDS = [
+    "高利用率",
+    "利用率",
+    "速率曲线",
+    "速率",
+    "流量趋势",
+    "流量来源",
+    "业务高峰",
+    "瞬时峰值",
+    "已恢复",
+    "Prometheus",
+    "指标曲线",
+    "告警窗口",
+    "时间窗口",
+    "入向速率",
+    "出向速率",
+    "input rate",
+    "output rate",
+    "traffic",
+    "utilization",
+]
+
+
+V11N_STATUS_RECOMMENDATIONS = [
+    "核查接口当前 oper/admin 状态是否与告警状态一致。",
+    "结合接口日志时间线确认是否存在链路 up/down、flap、模块异常或对端切换。",
+    "如接口属于聚合链路，继续核查 port-channel 成员状态、LACP 状态和对端端口状态。",
+    "必要时结合对端设备接口状态、光模块状态和链路物理层信息继续确认。",
+]
+
+
+def _v11n_safe_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v11n_get_family_from_payload(payload):
+    if not isinstance(payload, dict):
+        return ""
+
+    candidates = [
+        ((payload.get("target") or {}).get("family")),
+        ((payload.get("family_result") or {}).get("family")),
+        ((payload.get("review") or {}).get("family")),
+        ((payload.get("review_data") or {}).get("family")),
+        ((payload.get("evidence_summary") or {}).get("family")),
+        ((payload.get("notify_view") or {}).get("family")),
+    ]
+
+    for item in candidates:
+        value = _v11n_safe_text(item)
+        if value:
+            return value
+
+    return ""
+
+
+def _v11n_is_non_traffic_interface_payload(payload):
+    family = _v11n_get_family_from_payload(payload)
+
+    if family in V11N_TRAFFIC_FAMILIES:
+        return False
+
+    if family in {
+        "interface_status_or_flap",
+        "interface_flap",
+        "interface_packet_loss_or_discards_high",
+    }:
+        return True
+
+    text = "\n".join(
+        [
+            _v11n_safe_text((payload.get("notify_view") or {}).get("alarm_text")),
+            _v11n_safe_text((payload.get("notify_view") or {}).get("analysis_process")),
+            _v11n_safe_text((payload.get("notify_view") or {}).get("recommendations")),
+            _v11n_safe_text((payload.get("target") or {}).get("interface")),
+            _v11n_safe_text((payload.get("target") or {}).get("family")),
+        ]
+    )
+
+    if "接口" in text or "端口" in text or "Ethernet" in text or "port-channel" in text:
+        if "状态变化" in text or "端口状态" in text or "接口状态" in text or "flap" in text.lower():
+            return True
+
+    return False
+
+
+def _v11n_has_traffic_word(line):
+    text = _v11n_safe_text(line)
+    lower = text.lower()
+
+    for word in V11N_TRAFFIC_WORDS:
+        if word in text or word.lower() in lower:
+            return True
+
+    return False
+
+
+def _v11n_strip_number_prefix(line):
+    return _v11n_re.sub(r"^\s*\d+[\.、]\s*", "", _v11n_safe_text(line)).strip()
+
+
+def _v11n_renumber_lines(lines):
+    result = []
+    for idx, line in enumerate(lines, start=1):
+        value = _v11n_strip_number_prefix(line)
+        if value:
+            result.append(f"{idx}. {value}")
+    return "\n".join(result)
+
+
+def _v11n_clean_recommendations_text(text):
+    lines = [_v11n_strip_number_prefix(x) for x in _v11n_safe_text(text).splitlines()]
+    kept = []
+    seen = set()
+
+    for line in lines:
+        if not line:
+            continue
+        if _v11n_has_traffic_word(line):
+            continue
+        if line in seen:
+            continue
+        seen.add(line)
+        kept.append(line)
+
+    for item in V11N_STATUS_RECOMMENDATIONS:
+        if item not in seen:
+            kept.append(item)
+            seen.add(item)
+
+    return _v11n_renumber_lines(kept[:8])
+
+
+def _v11n_extract_interface_status(analysis_process):
+    text = _v11n_safe_text(analysis_process)
+
+    m = _v11n_re.search(r"接口状态：\s*([A-Za-z0-9\/\.\-]+)\s+oper=([^\s，,]+)\s+admin=([^\s，,]+)", text)
+    if m:
+        return m.group(1), m.group(2), m.group(3)
+
+    m = _v11n_re.search(r"([A-Za-z]+[A-Za-z0-9\/\.\-]+)\s+oper=([^\s，,]+)\s+admin=([^\s，,]+)", text)
+    if m:
+        return m.group(1), m.group(2), m.group(3)
+
+    return "接口", "未知", "未知"
+
+
+def _v11n_clean_analysis_process_text(text):
+    raw_lines = _v11n_safe_text(text).splitlines()
+    cleaned = []
+
+    iface, oper, admin = _v11n_extract_interface_status(text)
+
+    for line in raw_lines:
+        value = _v11n_safe_text(line)
+        if not value:
+            continue
+
+        if "综合执行结果判断" in value and _v11n_has_traffic_word(value):
+            prefix_match = _v11n_re.match(r"^\s*(\d+[\.、])\s*", value)
+            prefix = prefix_match.group(1) if prefix_match else f"{len(cleaned) + 1}."
+            cleaned.append(
+                f"{prefix} 综合执行结果判断：{iface} 状态类只读取证完成；"
+                f"接口状态 oper={oper} / admin={admin}。"
+                "建议结合接口状态、聚合关系、对端端口和日志时间线判断是否存在链路抖动、模块异常或链路切换。"
+            )
+            continue
+
+        if _v11n_has_traffic_word(value) and (
+            "取证事实" in value
+            or "接口带宽" in value
+            or "实时速率" in value
+            or "估算利用率" in value
+            or "流量判断" in value
+            or "告警口径" in value
+        ):
+            continue
+
+        cleaned.append(value)
+
+    return "\n".join(cleaned)
+
+
+def _v11n_clean_payload(payload):
+    if not isinstance(payload, dict):
+        return payload
+
+    if not _v11n_is_non_traffic_interface_payload(payload):
+        return payload
+
+    payload = dict(payload)
+    notify_view = dict(payload.get("notify_view") or {})
+
+    if "analysis_process" in notify_view:
+        notify_view["analysis_process"] = _v11n_clean_analysis_process_text(
+            notify_view.get("analysis_process")
+        )
+
+    if "recommendations" in notify_view:
+        notify_view["recommendations"] = _v11n_clean_recommendations_text(
+            notify_view.get("recommendations")
+        )
+
+    payload["notify_view"] = notify_view
+    payload["v5_non_traffic_interface_notify_filter"] = {
+        "enabled": True,
+        "reason": "non_traffic_interface_family",
+        "family": _v11n_get_family_from_payload(payload),
+    }
+
+    return payload
+
+
+def _v11n_clean_final_text(payload, text):
+    if not _v11n_is_non_traffic_interface_payload(payload):
+        return text
+
+    value = _v11n_safe_text(text)
+
+    if "\n建议：\n" not in value:
+        return value
+
+    before, rec = value.split("\n建议：\n", 1)
+
+    # 如果建议后面未来追加了其他 section，这里先按当前通知结构处理。
+    cleaned_rec = _v11n_clean_recommendations_text(rec)
+
+    return before.rstrip() + "\n\n建议：\n" + cleaned_rec
+
+
+if _v11n_original_build_notification_payload is not None:
+    def build_notification_payload(request_id):
+        payload = _v11n_original_build_notification_payload(request_id)
+        return _v11n_clean_payload(payload)
+
+
+if _v11n_original_build_notification_text is not None:
+    def build_notification_text(payload):
+        payload = _v11n_clean_payload(payload)
+        text = _v11n_original_build_notification_text(payload)
+        return _v11n_clean_final_text(payload, text)
+# ===== v5 notification non-traffic interface recommendation final filter end =====

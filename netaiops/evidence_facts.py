@@ -474,11 +474,66 @@ def _v5_format_bps(value: _V5Optional[int]) -> str:
     return f"{int(v)} bps"
 
 
+
+# ===== v5 interface traffic fact scope guard begin =====
+# 只有流量/利用率类 family 才展示接口带宽、实时速率、估算利用率和流量判断。
+# 接口状态变化、接口 flap、错包/丢包类告警不展示这些流量类事实，避免误导值班人员。
+V5_TRAFFIC_METRIC_FAMILIES = {
+    "interface_or_link_utilization_high",
+    "interface_or_link_traffic_drop",
+}
+
+
+def _v5_get_execution_family(execution_data):
+    if not isinstance(execution_data, dict):
+        return ""
+
+    return _v5_safe_text(
+        ((execution_data.get("family_result") or {}).get("family"))
+        or ((execution_data.get("classification") or {}).get("family"))
+        or ((execution_data.get("classification") or {}).get("playbook_type"))
+        or ((execution_data.get("playbook") or {}).get("playbook_id"))
+    )
+
+
+def _v5_should_add_interface_traffic_facts(execution_data):
+    family = _v5_get_execution_family(execution_data)
+
+    if family in V5_TRAFFIC_METRIC_FAMILIES:
+        return True
+
+    # 老数据可能没有 family_result，做一个兜底判断：
+    # 只有明确出现“利用率 / 流量突降 / traffic drop / utilization”时才开启。
+    if not family:
+        target_scope = execution_data.get("target_scope", {}) or {}
+        blob = " ".join(
+            [
+                _v5_safe_text(target_scope.get("alarm_type")),
+                _v5_safe_text(target_scope.get("raw_text")),
+                _v5_safe_text((execution_data.get("event") or {}).get("alarm_type")),
+                _v5_safe_text((execution_data.get("event") or {}).get("raw_text")),
+            ]
+        ).lower()
+
+        if (
+            "利用率" in blob
+            or "流量突降" in blob
+            or "utilization" in blob
+            or "traffic drop" in blob
+        ):
+            return True
+
+    return False
+# ===== v5 interface traffic fact scope guard end =====
+
 def _v5_enrich_interface_traffic_summary(
     summary: _V5Dict[str, _V5Any],
     execution_data: _V5Dict[str, _V5Any],
 ) -> _V5Dict[str, _V5Any]:
     summary = dict(summary or {})
+
+    if not _v5_should_add_interface_traffic_facts(execution_data):
+        return summary
 
     outputs = _v5_collect_interface_outputs(execution_data)
     if not outputs:
@@ -908,6 +963,10 @@ def _v5b_enrich_business_bandwidth_summary(
     execution_data: _V5BDict[str, _V5BAny],
 ) -> _V5BDict[str, _V5BAny]:
     summary = dict(summary or {})
+
+    if not _v5_should_add_interface_traffic_facts(execution_data):
+        return summary
+
     facts = dict(summary.get("facts", {}) or {})
 
     context_text, context_source = _v5b_collect_alarm_context_text(execution_data)
@@ -1022,3 +1081,285 @@ if _v5b_original_build_interface_evidence_summary is not None:
         base_summary = _v5b_original_build_interface_evidence_summary(execution_data)
         return _v5b_enrich_business_bandwidth_summary(base_summary, execution_data)
 # ===== v5 business bandwidth facts enhancement end =====
+
+# ===== v5 non-traffic family rate fact final filter begin =====
+# 上一层 guard 已经限制了大部分流量/利用率事实，但旧版基础解析中仍可能生成：
+# “取证时实时速率：input=... output=...”
+# 这里做最终兜底过滤：
+# 只有 interface_or_link_utilization_high / interface_or_link_traffic_drop 才允许展示速率/利用率事实。
+# 其他 family 一律过滤带宽、速率、利用率、流量判断等 notify_lines / key_findings / conclusion 片段。
+
+try:
+    _v11_original_build_interface_evidence_summary = build_interface_evidence_summary
+except NameError:
+    _v11_original_build_interface_evidence_summary = None
+
+
+V11_TRAFFIC_FACT_KEYWORDS = [
+    "接口带宽",
+    "接口物理带宽",
+    "设备侧实时速率",
+    "设备侧估算利用率",
+    "取证时实时速率",
+    "流量判断",
+    "告警口径带宽",
+    "按告警口径估算利用率",
+    "告警口径流量判断",
+    "Prometheus告警窗口入向速率",
+    "Prometheus告警窗口出向速率",
+]
+
+
+V11_TRAFFIC_FACT_KEYS = [
+    "input_rate_bps",
+    "output_rate_bps",
+    "bandwidth_bps",
+    "business_bandwidth_bps",
+    "business_bandwidth_text",
+    "business_bandwidth_source",
+    "business_bandwidth_context",
+    "business_bandwidth_context_source",
+    "input_utilization_percent_estimated",
+    "output_utilization_percent_estimated",
+    "input_utilization_percent_business_estimated",
+    "output_utilization_percent_business_estimated",
+]
+
+
+def _v11_safe_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v11_is_traffic_family(execution_data):
+    try:
+        return bool(_v5_should_add_interface_traffic_facts(execution_data))
+    except Exception:
+        family = _v11_safe_text(
+            ((execution_data.get("family_result") or {}).get("family"))
+            or ((execution_data.get("classification") or {}).get("family"))
+            or ((execution_data.get("classification") or {}).get("playbook_type"))
+            or ((execution_data.get("playbook") or {}).get("playbook_id"))
+        )
+
+        return family in {
+            "interface_or_link_utilization_high",
+            "interface_or_link_traffic_drop",
+        }
+
+
+def _v11_line_has_traffic_fact(line):
+    text = _v11_safe_text(line)
+    return any(keyword in text for keyword in V11_TRAFFIC_FACT_KEYWORDS)
+
+
+def _v11_filter_lines(lines):
+    result = []
+
+    for line in lines or []:
+        if _v11_line_has_traffic_fact(line):
+            continue
+        result.append(line)
+
+    return result
+
+
+def _v11_filter_conclusion(conclusion):
+    text = _v11_safe_text(conclusion)
+    if not text:
+        return text
+
+    # 按中文句号/分号做轻量切分，去掉含速率/利用率事实的句子。
+    parts = []
+    current = ""
+
+    for ch in text:
+        current += ch
+        if ch in "。；;":
+            parts.append(current.strip())
+            current = ""
+
+    if current.strip():
+        parts.append(current.strip())
+
+    filtered = [
+        part for part in parts
+        if not _v11_line_has_traffic_fact(part)
+        and "output rate" not in part.lower()
+        and "input rate" not in part.lower()
+        and "rate=" not in part.lower()
+    ]
+
+    if filtered:
+        return "".join(filtered).strip()
+
+    # 如果全部被过滤，保留一个不含速率的兜底结论。
+    return "接口状态类只读取证完成；建议结合接口状态、聚合关系和日志时间线判断是否存在链路抖动、模块异常或链路切换。"
+
+
+def _v11_filter_non_traffic_summary(summary, execution_data):
+    if _v11_is_traffic_family(execution_data):
+        return summary
+
+    summary = dict(summary or {})
+
+    summary["notify_lines"] = _v11_filter_lines(summary.get("notify_lines", []) or [])
+    summary["key_findings"] = _v11_filter_lines(summary.get("key_findings", []) or [])
+    summary["recommendations"] = _v11_filter_lines(summary.get("recommendations", []) or [])
+
+    facts = dict(summary.get("facts", {}) or {})
+    for key in V11_TRAFFIC_FACT_KEYS:
+        facts.pop(key, None)
+    summary["facts"] = facts
+
+    summary["conclusion"] = _v11_filter_conclusion(summary.get("conclusion"))
+
+    return summary
+
+
+if _v11_original_build_interface_evidence_summary is not None:
+    def build_interface_evidence_summary(execution_data):
+        base_summary = _v11_original_build_interface_evidence_summary(execution_data)
+        return _v11_filter_non_traffic_summary(base_summary, execution_data)
+# ===== v5 non-traffic family rate fact final filter end =====
+
+# ===== v5 non-traffic family recommendation final filter begin =====
+# 小修说明：
+# 非流量/利用率类接口告警不应再出现：
+# 高利用率、速率曲线、瞬时峰值、Prometheus历史窗口、告警窗口指标曲线等建议话术。
+# 这些话术只保留给 interface_or_link_utilization_high / interface_or_link_traffic_drop。
+
+try:
+    _v11b_original_build_interface_evidence_summary = build_interface_evidence_summary
+except NameError:
+    _v11b_original_build_interface_evidence_summary = None
+
+
+V11B_TRAFFIC_RECOMMENDATION_KEYWORDS = [
+    "高利用率",
+    "利用率",
+    "速率曲线",
+    "流量趋势",
+    "流量来源",
+    "业务高峰",
+    "瞬时峰值",
+    "已恢复",
+    "Prometheus",
+    "指标曲线",
+    "告警窗口",
+    "时间窗口指标",
+    "入向速率",
+    "出向速率",
+    "input rate",
+    "output rate",
+    "traffic",
+    "utilization",
+]
+
+
+V11B_STATUS_RECOMMENDATIONS = [
+    "核查接口当前 oper/admin 状态是否与告警状态一致。",
+    "结合接口日志时间线确认是否存在链路 up/down、flap、模块异常或对端切换。",
+    "如接口属于聚合链路，继续核查 port-channel 成员状态、LACP 状态和对端端口状态。",
+    "必要时结合对端设备接口状态、光模块状态和链路物理层信息继续确认。",
+]
+
+
+def _v11b_safe_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v11b_is_traffic_family(execution_data):
+    try:
+        return bool(_v5_should_add_interface_traffic_facts(execution_data))
+    except Exception:
+        family = _v11b_safe_text(
+            ((execution_data.get("family_result") or {}).get("family"))
+            or ((execution_data.get("classification") or {}).get("family"))
+            or ((execution_data.get("classification") or {}).get("playbook_type"))
+            or ((execution_data.get("playbook") or {}).get("playbook_id"))
+        )
+
+        return family in {
+            "interface_or_link_utilization_high",
+            "interface_or_link_traffic_drop",
+        }
+
+
+def _v11b_has_traffic_recommendation_text(line):
+    text = _v11b_safe_text(line)
+    lower = text.lower()
+
+    for keyword in V11B_TRAFFIC_RECOMMENDATION_KEYWORDS:
+        if keyword in text or keyword.lower() in lower:
+            return True
+
+    return False
+
+
+def _v11b_filter_recommendation_lines(lines):
+    result = []
+    seen = set()
+
+    for line in lines or []:
+        value = _v11b_safe_text(line)
+        if not value:
+            continue
+
+        if _v11b_has_traffic_recommendation_text(value):
+            continue
+
+        if value in seen:
+            continue
+
+        seen.add(value)
+        result.append(value)
+
+    return result
+
+
+def _v11b_status_conclusion(summary):
+    facts = summary.get("facts", {}) or {}
+    interface = _v11b_safe_text(facts.get("interface")) or "接口"
+    oper = _v11b_safe_text(facts.get("oper_status")) or "未知"
+    admin = _v11b_safe_text(facts.get("admin_status")) or "未知"
+
+    return (
+        f"{interface} 状态类只读取证完成；"
+        f"接口状态 oper={oper} / admin={admin}。"
+        "建议结合接口状态、聚合关系、对端端口和日志时间线判断是否存在链路抖动、模块异常或链路切换。"
+    )
+
+
+def _v11b_filter_non_traffic_recommendation_summary(summary, execution_data):
+    if _v11b_is_traffic_family(execution_data):
+        return summary
+
+    summary = dict(summary or {})
+
+    summary["notify_lines"] = _v11b_filter_recommendation_lines(summary.get("notify_lines", []) or [])
+    summary["key_findings"] = _v11b_filter_recommendation_lines(summary.get("key_findings", []) or [])
+
+    filtered_recommendations = _v11b_filter_recommendation_lines(summary.get("recommendations", []) or [])
+
+    for item in V11B_STATUS_RECOMMENDATIONS:
+        if item not in filtered_recommendations:
+            filtered_recommendations.append(item)
+
+    summary["recommendations"] = filtered_recommendations[:8]
+
+    conclusion = _v11b_safe_text(summary.get("conclusion"))
+    if _v11b_has_traffic_recommendation_text(conclusion):
+        summary["conclusion"] = _v11b_status_conclusion(summary)
+
+    return summary
+
+
+if _v11b_original_build_interface_evidence_summary is not None:
+    def build_interface_evidence_summary(execution_data):
+        base_summary = _v11b_original_build_interface_evidence_summary(execution_data)
+        return _v11b_filter_non_traffic_recommendation_summary(base_summary, execution_data)
+# ===== v5 non-traffic family recommendation final filter end =====

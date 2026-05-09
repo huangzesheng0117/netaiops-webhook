@@ -1,6 +1,6 @@
 # webhook_v5 真实告警回归报告
 
-- generated_at: 2026-05-09T07:38:13.679298+00:00
+- generated_at: 2026-05-09T08:59:14.367940+00:00
 - total_checked: 5
 - passed: 5
 - failed: 0
@@ -11,8 +11,8 @@
 
 | family | total_count | execution_count |
 |---|---:|---:|
-| interface_status_or_flap | 1589 | 668 |
-| interface_or_link_utilization_high | 1006 | 259 |
+| interface_status_or_flap | 1605 | 674 |
+| interface_or_link_utilization_high | 1010 | 259 |
 | interface_packet_loss_or_discards_high | 344 | 226 |
 | generic_network_readonly | 322 | 0 |
 | connection_or_session_anomaly | 236 | 0 |
@@ -54,5 +54,5 @@
 | P0 | interface_or_link_utilization_high | 20260509_121856_464702_0753f1e0 | 10.189.250.50 | 3 | True |  |
 | P0 | interface_or_link_traffic_drop | 20260424_233124_296218_9915133e | 10.192.251.102 | 4 | True |  |
 | P0 | interface_packet_loss_or_discards_high | 20260508_170059_069466_3144d3c3 | 10.187.250.95 | 3 | True |  |
-| P0 | interface_status_or_flap | 20260509_152542_719620_de540f58 | 10.187.250.212 | 3 | True |  |
+| P0 | interface_status_or_flap | 20260509_165043_044145_e941d97c | 10.187.250.212 | 3 | True |  |
 | P0 | bgp_neighbor_down | summarytest01 |  | 0 | True |  |
