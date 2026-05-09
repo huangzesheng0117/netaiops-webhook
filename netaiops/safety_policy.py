@@ -311,3 +311,29 @@ def apply_safety_policy_to_plan(plan_data: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     return plan_data
+
+# ===== v5 expanded family safety allowlist begin =====
+# 将第六批新增 capability 加入安全白名单。
+# 这些 capability 仍然只允许只读命令，最终命令还会继续经过 prefix / deny pattern 检查。
+
+V5_EXPANDED_ALLOWED_CAPABILITIES = {
+    "query_prometheus_metric_window",
+    "query_elastic_related_logs",
+    "show_device_environment",
+    "show_fan_status",
+    "show_power_status",
+    "show_environment_temperature",
+    "show_chassis_status",
+    "show_module_status",
+    "show_inventory",
+    "show_interface_transceiver",
+    "show_device_disk",
+    "show_ha_state",
+    "show_cimc_hardware_status",
+}
+
+try:
+    DEFAULT_ALLOWED_CAPABILITIES.update(V5_EXPANDED_ALLOWED_CAPABILITIES)
+except NameError:
+    DEFAULT_ALLOWED_CAPABILITIES = set(V5_EXPANDED_ALLOWED_CAPABILITIES)
+# ===== v5 expanded family safety allowlist end =====

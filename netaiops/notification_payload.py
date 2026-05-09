@@ -207,6 +207,101 @@ def build_command_result_line(item: Dict[str, Any], line_index: int) -> str:
     return prefix
 
 
+def _v5_command_text(item: Dict[str, Any]) -> str:
+    item = item or {}
+
+    for key in ("command", "rendered_command", "cmd"):
+        value = safe_text(item.get(key))
+        if value:
+            return value
+
+    candidate = item.get("candidate")
+    if isinstance(candidate, dict):
+        for key in ("command", "rendered_command", "cmd"):
+            value = safe_text(candidate.get(key))
+            if value:
+                return value
+
+    return ""
+
+
+def _v5_command_status(item: Dict[str, Any]) -> str:
+    item = item or {}
+    judge = item.get("judge", {}) or {}
+
+    if judge.get("hard_error"):
+        return "failed"
+
+    status = safe_text(
+        judge.get("final_status")
+        or item.get("final_status")
+        or item.get("dispatch_status")
+        or item.get("status")
+    ).lower()
+
+    if status in ("completed", "success", "succeeded", "ok"):
+        return "completed"
+
+    if status in ("failed", "failure", "error", "timeout"):
+        return "failed"
+
+    if status in ("partial", "partially_completed", "partial_completed"):
+        return "partial"
+
+    return "partial"
+
+
+def _v5_format_command_list(commands: List[str]) -> str:
+    cleaned = []
+    seen = set()
+
+    for cmd in commands or []:
+        value = safe_text(cmd)
+        if not value:
+            continue
+        if value in seen:
+            continue
+        seen.add(value)
+        cleaned.append(value)
+
+    if not cleaned:
+        return "无"
+
+    return "；".join(cleaned)
+
+
+def _v5_build_command_execution_summary_line(
+    line_no: int,
+    command_results: List[Dict[str, Any]],
+) -> str:
+    completed_commands: List[str] = []
+    failed_commands: List[str] = []
+    partial_commands: List[str] = []
+
+    for item in command_results or []:
+        command = _v5_command_text(item)
+        status = _v5_command_status(item)
+
+        if status == "completed":
+            completed_commands.append(command)
+        elif status == "failed":
+            failed_commands.append(command)
+        else:
+            partial_commands.append(command)
+
+    completed_count = len(completed_commands)
+    failed_count = len(failed_commands)
+    partial_count = len(partial_commands)
+    total_count = len(command_results or [])
+
+    return (
+        f"{line_no}. 已完成MCP只读取证：共执行 {total_count} 条只读命令，"
+        f"成功 {completed_count} 条，具体内容为：{_v5_format_command_list(completed_commands)}。"
+        f"失败 {failed_count} 条，具体内容为：{_v5_format_command_list(failed_commands)}。"
+        f"部分完成 {partial_count} 条，具体内容为：{_v5_format_command_list(partial_commands)}。"
+    )
+
+
 def build_analysis_process(
     analysis_data: Dict[str, Any],
     execution_data: Dict[str, Any],
@@ -225,23 +320,12 @@ def build_analysis_process(
         lines.append(f"1. 根据告警内容初步判断：{summary_text}")
 
     if evidence_summary.get("has_facts"):
-        completed_count = 0
-        failed_count = 0
-        partial_count = 0
-
-        for item in command_results:
-            status = safe_text(item.get("dispatch_status")).lower()
-            if status == "completed":
-                completed_count += 1
-            elif status == "failed":
-                failed_count += 1
-            else:
-                partial_count += 1
-
         if command_results:
             lines.append(
-                f"{len(lines) + 1}. 已完成MCP只读取证：共执行 {len(command_results)} 条只读命令，"
-                f"成功 {completed_count} 条，失败 {failed_count} 条，部分完成 {partial_count} 条。"
+                _v5_build_command_execution_summary_line(
+                    len(lines) + 1,
+                    command_results,
+                )
             )
 
         notify_lines = evidence_summary.get("notify_lines", []) or []
@@ -476,4 +560,3 @@ try:
 except NameError:
     pass
 # ===== v5 notify template wrapper end =====
-

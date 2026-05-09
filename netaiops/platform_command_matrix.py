@@ -377,3 +377,128 @@ def resolve_execution_candidates(
         order += 1
 
     return results
+
+# ===== v5 expanded family platform commands begin =====
+# 说明：
+# 为第六批新增的 Prometheus rule family 补平台命令矩阵。
+# query_prometheus_metric_window / query_elastic_related_logs 属于内置证据能力，
+# 不渲染为 MCP 设备命令，避免被 runner 当作设备命令执行。
+
+V5_EXPANDED_PLATFORM_COMMANDS = {
+    "cisco_nxos": {
+        "show_device_environment": "show environment",
+        "show_fan_status": "show environment fan",
+        "show_power_status": "show environment power",
+        "show_environment_temperature": "show environment temperature",
+        "show_chassis_status": "show module",
+        "show_module_status": "show module",
+        "show_inventory": "show inventory",
+        "show_interface_transceiver": "show interface {interface} transceiver details",
+        "show_device_disk": "show file systems",
+        "show_ha_state": "show system redundancy status",
+        "show_cimc_hardware_status": "show inventory",
+    },
+
+    "cisco_iosxe": {
+        "show_device_environment": "show environment all",
+        "show_fan_status": "show environment all",
+        "show_power_status": "show environment all",
+        "show_environment_temperature": "show environment all",
+        "show_chassis_status": "show platform",
+        "show_module_status": "show platform",
+        "show_inventory": "show inventory",
+        "show_interface_transceiver": "show interfaces {interface} transceiver detail",
+        "show_device_disk": "show file systems",
+        "show_ha_state": "show redundancy states",
+        "show_cimc_hardware_status": "show inventory",
+    },
+
+    "huawei_vrp": {
+        "show_device_environment": "display environment",
+        "show_fan_status": "display fan",
+        "show_power_status": "display power",
+        "show_environment_temperature": "display temperature all",
+        "show_chassis_status": "display device",
+        "show_module_status": "display device",
+        "show_inventory": "display device manuinfo",
+        "show_interface_transceiver": "display transceiver interface {interface} verbose",
+        "show_device_disk": "display storage",
+        "show_ha_state": "display device",
+        "show_cimc_hardware_status": "display device manuinfo",
+    },
+
+    "h3c_comware": {
+        "show_device_environment": "display environment",
+        "show_fan_status": "display fan",
+        "show_power_status": "display power",
+        "show_environment_temperature": "display environment",
+        "show_chassis_status": "display device",
+        "show_module_status": "display device",
+        "show_inventory": "display device manuinfo",
+        "show_interface_transceiver": "display transceiver interface {interface} verbose",
+        "show_device_disk": "display storage",
+        "show_ha_state": "display irf",
+        "show_cimc_hardware_status": "display device manuinfo",
+    },
+
+    "f5_tmsh": {
+        "show_device_environment": "tmsh show sys hardware",
+        "show_fan_status": "tmsh show sys hardware",
+        "show_power_status": "tmsh show sys hardware",
+        "show_environment_temperature": "tmsh show sys hardware",
+        "show_chassis_status": "tmsh show sys hardware",
+        "show_module_status": "tmsh show sys hardware",
+        "show_inventory": "tmsh show sys hardware",
+        "show_device_disk": "tmsh show sys disk",
+        "show_ha_state": "tmsh show sys failover",
+        "show_cimc_hardware_status": "tmsh show sys hardware",
+    },
+
+    "fortigate_fortios": {
+        "show_device_environment": "get system status",
+        "show_fan_status": "get system status",
+        "show_power_status": "get system status",
+        "show_environment_temperature": "get system performance status",
+        "show_chassis_status": "get system status",
+        "show_module_status": "get system status",
+        "show_inventory": "get system status",
+        "show_interface_transceiver": "diagnose hardware deviceinfo nic {interface}",
+        "show_device_disk": "get system status",
+        "show_ha_state": "get system ha status",
+        "show_cimc_hardware_status": "get system status",
+    },
+
+    "hillstone_stoneos": {
+        "show_device_environment": "show environment",
+        "show_fan_status": "show fan",
+        "show_power_status": "show power",
+        "show_environment_temperature": "show temperature",
+        "show_chassis_status": "show hardware",
+        "show_module_status": "show hardware",
+        "show_inventory": "show hardware",
+        "show_interface_transceiver": "show interface {interface}",
+        "show_device_disk": "show storage",
+        "show_ha_state": "show ha",
+        "show_cimc_hardware_status": "show hardware",
+    },
+
+    "generic_network": {
+        "show_device_environment": "show environment",
+        "show_fan_status": "show environment",
+        "show_power_status": "show environment",
+        "show_environment_temperature": "show environment",
+        "show_chassis_status": "show inventory",
+        "show_module_status": "show inventory",
+        "show_inventory": "show inventory",
+        "show_interface_transceiver": "show interface {interface} transceiver details",
+        "show_device_disk": "show file systems",
+        "show_ha_state": "show redundancy",
+        "show_cimc_hardware_status": "show inventory",
+    },
+}
+
+
+for _v5_platform, _v5_commands in V5_EXPANDED_PLATFORM_COMMANDS.items():
+    PLATFORM_COMMAND_MATRIX.setdefault(_v5_platform, {})
+    PLATFORM_COMMAND_MATRIX[_v5_platform].update(_v5_commands)
+# ===== v5 expanded family platform commands end =====

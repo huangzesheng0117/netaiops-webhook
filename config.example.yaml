@@ -157,3 +157,33 @@ safety_policy:
     - ";"
     - "&&"
     - "\|\|"
+
+# Prometheus 指标窗口证据接入示例
+# 说明：
+# 1. enabled=true 且 base_url 有效时，review 会自动查询告警前后窗口指标。
+# 2. 默认按 ifHCInOctets / ifHCOutOctets / ifHighSpeed 生成 PromQL。
+# 3. 如果你的 Prometheus 指标名或标签名不同，请修改 metric_names / label_names / queries。
+# 4. 可用变量：
+#    {instance} {interface} {interface_regex} {device_ip} {hostname} {job} {alarm_type}
+prometheus:
+  enabled: false
+  base_url: "http://127.0.0.1:9090"
+  timeout: 10
+  lookback_minutes: 15
+  lookahead_minutes: 5
+  step: "60s"
+  rate_window: "5m"
+  high_threshold_percent: 80
+  recovered_threshold_percent: 20
+  metric_names:
+    if_in_octets: "ifHCInOctets"
+    if_out_octets: "ifHCOutOctets"
+    if_speed_mbps: "ifHighSpeed"
+  label_names:
+    instance: "instance"
+    if_name: "ifName"
+  queries:
+    interface_input_utilization_percent: ""
+    interface_output_utilization_percent: ""
+    interface_input_bps: ""
+    interface_output_bps: ""

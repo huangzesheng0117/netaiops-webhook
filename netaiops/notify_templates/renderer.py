@@ -62,3 +62,59 @@ def render_notification_text(
         return fallback_renderer(payload)
 
     return generic.render(payload, fallback_renderer=None)
+
+# ===== v5 expanded family notify template router begin =====
+# 为新增 family 增加通知模板路由。
+# 当前模板保持原通知正文格式，后续可以在 hardware.py / dns.py / ha.py 内细化话术。
+
+import importlib as _v8_importlib
+
+
+V8_HARDWARE_TEMPLATE_FAMILIES = {
+    "hardware_fan_abnormal",
+    "hardware_power_abnormal",
+    "hardware_temperature_high",
+    "chassis_slot_or_module_abnormal",
+    "optical_power_abnormal",
+    "device_disk_high",
+    "cimc_hardware_abnormal",
+}
+
+V8_DNS_TEMPLATE_FAMILIES = {
+    "dns_request_rate_anomaly",
+    "dns_response_rate_anomaly",
+}
+
+V8_HA_TEMPLATE_FAMILIES = {
+    "ha_or_cluster_state_abnormal",
+}
+
+V8_F5_TEMPLATE_FAMILIES = {
+    "f5_connection_rate_anomaly",
+}
+
+
+try:
+    _v8_original_select_template_module = select_template_module
+except NameError:
+    _v8_original_select_template_module = None
+
+
+def select_template_module(family: str):
+    if family in V8_HARDWARE_TEMPLATE_FAMILIES:
+        return _v8_importlib.import_module("netaiops.notify_templates.hardware")
+
+    if family in V8_DNS_TEMPLATE_FAMILIES:
+        return _v8_importlib.import_module("netaiops.notify_templates.dns")
+
+    if family in V8_HA_TEMPLATE_FAMILIES:
+        return _v8_importlib.import_module("netaiops.notify_templates.ha")
+
+    if family in V8_F5_TEMPLATE_FAMILIES:
+        return _v8_importlib.import_module("netaiops.notify_templates.f5")
+
+    if _v8_original_select_template_module is not None:
+        return _v8_original_select_template_module(family)
+
+    return _v8_importlib.import_module("netaiops.notify_templates.generic")
+# ===== v5 expanded family notify template router end =====
