@@ -594,3 +594,78 @@ def v4_internal_auto_pipeline(request_id: str):
         "request_id": request_id,
         "result": result,
     }
+
+# ===== v5 skip resolved alertmanager/prometheus alerts begin =====
+# Resolved 恢复告警不进入分析流程：
+# 1. 全 resolved payload：直接返回 skipped。
+# 2. mixed payload：只保留 firing alerts，丢弃 resolved alerts 后继续进入原 webhook 流程。
+# 3. 非 webhook 路径不受影响。
+
+try:
+    import json as _v5sr_json
+    from starlette.requests import Request as _V5SRRequest
+    from starlette.responses import JSONResponse as _V5SRJSONResponse
+
+    from netaiops.alert_status_filter import filter_firing_alerts as _v5sr_filter_firing_alerts
+
+    if not getattr(app.state, "v5_skip_resolved_alerts_enabled", False):
+        app.state.v5_skip_resolved_alerts_enabled = True
+
+        @app.middleware("http")
+        async def v5_skip_resolved_alerts_middleware(request: _V5SRRequest, call_next):
+            path = request.url.path or ""
+
+            # 只处理 webhook 告警入口，避免影响 health / summary / query 等接口。
+            if request.method.upper() == "POST" and "/webhook/" in path:
+                body = await request.body()
+
+                try:
+                    payload = _v5sr_json.loads(body.decode("utf-8", errors="replace") or "{}")
+                except Exception:
+                    async def receive_original():
+                        return {
+                            "type": "http.request",
+                            "body": body,
+                            "more_body": False,
+                        }
+
+                    request = _V5SRRequest(request.scope, receive_original)
+                    return await call_next(request)
+
+                action, filtered_payload, meta = _v5sr_filter_firing_alerts(payload)
+
+                if action == "skip_resolved":
+                    return _V5SRJSONResponse(
+                        {
+                            "status": "skipped",
+                            "reason": "resolved_alert_ignored",
+                            "message": "resolved alert payload ignored; no analysis will be triggered",
+                            "analysis_skipped": True,
+                            "mcp_skipped": True,
+                            "notify_skipped": True,
+                            "path": path,
+                            "filter_meta": meta,
+                        }
+                    )
+
+                if action == "pass_filtered":
+                    body = _v5sr_json.dumps(filtered_payload, ensure_ascii=False).encode("utf-8")
+
+                async def receive_filtered():
+                    return {
+                        "type": "http.request",
+                        "body": body,
+                        "more_body": False,
+                    }
+
+                request = _V5SRRequest(request.scope, receive_filtered)
+
+            return await call_next(request)
+
+except Exception as _v5sr_exc:
+    # 不因中间件注册失败影响主服务启动。
+    try:
+        print("WARN: v5 skip resolved alerts middleware init failed:", _v5sr_exc)
+    except Exception:
+        pass
+# ===== v5 skip resolved alertmanager/prometheus alerts end =====
