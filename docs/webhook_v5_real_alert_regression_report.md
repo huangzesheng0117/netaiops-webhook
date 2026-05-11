@@ -1,6 +1,6 @@
 # webhook_v5 真实告警回归报告
 
-- generated_at: 2026-05-11T06:01:31.393286+00:00
+- generated_at: 2026-05-11T09:12:44.975265+00:00
 - total_checked: 5
 - passed: 5
 - failed: 0
@@ -12,9 +12,9 @@
 | family | total_count | execution_count |
 |---|---:|---:|
 | interface_status_or_flap | 1626 | 677 |
-| interface_or_link_utilization_high | 1198 | 341 |
+| interface_or_link_utilization_high | 1218 | 354 |
 | interface_packet_loss_or_discards_high | 344 | 226 |
-| generic_network_readonly | 322 | 0 |
+| generic_network_readonly | 325 | 0 |
 | connection_or_session_anomaly | 236 | 0 |
 | dns_quality_or_traffic_anomaly | 53 | 0 |
 |  | 27 | 1 |
@@ -52,7 +52,7 @@
 
 | priority | family | request_id | device | commands | ok | errors |
 |---|---|---|---|---:|---|---|
-| P0 | interface_or_link_utilization_high | 20260511_130503_635574_11c83412 | 10.189.250.51 | 3 | True |  |
+| P0 | interface_or_link_utilization_high | 20260511_163358_105688_d9c29e6f | 10.189.250.50 | 3 | True |  |
 | P0 | interface_or_link_traffic_drop | 20260424_233124_296218_9915133e | 10.192.251.102 | 4 | True |  |
 | P0 | interface_packet_loss_or_discards_high | 20260508_170059_069466_3144d3c3 | 10.187.250.95 | 3 | True |  |
 | P0 | interface_status_or_flap | 20260509_172543_169146_45f01516 | 10.187.250.212 | 3 | True |  |

@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-05-11T06:01:31.393286+00:00",
+  "generated_at": "2026-05-11T09:12:44.975265+00:00",
   "rebuild_index": {
     "db_path": "/opt/netaiops-webhook/data/index/netaiops_meta.sqlite3",
-    "total_seen": 3859,
-    "indexed": 3859,
+    "total_seen": 3882,
+    "indexed": 3882,
     "failed": []
   },
   "family_counts": {
     "interface_status_or_flap": 1626,
-    "interface_or_link_utilization_high": 1198,
+    "interface_or_link_utilization_high": 1218,
     "interface_packet_loss_or_discards_high": 344,
-    "generic_network_readonly": 322,
+    "generic_network_readonly": 325,
     "connection_or_session_anomaly": 236,
     "dns_quality_or_traffic_anomaly": 53,
     "": 27,
@@ -24,7 +24,7 @@
   },
   "family_execution_counts": {
     "interface_status_or_flap": 677,
-    "interface_or_link_utilization_high": 341,
+    "interface_or_link_utilization_high": 354,
     "interface_packet_loss_or_discards_high": 226,
     "bgp_neighbor_down": 9,
     "interface_or_link_traffic_drop": 5,
@@ -80,11 +80,11 @@
   "failed": 0,
   "checked_items": [
     {
-      "request_id": "20260511_130503_635574_11c83412",
+      "request_id": "20260511_163358_105688_d9c29e6f",
       "family": "interface_or_link_utilization_high",
-      "device_ip": "10.189.250.51",
+      "device_ip": "10.189.250.50",
       "hostname": "10.191.96.43:9116",
-      "interface_name": "Ethernet1/26",
+      "interface_name": "Ethernet1/29",
       "event_status": "firing",
       "command_count": 3,
       "ok": true,
@@ -101,7 +101,7 @@
       "bundle_metric_count": 0,
       "bundle_log_count": 0,
       "bundle_device_output_count": 3,
-      "notify_title": "NetAIOps分析结果-20260511-1305",
+      "notify_title": "NetAIOps分析结果-20260511-1633",
       "notify_has_device": true,
       "notify_has_alarm": true,
       "notify_has_analysis": true,
@@ -109,7 +109,7 @@
       "notify_has_removed_context": false,
       "notify_has_removed_detail": false,
       "notify_has_command_detail": true,
-      "notify_text_len": 864
+      "notify_text_len": 859
     },
     {
       "request_id": "20260424_233124_296218_9915133e",
