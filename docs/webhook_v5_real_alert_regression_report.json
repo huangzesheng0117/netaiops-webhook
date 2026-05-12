@@ -1,14 +1,14 @@
 {
-  "generated_at": "2026-05-11T09:12:44.975265+00:00",
+  "generated_at": "2026-05-12T03:31:38.499277+00:00",
   "rebuild_index": {
     "db_path": "/opt/netaiops-webhook/data/index/netaiops_meta.sqlite3",
-    "total_seen": 3882,
-    "indexed": 3882,
+    "total_seen": 3885,
+    "indexed": 3885,
     "failed": []
   },
   "family_counts": {
     "interface_status_or_flap": 1626,
-    "interface_or_link_utilization_high": 1218,
+    "interface_or_link_utilization_high": 1221,
     "interface_packet_loss_or_discards_high": 344,
     "generic_network_readonly": 325,
     "connection_or_session_anomaly": 236,
@@ -24,7 +24,7 @@
   },
   "family_execution_counts": {
     "interface_status_or_flap": 677,
-    "interface_or_link_utilization_high": 354,
+    "interface_or_link_utilization_high": 357,
     "interface_packet_loss_or_discards_high": 226,
     "bgp_neighbor_down": 9,
     "interface_or_link_traffic_drop": 5,
@@ -80,28 +80,28 @@
   "failed": 0,
   "checked_items": [
     {
-      "request_id": "20260511_163358_105688_d9c29e6f",
+      "request_id": "20260512_110314_957370_1dbd9398",
       "family": "interface_or_link_utilization_high",
-      "device_ip": "10.189.250.50",
-      "hostname": "10.191.96.43:9116",
-      "interface_name": "Ethernet1/29",
+      "device_ip": "10.189.250.8",
+      "hostname": "WG404-H0304-C95-INT-ACC",
+      "interface_name": "Te1/0/1",
       "event_status": "firing",
       "command_count": 3,
       "ok": true,
       "skipped": false,
       "skip_reason": "",
       "errors": [],
-      "review_status": "completed",
+      "review_status": "needs_attention",
       "has_evidence_summary": true,
       "evidence_has_facts": true,
       "evidence_family": "interface_or_link_utilization_high",
       "bundle_schema_version": "1.0",
-      "bundle_confidence": "medium",
-      "bundle_fact_count": 24,
+      "bundle_confidence": "medium_low",
+      "bundle_fact_count": 30,
       "bundle_metric_count": 0,
       "bundle_log_count": 0,
       "bundle_device_output_count": 3,
-      "notify_title": "NetAIOps分析结果-20260511-1633",
+      "notify_title": "NetAIOps分析结果-20260512-1103",
       "notify_has_device": true,
       "notify_has_alarm": true,
       "notify_has_analysis": true,
@@ -109,7 +109,7 @@
       "notify_has_removed_context": false,
       "notify_has_removed_detail": false,
       "notify_has_command_detail": true,
-      "notify_text_len": 859
+      "notify_text_len": 1061
     },
     {
       "request_id": "20260424_233124_296218_9915133e",

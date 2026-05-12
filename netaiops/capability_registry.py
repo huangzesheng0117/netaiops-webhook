@@ -427,3 +427,225 @@ if _v5_original_build_capability_plan is not None:
 
         return _v5_original_build_capability_plan(event, family_result)
 # ===== v5 prometheus rule expanded capabilities end =====
+
+# ===== v5 PromQL interface utilization capability final planner begin =====
+# 修复场景：
+# family 已被修正为 interface_or_link_utilization_high，
+# 但 build_capability_plan 仍返回 ['show_recent_logs']，导致 MCP 只执行 show logging。
+#
+# 这里做最终兜底：
+# 只要是 PromQL / 告警文本明确表达接口利用率类告警，
+# 且原 plan 为空或只包含 show_recent_logs，就强制生成接口利用率取证能力集合。
+
+import json as _v16c_json
+import re as _v16c_re
+import urllib.parse as _v16c_urlparse
+
+
+try:
+    _v16c_original_build_capability_plan = build_capability_plan
+except NameError:
+    _v16c_original_build_capability_plan = None
+
+
+V16C_INTERFACE_UTILIZATION_CAPABILITIES = [
+    "show_interface_detail",
+    "show_interface_error_counters",
+    "show_portchannel_summary",
+    "query_prometheus_metric_window",
+]
+
+
+def _v16c_safe_text(value):
+    if value is None:
+        return ""
+
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            return _v16c_json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+
+    return str(value).strip()
+
+
+def _v16c_walk_text(obj, max_depth=5):
+    parts = []
+
+    def walk(value, depth=0):
+        if depth > max_depth:
+            return
+
+        if value is None:
+            return
+
+        if isinstance(value, dict):
+            for k, v in value.items():
+                parts.append(_v16c_safe_text(k))
+                walk(v, depth + 1)
+            return
+
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                walk(item, depth + 1)
+            return
+
+        parts.append(_v16c_safe_text(value))
+
+    walk(obj)
+    return _v16c_urlparse.unquote(" ".join(x for x in parts if x))
+
+
+def _v16c_get_family(family_result):
+    if not isinstance(family_result, dict):
+        return ""
+    return _v16c_safe_text(family_result.get("family"))
+
+
+def _v16c_get_interface(event, family_result):
+    for obj in (event, family_result, (family_result or {}).get("target_scope") if isinstance(family_result, dict) else {}):
+        if not isinstance(obj, dict):
+            continue
+
+        for key in ("interface", "ifName", "if_name", "port", "object_name"):
+            value = _v16c_safe_text(obj.get(key))
+            if value:
+                return value
+
+        labels = obj.get("labels")
+        if isinstance(labels, dict):
+            for key in ("interface", "ifName", "if_name", "port"):
+                value = _v16c_safe_text(labels.get(key))
+                if value:
+                    return value
+
+    text = _v16c_walk_text(event)
+
+    for pattern in (
+        r'ifName\s*=~\s*"([^"]+)"',
+        r"ifName\s*=~\s*'([^']+)'",
+        r'ifDescr\s*=~\s*"([^"]+)"',
+        r"ifDescr\s*=~\s*'([^']+)'",
+    ):
+        m = _v16c_re.search(pattern, text, flags=_v16c_re.IGNORECASE)
+        if not m:
+            continue
+
+        first = m.group(1).split("|")[0].strip()
+
+        if first:
+            return first
+
+    return ""
+
+
+def _v16c_is_promql_interface_utilization(event, family_result):
+    family = _v16c_get_family(family_result)
+
+    if family != "interface_or_link_utilization_high":
+        return False
+
+    text = _v16c_walk_text(event) + " " + _v16c_walk_text(family_result)
+    lower = text.lower()
+
+    if "利用率" in text and ("入向" in text or "出向" in text):
+        return True
+
+    if (
+        ("ifhcoutoctets" in lower or "ifhcinoctets" in lower or "ifoutoctets" in lower or "ifinoctets" in lower)
+        and ("ifname" in lower or "ifdescr" in lower)
+        and ("irate(" in lower or "rate(" in lower or "> 80000000" in text or ">80000000" in text)
+    ):
+        return True
+
+    return False
+
+
+def _v16c_plan_is_generic_logs_only(plan):
+    if not isinstance(plan, dict):
+        return True
+
+    items = plan.get("selected_capabilities", []) or []
+
+    if not items:
+        return True
+
+    capabilities = [
+        _v16c_safe_text(item.get("capability"))
+        for item in items
+        if isinstance(item, dict)
+    ]
+
+    if not capabilities:
+        return True
+
+    return set(capabilities).issubset({"show_recent_logs"})
+
+
+def _v16c_build_capability_item(capability, event, family_result, order):
+    meta = {}
+    try:
+        meta = CAPABILITY_REGISTRY.get(capability, {}) or {}
+    except Exception:
+        meta = {}
+
+    interface = _v16c_get_interface(event, family_result)
+
+    required_args = meta.get("required_args", []) or []
+
+    if capability in ("show_interface_detail", "show_interface_error_counters", "show_interface_transceiver", "show_interface_state", "show_interface_traffic_rate"):
+        if "interface" not in required_args:
+            required_args = list(required_args) + ["interface"]
+
+    arguments = {}
+
+    if interface:
+        arguments["interface"] = interface
+
+    if isinstance(event, dict):
+        for key in ("device_ip", "hostname", "vendor", "platform", "os_family", "job"):
+            value = event.get(key)
+            if value:
+                arguments[key] = value
+
+    return {
+        "order": order,
+        "capability": capability,
+        "readonly": bool(meta.get("readonly", True)),
+        "required_args": required_args,
+        "arguments": arguments,
+        "judge_profile": meta.get("judge_profile", "network_cli_generic"),
+        "reason": "v16_promql_interface_utilization_forced_capability_plan",
+    }
+
+
+def _v16c_build_forced_interface_utilization_plan(event, family_result, original_plan=None):
+    selected = [
+        _v16c_build_capability_item(capability, event, family_result, index)
+        for index, capability in enumerate(V16C_INTERFACE_UTILIZATION_CAPABILITIES, start=1)
+    ]
+
+    return {
+        "family": "interface_or_link_utilization_high",
+        "plan_source": "v16_promql_interface_utilization_forced_capability_registry",
+        "readonly_only": all(item.get("readonly", True) for item in selected),
+        "selected_capabilities": selected,
+        "capability_count": len(selected),
+        "original_plan_source": (original_plan or {}).get("plan_source") if isinstance(original_plan, dict) else "",
+        "original_capabilities": [
+            item.get("capability")
+            for item in ((original_plan or {}).get("selected_capabilities", []) if isinstance(original_plan, dict) else [])
+            if isinstance(item, dict)
+        ],
+    }
+
+
+if _v16c_original_build_capability_plan is not None:
+    def build_capability_plan(event, family_result):
+        original_plan = _v16c_original_build_capability_plan(event, family_result)
+
+        if _v16c_is_promql_interface_utilization(event, family_result) and _v16c_plan_is_generic_logs_only(original_plan):
+            return _v16c_build_forced_interface_utilization_plan(event, family_result, original_plan)
+
+        return original_plan
+# ===== v5 PromQL interface utilization capability final planner end =====

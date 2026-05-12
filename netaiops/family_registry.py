@@ -571,3 +571,208 @@ if _v5_original_classify_family is not None:
 
         return original
 # ===== v5 prometheus rule expanded families end =====
+
+# ===== v5 PromQL interface utilization family final classifier begin =====
+# 修复场景：
+# alert: WG88互联网线路_电信_100M_利用率-出向
+# expr: sum(irate(ifHCOutOctets{ip=~"10.189.250.8",ifName=~"Te1/0/1|Te2/0/1"}[2m]))*8 > 80000000
+#
+# 之前这类告警可能被误归到 generic_network_readonly，导致只生成 show_recent_logs，
+# 进而无法对 Te1/0/1 和 Te2/0/1 做多接口 MCP 取证。
+#
+# 这里做最终兜底：只要文本/PromQL 明确包含 ifHCInOctets/ifHCOutOctets + ifName/接口 + 利用率/阈值，
+# 就归类为 interface_or_link_utilization_high。
+
+import json as _v16f_json
+import re as _v16f_re
+import urllib.parse as _v16f_urlparse
+
+
+try:
+    _v16f_original_classify_family = classify_family
+except NameError:
+    _v16f_original_classify_family = None
+
+
+def _v16f_safe_text(value):
+    if value is None:
+        return ""
+
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            return _v16f_json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+
+    return str(value).strip()
+
+
+def _v16f_walk_text(obj, max_depth=5):
+    parts = []
+
+    def walk(value, depth=0):
+        if depth > max_depth:
+            return
+
+        if value is None:
+            return
+
+        if isinstance(value, dict):
+            for k, v in value.items():
+                parts.append(_v16f_safe_text(k))
+                walk(v, depth + 1)
+            return
+
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                walk(item, depth + 1)
+            return
+
+        parts.append(_v16f_safe_text(value))
+
+    walk(obj)
+    return _v16f_urlparse.unquote(" ".join(x for x in parts if x))
+
+
+def _v16f_extract_interface_from_promql(text):
+    patterns = [
+        r'ifName\s*=~\s*"([^"]+)"',
+        r"ifName\s*=~\s*'([^']+)'",
+        r'ifDescr\s*=~\s*"([^"]+)"',
+        r"ifDescr\s*=~\s*'([^']+)'",
+        r'interface\s*=~\s*"([^"]+)"',
+        r"interface\s*=~\s*'([^']+)'",
+    ]
+
+    for pattern in patterns:
+        m = _v16f_re.search(pattern, text or "", flags=_v16f_re.IGNORECASE)
+        if not m:
+            continue
+
+        expr = m.group(1).strip()
+
+        # 多接口时取第一个作为 primary interface，后续 platform_command_matrix 会展开全部接口。
+        first = expr.split("|")[0].strip()
+
+        if _v16f_re.match(r"^[A-Za-z][A-Za-z0-9_\-./]+$", first):
+            return first
+
+    return ""
+
+
+def _v16f_is_promql_interface_utilization(event):
+    text = _v16f_walk_text(event)
+    lower = text.lower()
+
+    has_octets = (
+        "ifhcoutoctets" in lower
+        or "ifhcinoc­tets" in lower
+        or "ifhcinoctets" in lower
+        or "ifoutoctets" in lower
+        or "ifinoctets" in lower
+    )
+
+    has_interface = (
+        "ifname" in lower
+        or "ifdescr" in lower
+        or "interface" in lower
+        or "端口" in text
+        or "接口" in text
+    )
+
+    has_utilization_text = (
+        "利用率" in text
+        or "带宽" in text
+        or "超过80" in text
+        or "> 80000000" in text
+        or ">80000000" in text
+        or "irate(" in lower
+        or "rate(" in lower
+    )
+
+    if has_octets and has_interface and has_utilization_text:
+        return True
+
+    # 针对告警名本身已经明确写“线路_100M_利用率-入/出向”的情况兜底。
+    if ("利用率" in text and ("入向" in text or "出向" in text) and ("线路" in text or "接口" in text or "端口" in text)):
+        return True
+
+    return False
+
+
+def _v16f_build_interface_utilization_family(event, original=None):
+    text = _v16f_walk_text(event)
+    original = original if isinstance(original, dict) else {}
+
+    interface = ""
+
+    if isinstance(event, dict):
+        for key in ("interface", "ifName", "if_name", "port", "object_name"):
+            value = _v16f_safe_text(event.get(key))
+            if value:
+                interface = value
+                break
+
+        if not interface:
+            labels = event.get("labels")
+            if isinstance(labels, dict):
+                for key in ("interface", "ifName", "if_name", "port"):
+                    value = _v16f_safe_text(labels.get(key))
+                    if value:
+                        interface = value
+                        break
+
+    if not interface:
+        interface = _v16f_extract_interface_from_promql(text)
+
+    target_scope = dict(original.get("target_scope") or {})
+
+    if isinstance(event, dict):
+        for key in (
+            "device_ip",
+            "hostname",
+            "instance",
+            "vendor",
+            "platform",
+            "os_family",
+            "job",
+            "alarm_type",
+            "raw_text",
+            "query",
+            "expr",
+        ):
+            value = event.get(key)
+            if value and key not in target_scope:
+                target_scope[key] = value
+
+    if interface:
+        target_scope["interface"] = interface
+
+    return {
+        "family": "interface_or_link_utilization_high",
+        "family_confidence": "high",
+        "match_source": "v5_promql_interface_utilization_classifier",
+        "match_reason": "matched PromQL/interface utilization pattern",
+        "catalog_rule_id": original.get("catalog_rule_id", ""),
+        "legacy_playbook_type": "interface_or_link_utilization_high",
+        "target_kind": "interface",
+        "auto_execute_allowed": True,
+        "default_capabilities": original.get("default_capabilities", []),
+        "target_scope": target_scope,
+    }
+
+
+if _v16f_original_classify_family is not None:
+    def classify_family(event):
+        original = _v16f_original_classify_family(event)
+
+        original_family = ""
+        if isinstance(original, dict):
+            original_family = _v16f_safe_text(original.get("family"))
+
+        if _v16f_is_promql_interface_utilization(event):
+            if original_family in ("", "generic", "generic_network", "generic_network_readonly", "unknown"):
+                return _v16f_build_interface_utilization_family(event, original)
+
+        return original
+# ===== v5 PromQL interface utilization family final classifier end =====

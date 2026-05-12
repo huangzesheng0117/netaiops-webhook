@@ -502,3 +502,543 @@ for _v5_platform, _v5_commands in V5_EXPANDED_PLATFORM_COMMANDS.items():
     PLATFORM_COMMAND_MATRIX.setdefault(_v5_platform, {})
     PLATFORM_COMMAND_MATRIX[_v5_platform].update(_v5_commands)
 # ===== v5 expanded family platform commands end =====
+
+# ===== v5 multi-interface PromQL command expansion begin =====
+# 支持 PromQL 多接口聚合告警：
+# 例如：
+# sum(irate(ifHCOutOctets{ip=~"10.189.250.8",ifName=~"Te1/0/1|Te2/0/1"}[2m]))*8 > 80000000
+#
+# 过去只会对 Te1/0/1 执行 MCP 取证。
+# 现在会把接口类 capability 展开成：
+# show interface Te1/0/1
+# show interface Te2/0/1
+# show interface Te1/0/1 counters errors
+# show interface Te2/0/1 counters errors
+
+import copy as _v16_copy
+import json as _v16_json
+import re as _v16_re
+import urllib.parse as _v16_urlparse
+from pathlib import Path as _V16Path
+
+
+try:
+    _v16_original_resolve_execution_candidates = resolve_execution_candidates
+except NameError:
+    _v16_original_resolve_execution_candidates = None
+
+
+V16_INTERFACE_EXPAND_CAPABILITIES = {
+    "show_interface_detail",
+    "show_interface_error_counters",
+    "show_interface_transceiver",
+    "show_interface_state",
+    "show_interface_traffic_rate",
+}
+
+
+V16_RULE_FILES = [
+    _V16Path("/opt/netaiops-webhook/input/prometheus_rules.txt"),
+    _V16Path("/opt/netaiops-webhook/input/rules.txt"),
+    _V16Path("/opt/netaiops-webhook/rules.txt"),
+]
+
+
+def _v16_safe_text(value):
+    if value is None:
+        return ""
+
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            return _v16_json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+
+    return str(value).strip()
+
+
+def _v16_walk_text(obj, max_depth=5):
+    parts = []
+
+    def walk(value, depth):
+        if depth > max_depth:
+            return
+
+        if value is None:
+            return
+
+        if isinstance(value, dict):
+            for key, item in value.items():
+                parts.append(_v16_safe_text(key))
+                walk(item, depth + 1)
+            return
+
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                walk(item, depth + 1)
+            return
+
+        parts.append(_v16_safe_text(value))
+
+    walk(obj, 0)
+
+    raw = " ".join(x for x in parts if x)
+    decoded = _v16_urlparse.unquote(raw)
+
+    return raw + " " + decoded
+
+
+def _v16_event_tokens_for_rule_lookup(event):
+    text = _v16_walk_text(event)
+
+    tokens = set()
+
+    for m in _v16_re.finditer(r"[A-Za-z0-9_\-\u4e00-\u9fff]+(?:_[A-Za-z0-9_\-\u4e00-\u9fff]+)+", text):
+        token = m.group(0).strip()
+        if len(token) >= 8:
+            tokens.add(token)
+
+    if isinstance(event, dict):
+        labels = event.get("labels") or {}
+        annotations = event.get("annotations") or {}
+
+        for obj in (event, labels, annotations):
+            if not isinstance(obj, dict):
+                continue
+
+            for key in ("alertname", "alarm_type", "summary", "description", "raw_text"):
+                value = _v16_safe_text(obj.get(key))
+                if value and len(value) >= 8:
+                    tokens.add(value)
+
+    return sorted(tokens, key=len, reverse=True)[:20]
+
+
+def _v16_rule_context_from_event(event):
+    tokens = _v16_event_tokens_for_rule_lookup(event)
+
+    if not tokens:
+        return ""
+
+    contexts = []
+
+    for path in V16_RULE_FILES:
+        if not path.exists():
+            continue
+
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+
+        for token in tokens:
+            pos = text.find(token)
+            if pos < 0:
+                continue
+
+            start = max(0, pos - 2500)
+            end = min(len(text), pos + 4500)
+            contexts.append(text[start:end])
+
+            if len(contexts) >= 5:
+                break
+
+        if len(contexts) >= 5:
+            break
+
+    return "\n".join(contexts)
+
+
+def _v16_text_blob(event, family_result, plan):
+    parts = [
+        _v16_walk_text(event),
+        _v16_walk_text(family_result),
+        _v16_walk_text(plan),
+        _v16_rule_context_from_event(event),
+    ]
+
+    text = "\n".join(x for x in parts if x)
+    return _v16_urlparse.unquote(text)
+
+
+def _v16_is_plain_interface_token(value):
+    value = _v16_safe_text(value)
+
+    if not value:
+        return False
+
+    if len(value) > 80:
+        return False
+
+    # 排除明显正则表达式，而保留 Te1/0/1、Eth1/1、port-channel27、Ten-GigabitEthernet1/0/1。
+    if any(ch in value for ch in ("*", "+", "?", "^", "$", "[", "]", "(", ")", "{", "}")):
+        return False
+
+    return bool(_v16_re.match(r"^[A-Za-z][A-Za-z0-9_\-./]+$", value))
+
+
+def _v16_split_interface_regex(expr):
+    expr = _v16_safe_text(expr).strip().strip('"').strip("'")
+
+    if "|" not in expr:
+        return []
+
+    items = []
+
+    for item in expr.split("|"):
+        item = item.strip().strip('"').strip("'")
+        if _v16_is_plain_interface_token(item):
+            items.append(item)
+
+    result = []
+    seen = set()
+
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+
+    if len(result) >= 2:
+        return result
+
+    return []
+
+
+def _v16_extract_multi_interfaces(event, family_result, plan):
+    text = _v16_text_blob(event, family_result, plan)
+
+    patterns = [
+        r'ifName\s*=~\s*"([^"]+\|[^"]+)"',
+        r"ifName\s*=~\s*'([^']+\|[^']+)'",
+        r'ifDescr\s*=~\s*"([^"]+\|[^"]+)"',
+        r"ifDescr\s*=~\s*'([^']+\|[^']+)'",
+        r'interface\s*=~\s*"([^"]+\|[^"]+)"',
+        r"interface\s*=~\s*'([^']+\|[^']+)'",
+        r'port\s*[:=]\s*"?(?P<ports>[A-Za-z][A-Za-z0-9_\-./]+(?:\|[A-Za-z][A-Za-z0-9_\-./]+)+)"?',
+    ]
+
+    for pattern in patterns:
+        m = _v16_re.search(pattern, text, flags=_v16_re.IGNORECASE)
+        if not m:
+            continue
+
+        expr = m.groupdict().get("ports") or m.group(1)
+        interfaces = _v16_split_interface_regex(expr)
+
+        if len(interfaces) >= 2:
+            return interfaces
+
+    return []
+
+
+def _v16_get_primary_interface(event, family_result, plan, commands):
+    candidates = []
+
+    for obj in (
+        event,
+        family_result,
+        (family_result or {}).get("target_scope") if isinstance(family_result, dict) else {},
+        plan,
+        (plan or {}).get("target_scope") if isinstance(plan, dict) else {},
+    ):
+        if not isinstance(obj, dict):
+            continue
+
+        for key in ("interface", "ifName", "if_name", "port", "object_name"):
+            value = _v16_safe_text(obj.get(key))
+            if _v16_is_plain_interface_token(value):
+                candidates.append(value)
+
+        labels = obj.get("labels")
+        if isinstance(labels, dict):
+            for key in ("interface", "ifName", "if_name", "port"):
+                value = _v16_safe_text(labels.get(key))
+                if _v16_is_plain_interface_token(value):
+                    candidates.append(value)
+
+    for command in commands:
+        cmd = _v16_safe_text(command)
+        for m in _v16_re.finditer(r"\b((?:Te|Gi|Eth|Ethernet|TenGigabitEthernet|GigabitEthernet|port-channel|Port-channel|Po)[A-Za-z0-9_\-./]+)\b", cmd):
+            value = m.group(1)
+            if _v16_is_plain_interface_token(value):
+                candidates.append(value)
+
+    for item in candidates:
+        if item:
+            return item
+
+    return ""
+
+
+def _v16_expand_interface_candidates(candidates, interfaces, primary_interface):
+    if not interfaces or len(interfaces) < 2:
+        return candidates
+
+    expanded = []
+    seen = set()
+
+    for item in candidates or []:
+        if not isinstance(item, dict):
+            continue
+
+        capability = _v16_safe_text(item.get("capability"))
+        command = _v16_safe_text(item.get("command"))
+
+        if capability not in V16_INTERFACE_EXPAND_CAPABILITIES:
+            key = (capability, command)
+            if key not in seen:
+                seen.add(key)
+                expanded.append(item)
+            continue
+
+        base_interface = primary_interface
+
+        if base_interface and base_interface not in command:
+            base_interface = ""
+
+        if not base_interface:
+            for iface in interfaces:
+                if iface in command:
+                    base_interface = iface
+                    break
+
+        if not base_interface:
+            key = (capability, command)
+            if key not in seen:
+                seen.add(key)
+                expanded.append(item)
+            continue
+
+        for iface in interfaces:
+            new_item = _v16_copy.deepcopy(item)
+            new_item["command"] = command.replace(base_interface, iface)
+            new_item["interface"] = iface
+            new_item["multi_interface_expanded"] = True
+            new_item["multi_interface_source"] = "promql_ifName_regex"
+            new_item["multi_interfaces"] = interfaces
+
+            arguments = dict(new_item.get("arguments") or {})
+            arguments["interface"] = iface
+            arguments["interfaces"] = interfaces
+            new_item["arguments"] = arguments
+
+            key = (capability, new_item["command"])
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+            expanded.append(new_item)
+
+    for idx, item in enumerate(expanded, start=1):
+        if isinstance(item, dict):
+            item["order"] = idx
+
+    return expanded
+
+
+if _v16_original_resolve_execution_candidates is not None:
+    def resolve_execution_candidates(event, family_result, plan):
+        candidates = _v16_original_resolve_execution_candidates(event, family_result, plan)
+
+        interfaces = _v16_extract_multi_interfaces(event, family_result, plan)
+
+        if len(interfaces) < 2:
+            return candidates
+
+        primary_interface = _v16_get_primary_interface(
+            event,
+            family_result,
+            plan,
+            [x.get("command") for x in candidates if isinstance(x, dict)],
+        )
+
+        expanded = _v16_expand_interface_candidates(candidates, interfaces, primary_interface)
+
+        return expanded
+# ===== v5 multi-interface PromQL command expansion end =====
+
+# ===== v5 Cisco IOS-XE interface command normalization begin =====
+# 修复场景：
+# Cisco IOS-XE C9500 上 show interfaces Te1/0/1 作为接口详情命令失败。
+# 改为更稳妥的 show interface TenGigabitEthernet1/0/1。
+#
+# 同时保留 counters errors 和 etherchannel summary 的 IOS-XE 命令形态。
+
+import copy as _v17_copy
+import re as _v17_re
+
+
+try:
+    _v17_original_resolve_execution_candidates = resolve_execution_candidates
+except NameError:
+    _v17_original_resolve_execution_candidates = None
+
+
+def _v17_safe_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v17_iosxe_full_interface_name(interface):
+    value = _v17_safe_text(interface)
+
+    if not value:
+        return value
+
+    m = _v17_re.match(r"^Te(\d+/\d+/\d+)$", value, flags=_v17_re.IGNORECASE)
+    if m:
+        return "TenGigabitEthernet" + m.group(1)
+
+    m = _v17_re.match(r"^Gi(\d+/\d+/\d+)$", value, flags=_v17_re.IGNORECASE)
+    if m:
+        return "GigabitEthernet" + m.group(1)
+
+    m = _v17_re.match(r"^Fo(\d+/\d+/\d+)$", value, flags=_v17_re.IGNORECASE)
+    if m:
+        return "FortyGigabitEthernet" + m.group(1)
+
+    m = _v17_re.match(r"^Hu(\d+/\d+/\d+)$", value, flags=_v17_re.IGNORECASE)
+    if m:
+        return "HundredGigE" + m.group(1)
+
+    m = _v17_re.match(r"^Twe(\d+/\d+/\d+)$", value, flags=_v17_re.IGNORECASE)
+    if m:
+        return "TwentyFiveGigE" + m.group(1)
+
+    m = _v17_re.match(r"^Po(\d+)$", value, flags=_v17_re.IGNORECASE)
+    if m:
+        return "Port-channel" + m.group(1)
+
+    return value
+
+
+def _v17_iosxe_command_normalize(command):
+    command = _v17_safe_text(command)
+
+    if not command:
+        return command
+
+    # 接口详情命令：show interfaces Te1/0/1 -> show interface TenGigabitEthernet1/0/1
+    m = _v17_re.match(
+        r"^show\s+interfaces\s+(\S+)\s*$",
+        command,
+        flags=_v17_re.IGNORECASE,
+    )
+    if m:
+        return "show interface " + _v17_iosxe_full_interface_name(m.group(1))
+
+    # 接口详情命令：show interface Te1/0/1 -> show interface TenGigabitEthernet1/0/1
+    m = _v17_re.match(
+        r"^show\s+interface\s+(\S+)\s*$",
+        command,
+        flags=_v17_re.IGNORECASE,
+    )
+    if m:
+        return "show interface " + _v17_iosxe_full_interface_name(m.group(1))
+
+    # 计数器命令保留 show interfaces ... counters errors 形态，但展开接口全名。
+    m = _v17_re.match(
+        r"^show\s+interfaces\s+(\S+)\s+counters\s+errors\s*$",
+        command,
+        flags=_v17_re.IGNORECASE,
+    )
+    if m:
+        return "show interfaces " + _v17_iosxe_full_interface_name(m.group(1)) + " counters errors"
+
+    # 兜底替换命令中的短接口名。
+    def repl(match):
+        return _v17_iosxe_full_interface_name(match.group(0))
+
+    command = _v17_re.sub(
+        r"\b(?:Te|Gi|Fo|Hu|Twe|Po)\d+(?:/\d+/\d+)?\b",
+        repl,
+        command,
+        flags=_v17_re.IGNORECASE,
+    )
+
+    return command
+
+
+def _v17_is_iosxe_event(event):
+    try:
+        platform = detect_platform(event)
+    except Exception:
+        platform = ""
+
+    platform = _v17_safe_text(platform).lower()
+
+    if platform == "cisco_iosxe":
+        return True
+
+    if isinstance(event, dict):
+        text = " ".join(
+            [
+                _v17_safe_text(event.get("vendor")),
+                _v17_safe_text(event.get("platform")),
+                _v17_safe_text(event.get("os_family")),
+                _v17_safe_text(event.get("job")),
+            ]
+        ).lower()
+
+        if "ios-xe" in text or "iosxe" in text or "cat9k" in text or "c9500" in text:
+            return True
+
+    return False
+
+
+if _v17_original_resolve_execution_candidates is not None:
+    def resolve_execution_candidates(event, family_result, plan):
+        candidates = _v17_original_resolve_execution_candidates(event, family_result, plan)
+
+        if not _v17_is_iosxe_event(event):
+            return candidates
+
+        normalized = []
+        seen = set()
+
+        for item in candidates or []:
+            if not isinstance(item, dict):
+                continue
+
+            new_item = _v17_copy.deepcopy(item)
+            old_command = _v17_safe_text(new_item.get("command"))
+            new_command = _v17_iosxe_command_normalize(old_command)
+
+            new_item["command"] = new_command
+
+            if old_command != new_command:
+                new_item["iosxe_command_normalized"] = True
+                new_item["original_command"] = old_command
+
+            args = dict(new_item.get("arguments") or {})
+            iface = _v17_safe_text(args.get("interface") or new_item.get("interface"))
+            if iface:
+                args["interface"] = _v17_iosxe_full_interface_name(iface)
+                new_item["interface"] = args["interface"]
+
+            new_item["arguments"] = args
+
+            key = (_v17_safe_text(new_item.get("capability")), new_command)
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+            normalized.append(new_item)
+
+        for index, item in enumerate(normalized, start=1):
+            item["order"] = index
+
+        return normalized
+
+
+try:
+    PLATFORM_COMMAND_MATRIX.setdefault("cisco_iosxe", {})
+    PLATFORM_COMMAND_MATRIX["cisco_iosxe"]["show_interface_detail"] = "show interface {interface}"
+    PLATFORM_COMMAND_MATRIX["cisco_iosxe"]["show_interface_error_counters"] = "show interfaces {interface} counters errors"
+    PLATFORM_COMMAND_MATRIX["cisco_iosxe"]["show_portchannel_summary"] = "show etherchannel summary"
+except Exception:
+    pass
+# ===== v5 Cisco IOS-XE interface command normalization end =====

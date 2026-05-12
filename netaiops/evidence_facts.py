@@ -1363,3 +1363,468 @@ if _v11b_original_build_interface_evidence_summary is not None:
         base_summary = _v11b_original_build_interface_evidence_summary(execution_data)
         return _v11b_filter_non_traffic_recommendation_summary(base_summary, execution_data)
 # ===== v5 non-traffic family recommendation final filter end =====
+
+# ===== v5 multi-interface traffic evidence aggregation begin =====
+# 对 ifName=~"Te1/0/1|Te2/0/1" 这种多接口汇总告警：
+# 1. 从 command_results 中分别解析每个接口 input/output rate。
+# 2. 按多接口汇总计算设备侧总速率。
+# 3. 如果告警文本里有 100M / 300M / 1G 业务带宽，按业务带宽计算汇总利用率。
+# 4. 避免只展示第一个接口的速率和利用率。
+
+import json as _v16e_json
+import re as _v16e_re
+import urllib.parse as _v16e_urlparse
+
+
+try:
+    _v16e_original_build_interface_evidence_summary = build_interface_evidence_summary
+except NameError:
+    _v16e_original_build_interface_evidence_summary = None
+
+
+def _v16e_safe_text(value):
+    if value is None:
+        return ""
+
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            return _v16e_json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+
+    return str(value).strip()
+
+
+def _v16e_text_blob(execution_data):
+    parts = []
+
+    def walk(value, depth=0):
+        if depth > 5:
+            return
+
+        if value is None:
+            return
+
+        if isinstance(value, dict):
+            for k, v in value.items():
+                parts.append(_v16e_safe_text(k))
+                walk(v, depth + 1)
+            return
+
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                walk(item, depth + 1)
+            return
+
+        parts.append(_v16e_safe_text(value))
+
+    walk(execution_data)
+    return _v16e_urlparse.unquote(" ".join(x for x in parts if x))
+
+
+def _v16e_split_interfaces(expr):
+    expr = _v16e_safe_text(expr).strip().strip('"').strip("'")
+
+    if "|" not in expr:
+        return []
+
+    result = []
+    seen = set()
+
+    for item in expr.split("|"):
+        item = item.strip().strip('"').strip("'")
+        if not item:
+            continue
+
+        if not _v16e_re.match(r"^[A-Za-z][A-Za-z0-9_\-./]+$", item):
+            continue
+
+        if item in seen:
+            continue
+
+        seen.add(item)
+        result.append(item)
+
+    if len(result) >= 2:
+        return result
+
+    return []
+
+
+def _v16e_extract_multi_interfaces(execution_data):
+    # 优先从 command_results 的 multi_interfaces 字段取。
+    for item in execution_data.get("command_results", []) or []:
+        if not isinstance(item, dict):
+            continue
+
+        interfaces = item.get("multi_interfaces")
+        if isinstance(interfaces, list) and len(interfaces) >= 2:
+            return [x for x in interfaces if _v16e_safe_text(x)]
+
+    text = _v16e_text_blob(execution_data)
+
+    patterns = [
+        r'ifName\s*=~\s*"([^"]+\|[^"]+)"',
+        r"ifName\s*=~\s*'([^']+\|[^']+)'",
+        r'ifDescr\s*=~\s*"([^"]+\|[^"]+)"',
+        r"ifDescr\s*=~\s*'([^']+\|[^']+)'",
+    ]
+
+    for pattern in patterns:
+        m = _v16e_re.search(pattern, text, flags=_v16e_re.IGNORECASE)
+        if not m:
+            continue
+
+        interfaces = _v16e_split_interfaces(m.group(1))
+        if len(interfaces) >= 2:
+            return interfaces
+
+    return []
+
+
+def _v16e_unit_to_bps(value, unit):
+    unit = _v16e_safe_text(unit).lower()
+
+    if unit in ("g", "gb", "gbps", "gbit", "gbits", "gbit/s", "gbits/s"):
+        return int(float(value) * 1000 * 1000 * 1000)
+
+    if unit in ("m", "mb", "mbps", "mbit", "mbits", "mbit/s", "mbits/s"):
+        return int(float(value) * 1000 * 1000)
+
+    if unit in ("k", "kb", "kbps", "kbit", "kbits", "kbit/s", "kbits/s"):
+        return int(float(value) * 1000)
+
+    return int(float(value))
+
+
+def _v16e_parse_rate_bps(text, direction):
+    text = _v16e_safe_text(text)
+
+    if direction == "input":
+        patterns = [
+            r"(?:5\s+minute|30\s+second|300\s+second)?\s*input\s+rate\s+([0-9]+(?:\.[0-9]+)?)\s*(Gbps|Mbps|Kbps|bps|bits/sec|bit/sec)?",
+            r"input\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*(Gbps|Mbps|Kbps|bps)?",
+        ]
+    else:
+        patterns = [
+            r"(?:5\s+minute|30\s+second|300\s+second)?\s*output\s+rate\s+([0-9]+(?:\.[0-9]+)?)\s*(Gbps|Mbps|Kbps|bps|bits/sec|bit/sec)?",
+            r"output\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*(Gbps|Mbps|Kbps|bps)?",
+        ]
+
+    for pattern in patterns:
+        m = _v16e_re.search(pattern, text, flags=_v16e_re.IGNORECASE)
+        if not m:
+            continue
+
+        value = m.group(1)
+        unit = m.group(2) or "bps"
+        unit = unit.replace("bits/sec", "bps").replace("bit/sec", "bps")
+
+        return _v16e_unit_to_bps(value, unit)
+
+    return None
+
+
+def _v16e_format_bps(value):
+    if value is None:
+        return "未知"
+
+    value = float(value)
+
+    if value >= 1000 * 1000 * 1000:
+        return f"{value / 1000 / 1000 / 1000:.2f} Gbps"
+
+    if value >= 1000 * 1000:
+        return f"{value / 1000 / 1000:.2f} Mbps"
+
+    if value >= 1000:
+        return f"{value / 1000:.2f} Kbps"
+
+    return f"{int(value)} bps"
+
+
+def _v16e_percent(value, denominator):
+    if not denominator:
+        return None
+
+    return round(float(value) / float(denominator) * 100.0, 2)
+
+
+def _v16e_command_belongs_to_interface(command, interface):
+    command = _v16e_safe_text(command)
+    interface = _v16e_safe_text(interface)
+
+    return bool(interface and interface in command)
+
+
+def _v16e_collect_interface_rates(execution_data, interfaces):
+    rates = {}
+
+    for iface in interfaces:
+        rates[iface] = {
+            "input_rate_bps": None,
+            "output_rate_bps": None,
+        }
+
+    for item in execution_data.get("command_results", []) or []:
+        if not isinstance(item, dict):
+            continue
+
+        capability = _v16e_safe_text(item.get("capability"))
+        command = _v16e_safe_text(item.get("command"))
+        output = _v16e_safe_text(item.get("output"))
+
+        if capability not in ("show_interface_detail", "show_interface_traffic_rate"):
+            continue
+
+        if not output:
+            continue
+
+        for iface in interfaces:
+            if not _v16e_command_belongs_to_interface(command, iface):
+                continue
+
+            input_rate = _v16e_parse_rate_bps(output, "input")
+            output_rate = _v16e_parse_rate_bps(output, "output")
+
+            if input_rate is not None:
+                rates[iface]["input_rate_bps"] = input_rate
+
+            if output_rate is not None:
+                rates[iface]["output_rate_bps"] = output_rate
+
+    return rates
+
+
+def _v16e_filter_old_single_interface_traffic_lines(lines):
+    result = []
+
+    drop_keywords = [
+        "设备侧实时速率",
+        "设备侧估算利用率",
+        "取证时实时速率",
+        "流量判断",
+        "按告警口径估算利用率",
+        "告警口径流量判断",
+    ]
+
+    for line in lines or []:
+        text = _v16e_safe_text(line)
+        if any(keyword in text for keyword in drop_keywords):
+            continue
+        result.append(line)
+
+    return result
+
+
+def _v16e_alarm_direction(summary, execution_data):
+    facts = summary.get("facts", {}) or {}
+    direction = _v16e_safe_text(facts.get("alarm_direction"))
+
+    if direction:
+        return direction
+
+    text = _v16e_text_blob(execution_data)
+
+    if "入向" in text or "input" in text.lower() or "inbound" in text.lower():
+        return "in"
+
+    if "出向" in text or "output" in text.lower() or "outbound" in text.lower():
+        return "out"
+
+    return ""
+
+
+def _v16e_enrich_multi_interface_traffic_summary(summary, execution_data):
+    summary = dict(summary or {})
+
+    try:
+        if not _v5_should_add_interface_traffic_facts(execution_data):
+            return summary
+    except Exception:
+        family = _v16e_safe_text(
+            ((execution_data.get("family_result") or {}).get("family"))
+            or ((execution_data.get("classification") or {}).get("family"))
+        )
+        if family not in ("interface_or_link_utilization_high", "interface_or_link_traffic_drop"):
+            return summary
+
+    interfaces = _v16e_extract_multi_interfaces(execution_data)
+
+    if len(interfaces) < 2:
+        return summary
+
+    rates = _v16e_collect_interface_rates(execution_data, interfaces)
+
+    if not rates:
+        return summary
+
+    input_sum = 0
+    output_sum = 0
+    input_found = False
+    output_found = False
+
+    for iface in interfaces:
+        item = rates.get(iface, {}) or {}
+
+        if isinstance(item.get("input_rate_bps"), int):
+            input_sum += item["input_rate_bps"]
+            input_found = True
+
+        if isinstance(item.get("output_rate_bps"), int):
+            output_sum += item["output_rate_bps"]
+            output_found = True
+
+    if not input_found and not output_found:
+        return summary
+
+    facts = dict(summary.get("facts", {}) or {})
+    business_bandwidth = facts.get("business_bandwidth_bps")
+    direction = _v16e_alarm_direction(summary, execution_data)
+
+    facts["multi_interfaces"] = interfaces
+    facts["multi_interface_rates"] = rates
+
+    if input_found:
+        facts["aggregate_input_rate_bps"] = input_sum
+
+    if output_found:
+        facts["aggregate_output_rate_bps"] = output_sum
+
+    input_business_util = None
+    output_business_util = None
+
+    if isinstance(business_bandwidth, int) and business_bandwidth > 0:
+        if input_found:
+            input_business_util = _v16e_percent(input_sum, business_bandwidth)
+            facts["aggregate_input_utilization_percent_business_estimated"] = input_business_util
+
+        if output_found:
+            output_business_util = _v16e_percent(output_sum, business_bandwidth)
+            facts["aggregate_output_utilization_percent_business_estimated"] = output_business_util
+
+    notify_lines = _v16e_filter_old_single_interface_traffic_lines(summary.get("notify_lines", []) or [])
+    key_findings = _v16e_filter_old_single_interface_traffic_lines(summary.get("key_findings", []) or [])
+
+    new_lines = [
+        "多接口汇总口径：本次告警涉及 " + "、".join(interfaces) + "，设备侧速率按这些接口汇总计算。",
+        f"多接口汇总设备侧实时速率：input={_v16e_format_bps(input_sum) if input_found else '未知'}，output={_v16e_format_bps(output_sum) if output_found else '未知'}。",
+    ]
+
+    if input_business_util is not None or output_business_util is not None:
+        new_lines.append(
+            "多接口按告警口径估算利用率："
+            f"input={input_business_util if input_business_util is not None else '未知'}%，"
+            f"output={output_business_util if output_business_util is not None else '未知'}%。"
+        )
+
+    if direction == "in" and input_business_util is not None:
+        if input_business_util >= 80:
+            new_lines.append(f"多接口流量判断：取证时入向汇总利用率约 {input_business_util}%，仍处于高利用率状态。")
+        else:
+            new_lines.append(f"多接口流量判断：取证时入向汇总利用率约 {input_business_util}%，低于80%阈值，更像瞬时峰值或已恢复。")
+
+    if direction == "out" and output_business_util is not None:
+        if output_business_util >= 80:
+            new_lines.append(f"多接口流量判断：取证时出向汇总利用率约 {output_business_util}%，仍处于高利用率状态。")
+        else:
+            new_lines.append(f"多接口流量判断：取证时出向汇总利用率约 {output_business_util}%，低于80%阈值，更像瞬时峰值或已恢复。")
+
+    notify_lines.extend(new_lines)
+    key_findings.extend(new_lines)
+
+    summary["facts"] = facts
+    summary["notify_lines"] = notify_lines[:16]
+    summary["key_findings"] = key_findings[:20]
+
+    conclusion = _v16e_safe_text(summary.get("conclusion"))
+    if direction == "in" and input_business_util is not None:
+        summary["conclusion"] = (
+            conclusion
+            + f" 多接口汇总后，取证时入向告警口径估算利用率约 {input_business_util}%。"
+        ).strip()
+
+    if direction == "out" and output_business_util is not None:
+        summary["conclusion"] = (
+            conclusion
+            + f" 多接口汇总后，取证时出向告警口径估算利用率约 {output_business_util}%。"
+        ).strip()
+
+    return summary
+
+
+if _v16e_original_build_interface_evidence_summary is not None:
+    def build_interface_evidence_summary(execution_data):
+        base_summary = _v16e_original_build_interface_evidence_summary(execution_data)
+        return _v16e_enrich_multi_interface_traffic_summary(base_summary, execution_data)
+# ===== v5 multi-interface traffic evidence aggregation end =====
+
+# ===== v5 Cisco IOS-XE interface alias match for evidence begin =====
+# 命令改成长接口名后，多接口汇总仍要能识别：
+# Te1/0/1 == TenGigabitEthernet1/0/1
+# Te2/0/1 == TenGigabitEthernet2/0/1
+
+import re as _v17e_re
+
+
+def _v17e_safe_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v17e_interface_aliases(interface):
+    value = _v17e_safe_text(interface)
+
+    if not value:
+        return []
+
+    aliases = {value}
+
+    m = _v17e_re.match(r"^Te(\d+/\d+/\d+)$", value, flags=_v17e_re.IGNORECASE)
+    if m:
+        aliases.add("TenGigabitEthernet" + m.group(1))
+
+    m = _v17e_re.match(r"^TenGigabitEthernet(\d+/\d+/\d+)$", value, flags=_v17e_re.IGNORECASE)
+    if m:
+        aliases.add("Te" + m.group(1))
+
+    m = _v17e_re.match(r"^Gi(\d+/\d+/\d+)$", value, flags=_v17e_re.IGNORECASE)
+    if m:
+        aliases.add("GigabitEthernet" + m.group(1))
+
+    m = _v17e_re.match(r"^GigabitEthernet(\d+/\d+/\d+)$", value, flags=_v17e_re.IGNORECASE)
+    if m:
+        aliases.add("Gi" + m.group(1))
+
+    m = _v17e_re.match(r"^Fo(\d+/\d+/\d+)$", value, flags=_v17e_re.IGNORECASE)
+    if m:
+        aliases.add("FortyGigabitEthernet" + m.group(1))
+
+    m = _v17e_re.match(r"^FortyGigabitEthernet(\d+/\d+/\d+)$", value, flags=_v17e_re.IGNORECASE)
+    if m:
+        aliases.add("Fo" + m.group(1))
+
+    m = _v17e_re.match(r"^Po(\d+)$", value, flags=_v17e_re.IGNORECASE)
+    if m:
+        aliases.add("Port-channel" + m.group(1))
+
+    m = _v17e_re.match(r"^Port-channel(\d+)$", value, flags=_v17e_re.IGNORECASE)
+    if m:
+        aliases.add("Po" + m.group(1))
+
+    return sorted(aliases, key=len, reverse=True)
+
+
+def _v16e_command_belongs_to_interface(command, interface):
+    command = _v17e_safe_text(command)
+
+    if not command:
+        return False
+
+    for alias in _v17e_interface_aliases(interface):
+        if alias and alias in command:
+            return True
+
+    return False
+# ===== v5 Cisco IOS-XE interface alias match for evidence end =====
