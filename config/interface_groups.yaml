@@ -1,0 +1,119 @@
+interface_groups:
+- name: SH16-CTC
+  description: SH16互联网线路_CTC_300M_利用率超过80%-入向
+  device_ip: 10.187.251.95
+  match_keywords:
+  - SH16-CTC利用率-入向
+  - SH16互联网线路_CTC_300M_利用率超过80%-入向
+  - SH16-CTC利用率
+  - SH16-CTC
+  - SH16互联网线路_CTC_300M_利用率
+  - SH16互联网线路_CTC_300M_
+  - SH16互联网线路_CTC_300M_利用率超过80%
+  - SH16互联网线路_CTC_300M
+  - SH16-CTC利用率-出向
+  - SH16互联网线路_CTC_300M_利用率超过80%-出向
+  interfaces:
+  - Te1/0/2
+  - Te2/0/2
+  source_rules:
+  - SH16-CTC利用率-入向
+  - SH16-CTC利用率-出向
+- name: SH16-GDS
+  description: SH16互联网线路_GDS_300M_利用率超过80%-入向
+  device_ip: 10.187.251.95
+  match_keywords:
+  - SH16-GDS利用率-入向
+  - SH16互联网线路_GDS_300M_利用率超过80%-入向
+  - SH16-GDS利用率
+  - SH16-GDS
+  - SH16互联网线路_GDS_300M_利用率
+  - SH16互联网线路_GDS_300M_
+  - SH16互联网线路_GDS_300M_利用率超过80%
+  - SH16互联网线路_GDS_300M
+  - SH16-GDS利用率-出向
+  - SH16互联网线路_GDS_300M_利用率超过80%-出向
+  interfaces:
+  - Te1/0/1
+  - Te2/0/1
+  source_rules:
+  - SH16-GDS利用率-入向
+  - SH16-GDS利用率-出向
+- name: WG88互联网线路_电信
+  description: WG88互联网线路_电信_100M_利用率超过80%-入向
+  device_ip: 10.189.250.8
+  match_keywords:
+  - WG88互联网线路_电信利用率-入向
+  - WG88互联网线路_电信_100M_利用率超过80%-入向
+  - WG88互联网线路_电信利用率
+  - WG88互联网线路_电信
+  - WG88互联网线路_电信_100M_利用率
+  - WG88互联网线路_电信_100M_
+  - WG88互联网线路_电信_100M_利用率超过80%
+  - WG88互联网线路_电信_100M
+  - WG88互联网线路_电信_100M_利用率-出向
+  - WG88互联网线路_电信_100M_利用率超过80%-出向
+  interfaces:
+  - Te1/0/1
+  - Te2/0/1
+  source_rules:
+  - WG88互联网线路_电信利用率-入向
+  - WG88互联网线路_电信_100M_利用率-出向
+- name: WG88互联网线路_电信BGP_200M
+  description: WG88互联网线路_电信BGP_200M_利用率超过80%-入向
+  device_ip: 10.189.250.8
+  match_keywords:
+  - WG88互联网线路_电信BGP_200M_利用率-入向
+  - WG88互联网线路_电信BGP_200M_利用率超过80%-入向
+  - WG88互联网线路_电信BGP_200M_利用率
+  - WG88互联网线路_电信BGP_200M
+  - WG88互联网线路_电信BGP_200M_
+  - WG88互联网线路_电信BGP_200M_利用率超过80%
+  - WG88互联网线路_电信BGP_200M_利用率-出向
+  - WG88互联网线路_电信BGP_200M_利用率超过80%-出向
+  interfaces:
+  - Te1/0/2
+  - Te2/0/2
+  source_rules:
+  - WG88互联网线路_电信BGP_200M_利用率-入向
+  - WG88互联网线路_电信BGP_200M_利用率-出向
+- name: SH8-CTC
+  description: SH8互联网线路_CTC_300M_利用率超过80%-入向
+  device_ip: 10.192.251.95
+  match_keywords:
+  - SH8-CTC利用率-入向
+  - SH8互联网线路_CTC_300M_利用率超过80%-入向
+  - SH8-CTC利用率
+  - SH8-CTC
+  - SH8互联网线路_CTC_300M_利用率
+  - SH8互联网线路_CTC_300M_
+  - SH8互联网线路_CTC_300M_利用率超过80%
+  - SH8互联网线路_CTC_300M
+  - SH8-CTC利用率-出向
+  - SH8互联网线路_CTC_300M_利用率超过80%-出向
+  interfaces:
+  - Te1/0/2
+  - Te2/0/2
+  source_rules:
+  - SH8-CTC利用率-入向
+  - SH8-CTC利用率-出向
+- name: SH8-GDS
+  description: SH8互联网线路_GDS_300M_利用率超过80%-入向
+  device_ip: 10.192.251.95
+  match_keywords:
+  - SH8-GDS利用率-入向
+  - SH8互联网线路_GDS_300M_利用率超过80%-入向
+  - SH8-GDS利用率
+  - SH8-GDS
+  - SH8互联网线路_GDS_300M_利用率
+  - SH8互联网线路_GDS_300M_
+  - SH8互联网线路_GDS_300M_利用率超过80%
+  - SH8互联网线路_GDS_300M
+  - SH8-GDS利用率-出向
+  - SH8互联网线路_GDS_300M_利用率超过80%-出向
+  interfaces:
+  - Te1/0/1
+  - Te2/0/1
+  source_rules:
+  - SH8-GDS利用率-入向
+  - SH8-GDS利用率-出向

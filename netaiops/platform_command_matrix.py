@@ -1042,3 +1042,730 @@ try:
 except Exception:
     pass
 # ===== v5 Cisco IOS-XE interface command normalization end =====
+
+# ===== v5 real multi-interface interface-group final override begin =====
+# 最终修复目标：
+# 1. 真实 Alertmanager 告警未携带 PromQL 时，仍可通过 config/interface_groups.yaml 识别业务线路聚合接口。
+# 2. WG88互联网线路_电信_100M -> Te1/0/1 + Te2/0/1。
+# 3. Cisco IOS-XE C9500 接口详情命令统一使用：
+#    show interfaces TenGigabitEthernet1/0/1
+#    而不是 show interface TenGigabitEthernet1/0/1。
+# 4. 对接口详情、接口错误计数类 capability 按接口组展开。
+
+import copy as _v18_copy
+import json as _v18_json
+import re as _v18_re
+import urllib.parse as _v18_urlparse
+from pathlib import Path as _V18Path
+
+try:
+    import yaml as _v18_yaml
+except Exception:
+    _v18_yaml = None
+
+try:
+    _v18_original_resolve_execution_candidates = resolve_execution_candidates
+except NameError:
+    _v18_original_resolve_execution_candidates = None
+
+
+V18_INTERFACE_GROUP_FILE = _V18Path("/opt/netaiops-webhook/config/interface_groups.yaml")
+
+V18_INTERFACE_EXPAND_CAPABILITIES = {
+    "show_interface_detail",
+    "show_interface_error_counters",
+    "show_interface_transceiver",
+    "show_interface_state",
+    "show_interface_traffic_rate",
+}
+
+
+def _v18_safe_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            return _v18_json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+    return str(value).strip()
+
+
+def _v18_walk_text(obj, max_depth=6):
+    parts = []
+
+    def walk(value, depth=0):
+        if depth > max_depth:
+            return
+        if value is None:
+            return
+        if isinstance(value, dict):
+            for k, v in value.items():
+                parts.append(_v18_safe_text(k))
+                walk(v, depth + 1)
+            return
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                walk(item, depth + 1)
+            return
+        parts.append(_v18_safe_text(value))
+
+    walk(obj)
+    return _v18_urlparse.unquote(" ".join(x for x in parts if x))
+
+
+def _v18_event_text(event, family_result=None, plan=None):
+    return "\n".join(
+        [
+            _v18_walk_text(event),
+            _v18_walk_text(family_result),
+            _v18_walk_text(plan),
+        ]
+    )
+
+
+def _v18_load_interface_groups():
+    if not V18_INTERFACE_GROUP_FILE.exists() or _v18_yaml is None:
+        return []
+
+    try:
+        data = _v18_yaml.safe_load(V18_INTERFACE_GROUP_FILE.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return []
+
+    groups = data.get("interface_groups", [])
+    if not isinstance(groups, list):
+        return []
+
+    return [x for x in groups if isinstance(x, dict)]
+
+
+def _v18_get_event_device_ip(event, family_result=None, plan=None):
+    for obj in (event, family_result, plan):
+        if not isinstance(obj, dict):
+            continue
+
+        for key in ("device_ip", "ip", "instance"):
+            value = _v18_safe_text(obj.get(key))
+            if value:
+                # instance 可能是 10.189.250.8:9116
+                m = _v18_re.search(r"(\d+\.\d+\.\d+\.\d+)", value)
+                if m:
+                    return m.group(1)
+
+        labels = obj.get("labels")
+        if isinstance(labels, dict):
+            for key in ("device_ip", "ip", "instance"):
+                value = _v18_safe_text(labels.get(key))
+                if value:
+                    m = _v18_re.search(r"(\d+\.\d+\.\d+\.\d+)", value)
+                    if m:
+                        return m.group(1)
+
+    return ""
+
+
+def _v18_interfaces_from_config(event, family_result=None, plan=None):
+    text = _v18_event_text(event, family_result, plan)
+    device_ip = _v18_get_event_device_ip(event, family_result, plan)
+
+    for group in _v18_load_interface_groups():
+        group_device_ip = _v18_safe_text(group.get("device_ip"))
+
+        if group_device_ip and device_ip and group_device_ip != device_ip:
+            continue
+
+        keywords = group.get("match_keywords") or []
+        if isinstance(keywords, str):
+            keywords = [keywords]
+
+        matched = False
+        for keyword in keywords:
+            keyword = _v18_safe_text(keyword)
+            if keyword and keyword in text:
+                matched = True
+                break
+
+        if not matched:
+            continue
+
+        interfaces = group.get("interfaces") or []
+        if not isinstance(interfaces, list):
+            continue
+
+        result = []
+        seen = set()
+
+        for iface in interfaces:
+            iface = _v18_safe_text(iface)
+            if iface and iface not in seen:
+                seen.add(iface)
+                result.append(iface)
+
+        if len(result) >= 2:
+            return result
+
+    return []
+
+
+def _v18_interfaces_from_promql_text(event, family_result=None, plan=None):
+    text = _v18_event_text(event, family_result, plan)
+
+    patterns = [
+        r'ifName\s*=~\s*"([^"]+\|[^"]+)"',
+        r"ifName\s*=~\s*'([^']+\|[^']+)'",
+        r'ifDescr\s*=~\s*"([^"]+\|[^"]+)"',
+        r"ifDescr\s*=~\s*'([^']+\|[^']+)'",
+    ]
+
+    for pattern in patterns:
+        m = _v18_re.search(pattern, text, flags=_v18_re.IGNORECASE)
+        if not m:
+            continue
+
+        items = []
+        seen = set()
+
+        for item in m.group(1).split("|"):
+            item = item.strip().strip('"').strip("'")
+            if not _v18_re.match(r"^[A-Za-z][A-Za-z0-9_\-./]+$", item):
+                continue
+            if item in seen:
+                continue
+            seen.add(item)
+            items.append(item)
+
+        if len(items) >= 2:
+            return items
+
+    return []
+
+
+def _v18_get_family(family_result):
+    if isinstance(family_result, dict):
+        return _v18_safe_text(family_result.get("family"))
+    return ""
+
+
+def _v18_is_interface_traffic_family(family_result):
+    return _v18_get_family(family_result) in {
+        "interface_or_link_utilization_high",
+        "interface_or_link_traffic_drop",
+    }
+
+
+def _v18_is_iosxe_event(event):
+    try:
+        platform = _v18_safe_text(detect_platform(event)).lower()
+        if platform == "cisco_iosxe":
+            return True
+    except Exception:
+        pass
+
+    text = _v18_walk_text(event).lower()
+
+    return (
+        "ios-xe" in text
+        or "iosxe" in text
+        or "cat9k" in text
+        or "c9500" in text
+        or "cisco_iosxe" in text
+    )
+
+
+def _v18_full_iosxe_interface(interface):
+    value = _v18_safe_text(interface)
+
+    if not value:
+        return value
+
+    m = _v18_re.match(r"^Te(\d+/\d+/\d+)$", value, flags=_v18_re.IGNORECASE)
+    if m:
+        return "TenGigabitEthernet" + m.group(1)
+
+    m = _v18_re.match(r"^TenGigabitEthernet(\d+/\d+/\d+)$", value, flags=_v18_re.IGNORECASE)
+    if m:
+        return "TenGigabitEthernet" + m.group(1)
+
+    m = _v18_re.match(r"^Gi(\d+/\d+/\d+)$", value, flags=_v18_re.IGNORECASE)
+    if m:
+        return "GigabitEthernet" + m.group(1)
+
+    m = _v18_re.match(r"^GigabitEthernet(\d+/\d+/\d+)$", value, flags=_v18_re.IGNORECASE)
+    if m:
+        return "GigabitEthernet" + m.group(1)
+
+    m = _v18_re.match(r"^Fo(\d+/\d+/\d+)$", value, flags=_v18_re.IGNORECASE)
+    if m:
+        return "FortyGigabitEthernet" + m.group(1)
+
+    m = _v18_re.match(r"^FortyGigabitEthernet(\d+/\d+/\d+)$", value, flags=_v18_re.IGNORECASE)
+    if m:
+        return "FortyGigabitEthernet" + m.group(1)
+
+    m = _v18_re.match(r"^Hu(\d+/\d+/\d+)$", value, flags=_v18_re.IGNORECASE)
+    if m:
+        return "HundredGigE" + m.group(1)
+
+    m = _v18_re.match(r"^Po(\d+)$", value, flags=_v18_re.IGNORECASE)
+    if m:
+        return "Port-channel" + m.group(1)
+
+    return value
+
+
+def _v18_interface_aliases(interface):
+    value = _v18_safe_text(interface)
+
+    if not value:
+        return []
+
+    aliases = {value}
+
+    full = _v18_full_iosxe_interface(value)
+    if full:
+        aliases.add(full)
+
+    m = _v18_re.match(r"^TenGigabitEthernet(\d+/\d+/\d+)$", full, flags=_v18_re.IGNORECASE)
+    if m:
+        aliases.add("Te" + m.group(1))
+
+    m = _v18_re.match(r"^GigabitEthernet(\d+/\d+/\d+)$", full, flags=_v18_re.IGNORECASE)
+    if m:
+        aliases.add("Gi" + m.group(1))
+
+    m = _v18_re.match(r"^FortyGigabitEthernet(\d+/\d+/\d+)$", full, flags=_v18_re.IGNORECASE)
+    if m:
+        aliases.add("Fo" + m.group(1))
+
+    m = _v18_re.match(r"^Port-channel(\d+)$", full, flags=_v18_re.IGNORECASE)
+    if m:
+        aliases.add("Po" + m.group(1))
+
+    return sorted(aliases, key=len, reverse=True)
+
+
+def _v18_target_alias_like(source_alias, target_interface):
+    source_alias = _v18_safe_text(source_alias)
+    target_interface = _v18_safe_text(target_interface)
+
+    if source_alias.lower().startswith("tengigabitethernet"):
+        return _v18_full_iosxe_interface(target_interface)
+
+    if source_alias.lower().startswith("gigabitethernet"):
+        return _v18_full_iosxe_interface(target_interface)
+
+    if source_alias.lower().startswith("fortygigabitethernet"):
+        return _v18_full_iosxe_interface(target_interface)
+
+    if source_alias.lower().startswith("port-channel"):
+        return _v18_full_iosxe_interface(target_interface)
+
+    return target_interface
+
+
+def _v18_replace_interface(command, base_interface, target_interface):
+    command = _v18_safe_text(command)
+
+    for alias in _v18_interface_aliases(base_interface):
+        if alias and alias in command:
+            return command.replace(alias, _v18_target_alias_like(alias, target_interface))
+
+    return command
+
+
+def _v18_get_base_interface(event, family_result, plan, candidates, interfaces):
+    candidates_text = _v18_walk_text(candidates)
+
+    for iface in interfaces:
+        for alias in _v18_interface_aliases(iface):
+            if alias and alias in candidates_text:
+                return iface
+
+    for obj in (event, family_result, plan):
+        if not isinstance(obj, dict):
+            continue
+
+        for key in ("interface", "ifName", "if_name", "port", "object_name"):
+            value = _v18_safe_text(obj.get(key))
+            if value:
+                return value
+
+        labels = obj.get("labels")
+        if isinstance(labels, dict):
+            for key in ("interface", "ifName", "if_name", "port"):
+                value = _v18_safe_text(labels.get(key))
+                if value:
+                    return value
+
+    return interfaces[0] if interfaces else ""
+
+
+def _v18_normalize_iosxe_command(command):
+    command = _v18_safe_text(command)
+
+    m = _v18_re.match(
+        r"^show\s+interface(?:s)?\s+(\S+)\s+counters\s+errors\s*$",
+        command,
+        flags=_v18_re.IGNORECASE,
+    )
+    if m:
+        return "show interfaces " + _v18_full_iosxe_interface(m.group(1)) + " counters errors"
+
+    m = _v18_re.match(
+        r"^show\s+interface(?:s)?\s+(\S+)\s*$",
+        command,
+        flags=_v18_re.IGNORECASE,
+    )
+    if m:
+        return "show interfaces " + _v18_full_iosxe_interface(m.group(1))
+
+    return command
+
+
+def _v18_expand_candidates(candidates, interfaces, base_interface, is_iosxe):
+    expanded = []
+    seen = set()
+
+    for item in candidates or []:
+        if not isinstance(item, dict):
+            continue
+
+        capability = _v18_safe_text(item.get("capability"))
+        command = _v18_safe_text(item.get("command"))
+
+        if capability not in V18_INTERFACE_EXPAND_CAPABILITIES:
+            new_item = _v18_copy.deepcopy(item)
+
+            if is_iosxe:
+                new_item["command"] = _v18_normalize_iosxe_command(command)
+
+            key = (capability, new_item.get("command"))
+
+            if key not in seen:
+                seen.add(key)
+                expanded.append(new_item)
+
+            continue
+
+        for iface in interfaces:
+            new_item = _v18_copy.deepcopy(item)
+
+            new_command = _v18_replace_interface(command, base_interface, iface)
+
+            if is_iosxe:
+                new_command = _v18_normalize_iosxe_command(new_command)
+
+            new_item["command"] = new_command
+            new_item["interface"] = _v18_full_iosxe_interface(iface) if is_iosxe else iface
+            new_item["multi_interface_expanded"] = True
+            new_item["multi_interface_source"] = "interface_group_or_promql"
+            new_item["multi_interfaces"] = interfaces
+
+            args = dict(new_item.get("arguments") or {})
+            args["interface"] = new_item["interface"]
+            args["interfaces"] = interfaces
+            new_item["arguments"] = args
+
+            key = (capability, new_command)
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+            expanded.append(new_item)
+
+    for idx, item in enumerate(expanded, start=1):
+        if isinstance(item, dict):
+            item["order"] = idx
+
+    return expanded
+
+
+if _v18_original_resolve_execution_candidates is not None:
+    def resolve_execution_candidates(event, family_result, plan):
+        candidates = _v18_original_resolve_execution_candidates(event, family_result, plan)
+
+        is_iosxe = _v18_is_iosxe_event(event)
+
+        # IOS-XE 即便不是多接口，也要统一修正 show interface(s) 命令格式。
+        if is_iosxe and not _v18_is_interface_traffic_family(family_result):
+            fixed = []
+            for item in candidates or []:
+                if not isinstance(item, dict):
+                    continue
+                new_item = _v18_copy.deepcopy(item)
+                new_item["command"] = _v18_normalize_iosxe_command(new_item.get("command"))
+                fixed.append(new_item)
+            return fixed
+
+        if not _v18_is_interface_traffic_family(family_result):
+            return candidates
+
+        interfaces = (
+            _v18_interfaces_from_config(event, family_result, plan)
+            or _v18_interfaces_from_promql_text(event, family_result, plan)
+        )
+
+        if len(interfaces) < 2:
+            if is_iosxe:
+                fixed = []
+                for item in candidates or []:
+                    if not isinstance(item, dict):
+                        continue
+                    new_item = _v18_copy.deepcopy(item)
+                    new_item["command"] = _v18_normalize_iosxe_command(new_item.get("command"))
+                    fixed.append(new_item)
+                return fixed
+
+            return candidates
+
+        base_interface = _v18_get_base_interface(event, family_result, plan, candidates, interfaces)
+
+        return _v18_expand_candidates(candidates, interfaces, base_interface, is_iosxe)
+
+
+try:
+    PLATFORM_COMMAND_MATRIX.setdefault("cisco_iosxe", {})
+    PLATFORM_COMMAND_MATRIX["cisco_iosxe"]["show_interface_detail"] = "show interfaces {interface}"
+    PLATFORM_COMMAND_MATRIX["cisco_iosxe"]["show_interface_error_counters"] = "show interfaces {interface} counters errors"
+    PLATFORM_COMMAND_MATRIX["cisco_iosxe"]["show_portchannel_summary"] = "show etherchannel summary"
+except Exception:
+    pass
+# ===== v5 real multi-interface interface-group final override end =====
+
+# ===== v5 interface group best-match final override begin =====
+# 修复场景：
+# 同一 device_ip 下存在多条线路：
+# - WG88互联网线路_电信_100M -> Te1/0/1 + Te2/0/1
+# - WG88互联网线路_电信BGP_200M -> Te1/0/2 + Te2/0/2
+#
+# 旧逻辑只要命中宽泛关键词 “WG88互联网线路_电信” 就返回第一个 group，
+# 导致 BGP_200M 被错误匹配到 100M 线路组。
+#
+# 新逻辑：
+# 1. source_rules 完整命中优先级最高。
+# 2. match_keywords 按命中关键词长度计分，越具体优先级越高。
+# 3. 同分时 source_rules / keywords 更长的 group 优先。
+# 4. 仍然要求 device_ip 匹配。
+
+import json as _v19_json
+import re as _v19_re
+import urllib.parse as _v19_urlparse
+from pathlib import Path as _V19Path
+
+try:
+    import yaml as _v19_yaml
+except Exception:
+    _v19_yaml = None
+
+V19_INTERFACE_GROUP_FILE = _V19Path("/opt/netaiops-webhook/config/interface_groups.yaml")
+
+
+def _v19_safe_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            return _v19_json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+    return str(value).strip()
+
+
+def _v19_walk_text(obj, max_depth=6):
+    parts = []
+
+    def walk(value, depth=0):
+        if depth > max_depth:
+            return
+        if value is None:
+            return
+        if isinstance(value, dict):
+            for k, v in value.items():
+                parts.append(_v19_safe_text(k))
+                walk(v, depth + 1)
+            return
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                walk(item, depth + 1)
+            return
+        parts.append(_v19_safe_text(value))
+
+    walk(obj)
+    return _v19_urlparse.unquote(" ".join(x for x in parts if x))
+
+
+def _v19_event_text(event, family_result=None, plan=None):
+    return "\n".join(
+        [
+            _v19_walk_text(event),
+            _v19_walk_text(family_result),
+            _v19_walk_text(plan),
+        ]
+    )
+
+
+def _v19_load_interface_groups():
+    if not V19_INTERFACE_GROUP_FILE.exists() or _v19_yaml is None:
+        return []
+
+    try:
+        data = _v19_yaml.safe_load(V19_INTERFACE_GROUP_FILE.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return []
+
+    groups = data.get("interface_groups", [])
+    if not isinstance(groups, list):
+        return []
+
+    return [x for x in groups if isinstance(x, dict)]
+
+
+def _v19_get_event_device_ip(event, family_result=None, plan=None):
+    for obj in (event, family_result, plan):
+        if not isinstance(obj, dict):
+            continue
+
+        for key in ("device_ip", "ip", "instance"):
+            value = _v19_safe_text(obj.get(key))
+            if value:
+                m = _v19_re.search(r"(\d+\.\d+\.\d+\.\d+)", value)
+                if m:
+                    return m.group(1)
+
+        labels = obj.get("labels")
+        if isinstance(labels, dict):
+            for key in ("device_ip", "ip", "instance"):
+                value = _v19_safe_text(labels.get(key))
+                if value:
+                    m = _v19_re.search(r"(\d+\.\d+\.\d+\.\d+)", value)
+                    if m:
+                        return m.group(1)
+
+    return ""
+
+
+def _v19_group_interfaces(group):
+    interfaces = group.get("interfaces") or []
+    if not isinstance(interfaces, list):
+        return []
+
+    result = []
+    seen = set()
+
+    for iface in interfaces:
+        iface = _v19_safe_text(iface)
+        if iface and iface not in seen:
+            seen.add(iface)
+            result.append(iface)
+
+    return result
+
+
+def _v19_score_group(group, text):
+    score = 0
+    matched_terms = []
+
+    source_rules = group.get("source_rules") or []
+    if isinstance(source_rules, str):
+        source_rules = [source_rules]
+
+    # 完整 rule name 命中最高优先级。
+    for rule in source_rules:
+        rule = _v19_safe_text(rule)
+        if not rule:
+            continue
+        if rule in text:
+            score += 100000 + len(rule) * 100
+            matched_terms.append(("source_rule", rule))
+
+    keywords = group.get("match_keywords") or []
+    if isinstance(keywords, str):
+        keywords = [keywords]
+
+    for keyword in keywords:
+        keyword = _v19_safe_text(keyword)
+        if not keyword:
+            continue
+        if keyword in text:
+            score += 1000 + len(keyword) * 10
+            matched_terms.append(("keyword", keyword))
+
+    name = _v19_safe_text(group.get("name"))
+    if name and name in text:
+        score += 5000 + len(name) * 20
+        matched_terms.append(("name", name))
+
+    description = _v19_safe_text(group.get("description"))
+    if description and description in text:
+        score += 3000 + len(description) * 10
+        matched_terms.append(("description", description))
+
+    return score, matched_terms
+
+
+def _v19_interfaces_from_config_best_match(event, family_result=None, plan=None):
+    text = _v19_event_text(event, family_result, plan)
+    device_ip = _v19_get_event_device_ip(event, family_result, plan)
+
+    candidates = []
+
+    for group in _v19_load_interface_groups():
+        group_device_ip = _v19_safe_text(group.get("device_ip"))
+
+        if group_device_ip and device_ip and group_device_ip != device_ip:
+            continue
+
+        interfaces = _v19_group_interfaces(group)
+        if len(interfaces) < 2:
+            continue
+
+        score, matched_terms = _v19_score_group(group, text)
+
+        if score <= 0:
+            continue
+
+        candidates.append(
+            {
+                "score": score,
+                "group": group,
+                "interfaces": interfaces,
+                "matched_terms": matched_terms,
+                "max_term_len": max([len(x[1]) for x in matched_terms] or [0]),
+            }
+        )
+
+    if not candidates:
+        return []
+
+    candidates.sort(
+        key=lambda x: (
+            x["score"],
+            x["max_term_len"],
+            len(_v19_safe_text(x["group"].get("name"))),
+        ),
+        reverse=True,
+    )
+
+    best = candidates[0]
+
+    try:
+        print(
+            "V19_INTERFACE_GROUP_MATCH:",
+            "group=" + _v19_safe_text(best["group"].get("name")),
+            "device_ip=" + _v19_safe_text(best["group"].get("device_ip")),
+            "interfaces=" + ",".join(best["interfaces"]),
+            "score=" + str(best["score"]),
+            "matched=" + ";".join([f"{a}:{b}" for a, b in best["matched_terms"][:5]]),
+        )
+    except Exception:
+        pass
+
+    return best["interfaces"]
+
+
+# 覆盖 v18 中的同名函数；resolve_execution_candidates 运行时会引用全局最新定义。
+def _v18_interfaces_from_config(event, family_result=None, plan=None):
+    return _v19_interfaces_from_config_best_match(event, family_result, plan)
+# ===== v5 interface group best-match final override end =====
