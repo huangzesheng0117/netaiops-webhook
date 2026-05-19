@@ -17,6 +17,11 @@ from netaiops.executor import (
 )
 from netaiops.logger import setup_logger
 from netaiops.request_summary import get_request_summary
+from netaiops.execution_parser_enricher import enrich_callback_execution_result
+from netaiops.investigation_state import (
+    build_and_persist_investigation_session,
+    build_persist_session_with_notify_result,
+)
 from netaiops.review_builder import (
     generate_review_for_request_id,
     get_latest_review,
@@ -541,18 +546,66 @@ def v4_execution_result(request_id: str, payload: dict):
     from netaiops.notifier import send_notification
 
     callback_result = handle_execution_result_callback(request_id, payload)
+    parser_enrich_result = {
+        "ok": False,
+        "enabled": True,
+        "stage": "v6.2",
+        "error": "",
+    }
+    try:
+        parser_enrich_result = enrich_callback_execution_result(callback_result)
+    except Exception as exc:
+        # v6.2 Parser enrichment 是旁路结构化能力，不能影响原 callback/review/notify 主链路。
+        parser_enrich_result = {
+            "ok": False,
+            "enabled": True,
+            "stage": "v6.2",
+            "error": str(exc),
+        }
+
     review_result = generate_review_for_request_id(request_id)
     summary = get_request_summary(request_id)
     notify_result = send_notification(request_id)
+
+    investigation_result = {
+        "ok": False,
+        "enabled": True,
+        "stage": "v6.1",
+        "error": "",
+    }
+    try:
+        investigation_session, investigation_file = build_persist_session_with_notify_result(
+            request_id=request_id,
+            notify_result=notify_result,
+            base_dir=BASE_DIR,
+        )
+        investigation_result = {
+            "ok": True,
+            "enabled": True,
+            "stage": "v6.1",
+            "session_file": str(investigation_file),
+            "session_status": investigation_session.get("session_status"),
+            "timeline_count": len(investigation_session.get("timeline") or []),
+        }
+    except Exception as exc:
+        # Investigation Session 是 v6.1 旁路审计能力，不能影响原 v4/v5 回调主链路。
+        investigation_result = {
+            "ok": False,
+            "enabled": True,
+            "stage": "v6.1",
+            "error": str(exc),
+        }
 
     return {
         "status": "ok",
         "stage": "v4_execution_result",
         "request_id": request_id,
         "callback_result": callback_result,
+        "parser_enrich_result": parser_enrich_result,
         "review_result": review_result,
         "summary": summary,
         "notify_result": notify_result,
+        "investigation_result": investigation_result,
     }
 
 
@@ -669,3 +722,138 @@ except Exception as _v5sr_exc:
     except Exception:
         pass
 # ===== v5 skip resolved alertmanager/prometheus alerts end =====
+
+
+
+# ===== v6.1 investigation session APIs begin =====
+@app.get("/v6/investigation/{request_id}")
+def v6_get_investigation_session(request_id: str, build: bool = True):
+    try:
+        if build:
+            session, session_file = build_and_persist_investigation_session(
+                request_id=request_id,
+                base_dir=BASE_DIR,
+            )
+        else:
+            from netaiops.investigation_state import build_investigation_session
+            session = build_investigation_session(
+                request_id=request_id,
+                base_dir=BASE_DIR,
+            )
+            session_file = BASE_DIR / "data" / "investigation" / f"{request_id}.investigation.session.json"
+
+        return {
+            "status": "ok",
+            "stage": "v6.1_investigation_session",
+            "request_id": request_id,
+            "session_file": str(session_file),
+            "session": session,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/v6/investigation/{request_id}/build")
+def v6_build_investigation_session(request_id: str):
+    try:
+        session, session_file = build_and_persist_investigation_session(
+            request_id=request_id,
+            base_dir=BASE_DIR,
+        )
+        return {
+            "status": "ok",
+            "stage": "v6.1_investigation_session_build",
+            "request_id": request_id,
+            "session_file": str(session_file),
+            "session_status": session.get("session_status"),
+            "timeline_count": len(session.get("timeline") or []),
+            "session": session,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+# ===== v6.1 investigation session APIs end =====
+
+
+
+# ===== v6.4 skill runtime APIs begin =====
+@app.get("/v6/skills/runtime")
+def v6_skill_runtime_index():
+    try:
+        from netaiops.skill_runtime_api import build_runtime_index_response
+        return build_runtime_index_response(BASE_DIR)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v6/skills/runtime/validate")
+def v6_skill_runtime_validate():
+    try:
+        from netaiops.skill_runtime_api import build_runtime_validate_response
+        return build_runtime_validate_response(BASE_DIR)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v6/skills/runtime/family/{family}")
+def v6_skill_runtime_by_family(family: str, levels: str = "metadata"):
+    try:
+        from netaiops.skill_runtime_api import build_runtime_family_response
+        return build_runtime_family_response(
+            family=family,
+            base_dir=BASE_DIR,
+            levels=levels,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v6/skills/runtime/skill/{skill_name}")
+def v6_skill_runtime_by_skill(skill_name: str, levels: str = "metadata"):
+    try:
+        from netaiops.skill_runtime_api import build_runtime_skill_response
+        return build_runtime_skill_response(
+            skill_name=skill_name,
+            base_dir=BASE_DIR,
+            levels=levels,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+# ===== v6.4 skill runtime APIs end =====
+
+
+
+# ===== v6.5 adaptive evidence APIs begin =====
+@app.get("/v6/adaptive/plan/{request_id}")
+def v6_adaptive_plan(request_id: str, include_candidates: bool = True):
+    try:
+        from netaiops.adaptive_evidence_api import build_adaptive_plan_response
+        return build_adaptive_plan_response(
+            request_id=request_id,
+            base_dir=BASE_DIR,
+            include_candidates=include_candidates,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v6/adaptive/simulate/missing-facts")
+def v6_adaptive_simulate_missing_facts(include_candidates: bool = True, strict: bool = True):
+    try:
+        from netaiops.adaptive_evidence_api import build_missing_facts_simulation_response
+        return build_missing_facts_simulation_response(
+            base_dir=BASE_DIR,
+            include_candidates=include_candidates,
+            strict=strict,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+# ===== v6.5 adaptive evidence APIs end =====
+

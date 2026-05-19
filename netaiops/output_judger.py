@@ -23,7 +23,6 @@ JUDGE_RULESETS: Dict[str, Dict[str, List[Dict[str, str]]]] = {
             {"id": "validation_error", "pattern": r"validation error"},
             {"id": "traceback", "pattern": r"Traceback"},
             {"id": "no_device_named", "pattern": r"no device named"},
-            {"id": "timeout", "pattern": r"(timed out|timeout)"},
         ],
         "ignore": [
             {"id": "input_errors_counter", "pattern": r"\binput errors\b"},
@@ -83,6 +82,19 @@ def judge_command_result(
             _safe_text(error),
         ]
     )
+
+    timeout_error_match = _match_rules(
+        _safe_text(error),
+        [{"id": "timeout", "pattern": r"(timed out|timeout)"}],
+    )
+    if timeout_error_match["matched_rule_id"]:
+        return {
+            "final_status": "failed",
+            "hard_error": True,
+            "matched_rule_id": timeout_error_match["matched_rule_id"],
+            "matched_text": timeout_error_match["matched_text"],
+            "judge_reason": "hard_fail_error_timeout_matched",
+        }
 
     hard_match = _match_rules(merged_text, ruleset.get("hard_fail", []))
     if hard_match["matched_rule_id"]:

@@ -1,0 +1,49 @@
+{
+  "skill_name": "interface_utilization_high",
+  "version": "v6.3.0",
+  "family": "interface_or_link_utilization_high",
+  "facts": {
+    "interface": "string",
+    "admin_status": "string",
+    "oper_status": "string",
+    "bandwidth_bps": "integer",
+    "logical_bandwidth_bps": "integer",
+    "input_rate_bps": "integer",
+    "output_rate_bps": "integer",
+    "input_utilization_percent_estimated": "number",
+    "output_utilization_percent_estimated": "number",
+    "crc": "integer",
+    "fcs_err": "integer",
+    "rcv_err": "integer",
+    "xmit_err": "integer",
+    "out_discards": "integer",
+    "output_discards": "integer",
+    "channel_group_count": "integer",
+    "port_channel_count": "integer",
+    "etherchannel_member_count": "integer",
+    "etherchannel_bundled_member_count": "integer",
+    "etherchannel_down_member_count": "integer",
+    "parsed_facts_enabled": "boolean",
+    "facts_source_preference": "string",
+    "parsed_fact_sources": "array"
+  },
+  "judgement": {
+    "traffic_state": "string",
+    "quality_state": "string",
+    "aggregation_state": "string",
+    "confidence": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "接口状态",
+      "告警方向",
+      "接口物理带宽",
+      "告警口径带宽",
+      "设备侧实时速率",
+      "设备侧估算利用率",
+      "接口错误/丢弃计数",
+      "综合执行结果判断"
+    ]
+  }
+}

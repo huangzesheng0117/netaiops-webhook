@@ -1,15 +1,15 @@
 {
-  "generated_at": "2026-05-13T01:52:09.848230+00:00",
+  "generated_at": "2026-05-13T06:05:29.360038+00:00",
   "rebuild_index": {
     "db_path": "/opt/netaiops-webhook/data/index/netaiops_meta.sqlite3",
-    "total_seen": 3946,
-    "indexed": 3946,
+    "total_seen": 4014,
+    "indexed": 4014,
     "failed": []
   },
   "family_counts": {
     "interface_status_or_flap": 1626,
-    "interface_or_link_utilization_high": 1273,
-    "interface_packet_loss_or_discards_high": 347,
+    "interface_or_link_utilization_high": 1339,
+    "interface_packet_loss_or_discards_high": 349,
     "generic_network_readonly": 328,
     "connection_or_session_anomaly": 236,
     "dns_quality_or_traffic_anomaly": 53,
@@ -25,8 +25,8 @@
   },
   "family_execution_counts": {
     "interface_status_or_flap": 677,
-    "interface_or_link_utilization_high": 377,
-    "interface_packet_loss_or_discards_high": 228,
+    "interface_or_link_utilization_high": 389,
+    "interface_packet_loss_or_discards_high": 229,
     "bgp_neighbor_down": 9,
     "interface_or_link_traffic_drop": 5,
     "cisco_nxos_basic_readonly": 3,
@@ -81,11 +81,11 @@
   "failed": 0,
   "checked_items": [
     {
-      "request_id": "20260513_092557_374264_27cc7fb5",
+      "request_id": "20260513_134759_865616_ddebf32a",
       "family": "interface_or_link_utilization_high",
       "device_ip": "10.189.250.50",
       "hostname": "10.191.96.43:9116",
-      "interface_name": "Ethernet1/27",
+      "interface_name": "Ethernet1/25",
       "event_status": "firing",
       "command_count": 3,
       "ok": true,
@@ -102,7 +102,7 @@
       "bundle_metric_count": 0,
       "bundle_log_count": 0,
       "bundle_device_output_count": 3,
-      "notify_title": "NetAIOps分析结果-20260513-0925",
+      "notify_title": "NetAIOps分析结果-20260513-1347",
       "notify_has_device": true,
       "notify_has_alarm": true,
       "notify_has_analysis": true,
@@ -145,7 +145,7 @@
       "notify_text_len": 866
     },
     {
-      "request_id": "20260513_094643_367110_f9c71edd",
+      "request_id": "20260513_104243_149322_43979712",
       "family": "interface_packet_loss_or_discards_high",
       "device_ip": "10.189.250.21",
       "hostname": "10.191.96.43:9116",
@@ -166,7 +166,7 @@
       "bundle_metric_count": 0,
       "bundle_log_count": 0,
       "bundle_device_output_count": 3,
-      "notify_title": "NetAIOps分析结果-20260513-0946",
+      "notify_title": "NetAIOps分析结果-20260513-1042",
       "notify_has_device": true,
       "notify_has_alarm": true,
       "notify_has_analysis": true,

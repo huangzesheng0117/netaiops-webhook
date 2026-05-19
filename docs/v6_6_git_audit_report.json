@@ -1,0 +1,461 @@
+{
+  "verdict": "pass",
+  "stage": "v6.6",
+  "purpose": "git diff and commit readiness audit",
+  "base_dir": "/opt/netaiops-webhook",
+  "violations": [],
+  "warnings": [],
+  "git_status_count": 83,
+  "git_status": [
+    {
+      "status": "M",
+      "path": "README_STATUS.md"
+    },
+    {
+      "status": "M",
+      "path": "app.py"
+    },
+    {
+      "status": "M",
+      "path": "docs/webhook_v5_real_alert_regression_report.json"
+    },
+    {
+      "status": "M",
+      "path": "docs/webhook_v5_real_alert_regression_report.md"
+    },
+    {
+      "status": "M",
+      "path": "netaiops/evidence_facts.py"
+    },
+    {
+      "status": "M",
+      "path": "netaiops/output_judger.py"
+    },
+    {
+      "status": "M",
+      "path": "tests/test_output_judger.py"
+    },
+    {
+      "status": "??",
+      "path": "docs/v6_1_investigation_runbook.md"
+    },
+    {
+      "status": "??",
+      "path": "docs/v6_2_tool_parser_runbook.md"
+    },
+    {
+      "status": "??",
+      "path": "docs/v6_3_skill_runbook.md"
+    },
+    {
+      "status": "??",
+      "path": "docs/v6_4_skill_runtime_runbook.md"
+    },
+    {
+      "status": "??",
+      "path": "docs/v6_5_adaptive_evidence_runbook.md"
+    },
+    {
+      "status": "??",
+      "path": "docs/v6_6_git_audit_report.json"
+    },
+    {
+      "status": "??",
+      "path": "docs/v6_6_release_and_maintenance_runbook.md"
+    },
+    {
+      "status": "??",
+      "path": "docs/v6_6_release_snapshot.json"
+    },
+    {
+      "status": "??",
+      "path": "docs/v6_commit_readiness_checklist.md"
+    },
+    {
+      "status": "??",
+      "path": "docs/v6_release_notes.md"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/adaptive_evidence_api.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/adaptive_evidence_planner.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/adaptive_evidence_policy.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/adaptive_session_context.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/evidence_parsed_facts.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/execution_parser_enricher.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/investigation_policy.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/investigation_state.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/parser_registry.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/parsers/"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/skill_binding_validator.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/skill_compliance_validator.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/skill_registry.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/skill_runtime.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/skill_runtime_api.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/skill_runtime_session_context.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/skill_session_context.py"
+    },
+    {
+      "status": "??",
+      "path": "netaiops/tool_registry.py"
+    },
+    {
+      "status": "??",
+      "path": "skills/"
+    },
+    {
+      "status": "??",
+      "path": "tests/fixtures/adaptive_missing_facts/"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_adaptive_evidence_api.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_adaptive_evidence_planner.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_adaptive_evidence_policy.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_adaptive_missing_facts_sample.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_adaptive_session_context.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_evidence_facts.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_execution_parser_enricher.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_investigation_policy.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_investigation_state.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_parser_registry.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_skill_binding_validator.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_skill_compliance_validator.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_skill_registry.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_skill_runtime.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_skill_runtime_api.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_skill_runtime_session_context.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_skill_session_context.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_tool_registry.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_v6_git_audit.py"
+    },
+    {
+      "status": "??",
+      "path": "tests/test_v6_release_precheck.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/enrich_execution_parsed.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/plan_adaptive_evidence.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/regress_investigation_sessions.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/regress_v6_1.sh"
+    },
+    {
+      "status": "??",
+      "path": "tools/regress_v6_2.sh"
+    },
+    {
+      "status": "??",
+      "path": "tools/regress_v6_3.sh"
+    },
+    {
+      "status": "??",
+      "path": "tools/regress_v6_4.sh"
+    },
+    {
+      "status": "??",
+      "path": "tools/regress_v6_5.sh"
+    },
+    {
+      "status": "??",
+      "path": "tools/regress_v6_5_adaptive_missing_sample.sh"
+    },
+    {
+      "status": "??",
+      "path": "tools/regress_v6_all.sh"
+    },
+    {
+      "status": "??",
+      "path": "tools/show_investigation_adaptive_context.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/show_investigation_session.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/show_investigation_skill_context.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/show_investigation_skill_runtime.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/show_skill_runtime.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/simulate_adaptive_missing_evidence.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/v6_git_audit.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/v6_release_precheck.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/validate_adaptive_evidence_api.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/validate_parser_registry.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/validate_skill_bindings.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/validate_skill_compliance.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/validate_skill_runtime_api.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/validate_skills.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/validate_tool_registry.py"
+    },
+    {
+      "status": "??",
+      "path": "tools/verify_evidence_parsed_facts.py"
+    }
+  ],
+  "classified_paths": {
+    "README_STATUS.md": [
+      "README_STATUS.md"
+    ],
+    "app.py": [
+      "app.py"
+    ],
+    "docs": [
+      "docs/webhook_v5_real_alert_regression_report.json",
+      "docs/webhook_v5_real_alert_regression_report.md",
+      "docs/v6_1_investigation_runbook.md",
+      "docs/v6_2_tool_parser_runbook.md",
+      "docs/v6_3_skill_runbook.md",
+      "docs/v6_4_skill_runtime_runbook.md",
+      "docs/v6_5_adaptive_evidence_runbook.md",
+      "docs/v6_6_git_audit_report.json",
+      "docs/v6_6_release_and_maintenance_runbook.md",
+      "docs/v6_6_release_snapshot.json",
+      "docs/v6_commit_readiness_checklist.md",
+      "docs/v6_release_notes.md"
+    ],
+    "netaiops": [
+      "netaiops/evidence_facts.py",
+      "netaiops/output_judger.py",
+      "netaiops/adaptive_evidence_api.py",
+      "netaiops/adaptive_evidence_planner.py",
+      "netaiops/adaptive_evidence_policy.py",
+      "netaiops/adaptive_session_context.py",
+      "netaiops/evidence_parsed_facts.py",
+      "netaiops/execution_parser_enricher.py",
+      "netaiops/investigation_policy.py",
+      "netaiops/investigation_state.py",
+      "netaiops/parser_registry.py",
+      "netaiops/parsers/",
+      "netaiops/skill_binding_validator.py",
+      "netaiops/skill_compliance_validator.py",
+      "netaiops/skill_registry.py",
+      "netaiops/skill_runtime.py",
+      "netaiops/skill_runtime_api.py",
+      "netaiops/skill_runtime_session_context.py",
+      "netaiops/skill_session_context.py",
+      "netaiops/tool_registry.py"
+    ],
+    "tests": [
+      "tests/test_output_judger.py",
+      "tests/fixtures/adaptive_missing_facts/",
+      "tests/test_adaptive_evidence_api.py",
+      "tests/test_adaptive_evidence_planner.py",
+      "tests/test_adaptive_evidence_policy.py",
+      "tests/test_adaptive_missing_facts_sample.py",
+      "tests/test_adaptive_session_context.py",
+      "tests/test_evidence_facts.py",
+      "tests/test_execution_parser_enricher.py",
+      "tests/test_investigation_policy.py",
+      "tests/test_investigation_state.py",
+      "tests/test_parser_registry.py",
+      "tests/test_skill_binding_validator.py",
+      "tests/test_skill_compliance_validator.py",
+      "tests/test_skill_registry.py",
+      "tests/test_skill_runtime.py",
+      "tests/test_skill_runtime_api.py",
+      "tests/test_skill_runtime_session_context.py",
+      "tests/test_skill_session_context.py",
+      "tests/test_tool_registry.py",
+      "tests/test_v6_git_audit.py",
+      "tests/test_v6_release_precheck.py"
+    ],
+    "skills": [
+      "skills/"
+    ],
+    "tools": [
+      "tools/enrich_execution_parsed.py",
+      "tools/plan_adaptive_evidence.py",
+      "tools/regress_investigation_sessions.py",
+      "tools/regress_v6_1.sh",
+      "tools/regress_v6_2.sh",
+      "tools/regress_v6_3.sh",
+      "tools/regress_v6_4.sh",
+      "tools/regress_v6_5.sh",
+      "tools/regress_v6_5_adaptive_missing_sample.sh",
+      "tools/regress_v6_all.sh",
+      "tools/show_investigation_adaptive_context.py",
+      "tools/show_investigation_session.py",
+      "tools/show_investigation_skill_context.py",
+      "tools/show_investigation_skill_runtime.py",
+      "tools/show_skill_runtime.py",
+      "tools/simulate_adaptive_missing_evidence.py",
+      "tools/v6_git_audit.py",
+      "tools/v6_release_precheck.py",
+      "tools/validate_adaptive_evidence_api.py",
+      "tools/validate_parser_registry.py",
+      "tools/validate_skill_bindings.py",
+      "tools/validate_skill_compliance.py",
+      "tools/validate_skill_runtime_api.py",
+      "tools/validate_skills.py",
+      "tools/validate_tool_registry.py",
+      "tools/verify_evidence_parsed_facts.py"
+    ]
+  },
+  "forbidden_changed_paths": [],
+  "gitignore_check": {
+    "expected": [
+      "config.yaml",
+      "data/",
+      "logs/",
+      "backup/",
+      "venv/"
+    ],
+    "missing": [],
+    "ok": true
+  },
+  "sensitive_keyword_hits": [],
+  "commit_recommendation": {
+    "ready_for_commit": true,
+    "commit_now": false,
+    "reason": "v6.6 still in release audit stage; commit after final confirmation.",
+    "suggested_commit_message": "feat: complete NetAIOps webhook v6 investigation, parser, skill and adaptive dry-run framework"
+  }
+}

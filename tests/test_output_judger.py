@@ -96,5 +96,36 @@ class TestOutputJudger(unittest.TestCase):
         self.assertEqual(result["matched_rule_id"], "shell_command_not_found")
 
 
+    def test_cisco_show_interfaces_with_arp_timeout_is_not_hard_error(self):
+        output = """TenGigabitEthernet1/0/1 is up, line protocol is up (connected)
+  Hardware is Ten Gigabit Ethernet
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input 00:00:00, output 00:00:00, output hang never
+"""
+        result = judge_command_result(
+            command="show interfaces TenGigabitEthernet1/0/1",
+            output=output,
+            error="",
+            judge_profile="network_cli_generic",
+            dispatch_status="completed",
+        )
+
+        self.assertEqual(result["final_status"], "completed")
+        self.assertFalse(result["hard_error"])
+
+    def test_wrapper_timeout_error_is_hard_error(self):
+        result = judge_command_result(
+            command="show interfaces TenGigabitEthernet1/0/1",
+            output="",
+            error="wrapper timeout: command timed out",
+            judge_profile="network_cli_generic",
+            dispatch_status="failed",
+        )
+
+        self.assertEqual(result["final_status"], "failed")
+        self.assertTrue(result["hard_error"])
+        self.assertEqual(result["matched_rule_id"], "timeout")
+
+
 if __name__ == "__main__":
     unittest.main()

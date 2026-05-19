@@ -1828,3 +1828,92 @@ def _v16e_command_belongs_to_interface(command, interface):
 
     return False
 # ===== v5 Cisco IOS-XE interface alias match for evidence end =====
+
+# ===== v5 final interface status line normalizer begin =====
+# 修复场景：
+# base summary 先生成了“接口状态 ... oper=未知 admin=未知”，
+# 后续 traffic enrichment 又从 Cisco show interfaces 输出中解析出了 oper/admin=up，
+# 但 notify_lines/key_findings 中旧的未知状态行没有被替换。
+try:
+    _v18_original_build_interface_evidence_summary = build_interface_evidence_summary
+except NameError:
+    _v18_original_build_interface_evidence_summary = None
+
+
+def _v18_safe_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v18_replace_status_lines(lines, status_line):
+    result = []
+    replaced = False
+
+    for line in lines or []:
+        value = _v18_safe_text(line)
+        if value.startswith("接口状态："):
+            if not replaced:
+                result.append(status_line)
+                replaced = True
+            continue
+        result.append(line)
+
+    if not replaced:
+        result.insert(0, status_line)
+
+    return result
+
+
+def _v18_fix_interface_status_lines(summary, execution_data):
+    summary = dict(summary or {})
+    facts = dict(summary.get("facts", {}) or {})
+
+    try:
+        outputs = _v5_collect_interface_outputs(execution_data)
+        parsed_status = _v5_parse_interface_status(outputs)
+        for key, value in parsed_status.items():
+            if value and (not facts.get(key) or _v18_safe_text(facts.get(key)) == "未知"):
+                facts[key] = value
+    except Exception:
+        pass
+
+    interface = _v18_safe_text(facts.get("interface")) or _v18_safe_text((execution_data.get("target_scope") or {}).get("interface"))
+    oper = _v18_safe_text(facts.get("oper_status"))
+    admin = _v18_safe_text(facts.get("admin_status"))
+
+    if not (interface or oper or admin):
+        return summary
+
+    status_line = f"接口状态：{interface or '未知接口'} oper={oper or '未知'} admin={admin or '未知'}"
+
+    summary["facts"] = facts
+    summary["notify_lines"] = _v18_replace_status_lines(summary.get("notify_lines", []) or [], status_line)
+    summary["key_findings"] = _v18_replace_status_lines(summary.get("key_findings", []) or [], status_line)
+
+    return summary
+
+
+if _v18_original_build_interface_evidence_summary is not None:
+    def build_interface_evidence_summary(execution_data):
+        base_summary = _v18_original_build_interface_evidence_summary(execution_data)
+        return _v18_fix_interface_status_lines(base_summary, execution_data)
+# ===== v5 final interface status line normalizer end =====
+
+# ===== v6.2 batch4 parsed facts first bridge begin =====
+try:
+    _v62_original_build_interface_evidence_summary = build_interface_evidence_summary
+except NameError:
+    _v62_original_build_interface_evidence_summary = None
+
+
+if _v62_original_build_interface_evidence_summary is not None:
+    def build_interface_evidence_summary(execution_data):
+        base_summary = _v62_original_build_interface_evidence_summary(execution_data)
+        try:
+            from netaiops.evidence_parsed_facts import apply_parsed_facts_to_summary
+            return apply_parsed_facts_to_summary(base_summary, execution_data)
+        except Exception:
+            return base_summary
+# ===== v6.2 batch4 parsed facts first bridge end =====
+

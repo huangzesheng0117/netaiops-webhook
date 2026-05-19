@@ -1,0 +1,44 @@
+{
+  "request_id": "simulated_missing_facts_001",
+  "session_status": "in_progress",
+  "target_scope": {
+    "hostname": "SIM-CISCO-IOSXE-01",
+    "device_ip": "192.0.2.10",
+    "platform": "cisco_iosxe",
+    "alarm_type": "SIM-接口利用率-出向",
+    "interface": "TenGigabitEthernet1/0/1",
+    "interfaces": [
+      "TenGigabitEthernet1/0/1"
+    ]
+  },
+  "classification": {
+    "family": "interface_or_link_utilization_high"
+  },
+  "skill_context": {
+    "stage": "v6.3",
+    "matched": true,
+    "family": "interface_or_link_utilization_high",
+    "skill_name": "interface_utilization_high",
+    "skill_version": "v6.3.0",
+    "risk_level": "readonly",
+    "binding_verdict": "pass",
+    "allowed_tools": [
+      "mcp_netmiko_run_show",
+      "prometheus_range_query",
+      "parser_parse_cli_output"
+    ],
+    "allowed_capabilities": [
+      "show_interface_detail",
+      "show_interface_error_counters",
+      "show_interface_aggregation",
+      "prometheus_interface_window",
+      "parse_cli_output"
+    ],
+    "parsers": [
+      "cisco_show_interfaces",
+      "cisco_show_interfaces_counters_errors",
+      "cisco_etherchannel_summary"
+    ],
+    "violations": []
+  }
+}

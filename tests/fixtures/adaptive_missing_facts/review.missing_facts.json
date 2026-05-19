@@ -1,0 +1,10 @@
+{
+  "evidence_summary": {
+    "facts": {
+      "interface": "TenGigabitEthernet1/0/1"
+    },
+    "notify_lines": [
+      "模拟样例：当前 review facts 缺少接口状态、速率、错误计数和聚合信息"
+    ]
+  }
+}
