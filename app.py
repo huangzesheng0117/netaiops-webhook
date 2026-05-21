@@ -857,3 +857,355 @@ def v6_adaptive_simulate_missing_facts(include_candidates: bool = True, strict: 
         raise HTTPException(status_code=500, detail=str(exc))
 # ===== v6.5 adaptive evidence APIs end =====
 
+# ===== v7.1 incident memory APIs begin =====
+@app.get("/v7/memory/incidents")
+def v7_memory_incidents(
+    family: str = "",
+    hostname: str = "",
+    interface: str = "",
+    q: str = "",
+    days: int = 0,
+    limit: int = 20,
+    rebuild: bool = False,
+    rebuild_limit: int = 0,
+):
+    try:
+        from netaiops.memory_api import build_incidents_response
+        return build_incidents_response(
+            base_dir=BASE_DIR,
+            family=family,
+            hostname=hostname,
+            interface=interface,
+            q=q,
+            days=days,
+            limit=limit,
+            rebuild=rebuild,
+            rebuild_limit=rebuild_limit,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v7/memory/incidents/{request_id}")
+def v7_memory_incident_detail(request_id: str, build: bool = True, write: bool = True):
+    try:
+        from netaiops.memory_api import build_incident_detail_response
+        return build_incident_detail_response(
+            request_id=request_id,
+            base_dir=BASE_DIR,
+            build=build,
+            write=write,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+# ===== v7.1 incident memory APIs end =====
+
+# ===== v7.2 relation engine APIs begin =====
+@app.get("/v7/relations/incidents")
+def v7_relation_incidents(
+    family: str = "",
+    hostname: str = "",
+    interface: str = "",
+    relation_type: str = "",
+    min_score: int = 0,
+    limit: int = 20,
+    rebuild: bool = False,
+    rebuild_limit: int = 0,
+):
+    try:
+        from netaiops.relation_api import build_relations_response
+        return build_relations_response(
+            base_dir=BASE_DIR,
+            family=family,
+            hostname=hostname,
+            interface=interface,
+            relation_type=relation_type,
+            min_score=min_score,
+            limit=limit,
+            rebuild=rebuild,
+            rebuild_limit=rebuild_limit,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/v7/relations/rebuild")
+def v7_relation_rebuild(limit: int = 0):
+    try:
+        from netaiops.relation_api import build_relation_rebuild_response
+        return build_relation_rebuild_response(
+            base_dir=BASE_DIR,
+            limit=limit,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v7/relations/incidents/{request_id}")
+def v7_relation_incident_detail(
+    request_id: str,
+    rebuild: bool = False,
+    rebuild_limit: int = 0,
+):
+    try:
+        from netaiops.relation_api import build_relation_detail_response
+        return build_relation_detail_response(
+            request_id=request_id,
+            base_dir=BASE_DIR,
+            rebuild=rebuild,
+            rebuild_limit=rebuild_limit,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+# ===== v7.2 relation engine APIs end =====
+
+# ===== v7.3 skill proposal APIs begin =====
+@app.get("/v7/skill-proposals")
+def v7_skill_proposals(
+    family: str = "",
+    proposal_type: str = "",
+    verdict: str = "",
+    min_score: int = 0,
+    limit: int = 20,
+    rebuild: bool = False,
+    limit_clusters: int = 0,
+):
+    try:
+        from netaiops.skill_proposal_api import query_skill_proposals_response
+        return query_skill_proposals_response(
+            base_dir=BASE_DIR,
+            family=family,
+            proposal_type=proposal_type,
+            verdict=verdict,
+            min_score=min_score,
+            limit=limit,
+            rebuild=rebuild,
+            limit_clusters=limit_clusters,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/v7/skill-proposals/rebuild")
+def v7_skill_proposals_rebuild(
+    limit_clusters: int = 0,
+    rebuild_relations: bool = False,
+):
+    try:
+        from netaiops.skill_proposal_api import build_skill_proposals_response
+        return build_skill_proposals_response(
+            base_dir=BASE_DIR,
+            limit_clusters=limit_clusters,
+            rebuild_relations=rebuild_relations,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v7/skill-proposals/{proposal_id}")
+def v7_skill_proposal_detail(proposal_id: str):
+    try:
+        from netaiops.skill_proposal_api import skill_proposal_detail_response
+        return skill_proposal_detail_response(
+            proposal_id=proposal_id,
+            base_dir=BASE_DIR,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+# ===== v7.3 skill proposal APIs end =====
+
+# ===== v7.4 skill proposal review APIs begin =====
+@app.get("/v7/skill-proposal-reviews/summary")
+def v7_skill_proposal_review_summary():
+    try:
+        from netaiops.skill_proposal_review_api import review_summary_response
+        return review_summary_response(base_dir=BASE_DIR)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v7/skill-proposal-reviews/pending")
+def v7_skill_proposal_review_pending(min_score: int = 0, limit: int = 20):
+    try:
+        from netaiops.skill_proposal_review_api import pending_reviews_response
+        return pending_reviews_response(
+            base_dir=BASE_DIR,
+            min_score=min_score,
+            limit=limit,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v7/skill-proposal-reviews")
+def v7_skill_proposal_reviews(
+    proposal_id: str = "",
+    decision: str = "",
+    reviewer: str = "",
+    family: str = "",
+    limit: int = 20,
+):
+    try:
+        from netaiops.skill_proposal_review_api import query_reviews_response
+        return query_reviews_response(
+            base_dir=BASE_DIR,
+            proposal_id=proposal_id,
+            decision=decision,
+            reviewer=reviewer,
+            family=family,
+            limit=limit,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v7/skill-proposal-reviews/{proposal_id}")
+def v7_skill_proposal_review_status(proposal_id: str):
+    try:
+        from netaiops.skill_proposal_review_api import proposal_review_status_response
+        return proposal_review_status_response(
+            proposal_id=proposal_id,
+            base_dir=BASE_DIR,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/v7/skill-proposal-reviews/{proposal_id}")
+def v7_skill_proposal_review_create(
+    proposal_id: str,
+    decision: str,
+    reviewer: str = "manual_reviewer",
+    comment: str = "",
+    next_action: str = "",
+):
+    try:
+        from netaiops.skill_proposal_review_api import create_review_response
+        return create_review_response(
+            proposal_id=proposal_id,
+            decision=decision,
+            reviewer=reviewer,
+            comment=comment,
+            next_action=next_action,
+            base_dir=BASE_DIR,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+# ===== v7.4 skill proposal review APIs end =====
+
+# ===== v7.5 skill draft APIs begin =====
+@app.get("/v7/skill-drafts")
+def v7_skill_drafts(
+    family: str = "",
+    proposal_id: str = "",
+    limit: int = 20,
+):
+    try:
+        from netaiops.skill_draft_api import query_skill_drafts_response
+        return query_skill_drafts_response(
+            base_dir=BASE_DIR,
+            family=family,
+            proposal_id=proposal_id,
+            limit=limit,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/v7/skill-drafts/rebuild")
+def v7_skill_drafts_rebuild(proposal_id: str = ""):
+    try:
+        from netaiops.skill_draft_api import build_skill_drafts_response
+        return build_skill_drafts_response(
+            base_dir=BASE_DIR,
+            proposal_id=proposal_id,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v7/skill-drafts/{draft_id}")
+def v7_skill_draft_detail(draft_id: str):
+    try:
+        from netaiops.skill_draft_api import skill_draft_detail_response
+        return skill_draft_detail_response(
+            draft_id=draft_id,
+            base_dir=BASE_DIR,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+# ===== v7.5 skill draft APIs end =====
+
+# ===== v7.6 learning report APIs begin =====
+@app.get("/v7/learning/report")
+def v7_learning_report(rebuild: bool = False):
+    try:
+        from netaiops.learning_report_api import latest_learning_report_response
+        return latest_learning_report_response(
+            base_dir=BASE_DIR,
+            rebuild=rebuild,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/v7/learning/reports/rebuild")
+def v7_learning_reports_rebuild():
+    try:
+        from netaiops.learning_report_api import build_learning_report_response
+        return build_learning_report_response(base_dir=BASE_DIR)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v7/learning/reports")
+def v7_learning_reports(limit: int = 20):
+    try:
+        from netaiops.learning_report_api import list_learning_reports_response
+        return list_learning_reports_response(
+            base_dir=BASE_DIR,
+            limit=limit,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v7/learning/reports/{report_id}")
+def v7_learning_report_detail(report_id: str):
+    try:
+        from netaiops.learning_report_api import learning_report_detail_response
+        return learning_report_detail_response(
+            report_id=report_id,
+            base_dir=BASE_DIR,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+# ===== v7.6 learning report APIs end =====
+
+# ===== v7.7 release audit APIs begin =====
+@app.get("/v7/release/audit")
+def v7_release_audit(write: bool = False):
+    try:
+        from netaiops.v7_release_audit_api import v7_release_audit_response
+        return v7_release_audit_response(
+            base_dir=BASE_DIR,
+            write=write,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+# ===== v7.7 release audit APIs end =====
+

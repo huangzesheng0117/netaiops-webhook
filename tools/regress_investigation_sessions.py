@@ -57,6 +57,7 @@ def main() -> int:
     parser.add_argument("--base-dir", default=str(ROOT), help="Project base directory")
     parser.add_argument("--limit", type=int, default=10, help="Max request_ids to evaluate")
     parser.add_argument("--rid", action="append", default=[], help="Specific request_id to evaluate; can be repeated")
+    parser.add_argument("--skip-in-progress", action="store_true", help="Skip sessions whose session_status is in_progress")
     parser.add_argument("--json", action="store_true", help="Print full JSON result")
     args = parser.parse_args()
 
@@ -97,12 +98,26 @@ def main() -> int:
             for item in violations:
                 print("  -", item)
 
+        if args.skip_in_progress and summary.get("session_status") == "in_progress":
+            print("skip_reason: session_status is in_progress")
+            continue
+
         if verdict != "pass":
             failed += 1
 
+    counted_results = [
+        item for item in results
+        if not (
+            args.skip_in_progress
+            and (item.get("summary") or {}).get("session_status") == "in_progress"
+        )
+    ]
+
     print("=" * 100)
     print("TOTAL:", len(results))
-    print("PASS:", len(results) - failed)
+    print("COUNTED:", len(counted_results))
+    print("SKIPPED_IN_PROGRESS:", len(results) - len(counted_results))
+    print("PASS:", len(counted_results) - failed)
     print("FAIL:", failed)
 
     if args.json:

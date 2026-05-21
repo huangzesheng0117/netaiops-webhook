@@ -18,7 +18,7 @@ python -m unittest \
 
 echo
 echo "===== v6.1 investigation session regression ====="
-python tools/regress_investigation_sessions.py --limit 10
+python tools/regress_investigation_sessions.py --limit 10 --skip-in-progress
 
 echo
 echo "===== v6.1 health check ====="

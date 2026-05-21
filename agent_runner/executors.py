@@ -60,7 +60,7 @@ def finalize_result_item(
         dispatch_status=dispatch_status,
     )
 
-    return build_result_item(
+    result = build_result_item(
         order=item.get("order", 0),
         command=command,
         dispatch_status=judge.get("final_status", dispatch_status),
@@ -74,6 +74,23 @@ def finalize_result_item(
         judge_profile=judge_profile,
         judge=judge,
     )
+
+    # Preserve planner metadata for downstream evidence builders.
+    # Multi-interface alerts rely on these fields to avoid reducing
+    # a grouped circuit alert to the first physical interface only.
+    for key in (
+        "interface",
+        "arguments",
+        "multi_interfaces",
+        "multi_interface_expanded",
+        "multi_interface_source",
+        "iosxe_command_normalized",
+        "original_command",
+    ):
+        if key in item:
+            result[key] = item.get(key)
+
+    return result
 
 
 def run_stub_commands(execution_candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

@@ -1451,6 +1451,62 @@ def _v16e_split_interfaces(expr):
     return []
 
 
+def _v16e_extract_interfaces_from_commands(execution_data):
+    """Infer grouped interfaces from command_results when planner metadata was not persisted.
+
+    Older runner/callback records kept only command/capability/output, so the
+    evidence layer could not see command_results[*].multi_interfaces even though
+    the MCP runner had executed multiple interface commands.
+    """
+    result = []
+    seen = set()
+
+    def add(value):
+        value = _v16e_safe_text(value)
+        if not value:
+            return
+        if not _v16e_re.match(r"^[A-Za-z][A-Za-z0-9_\-./]+$", value):
+            return
+        key = value.lower()
+        if key in seen:
+            return
+        seen.add(key)
+        result.append(value)
+
+    for item in execution_data.get("command_results", []) or []:
+        if not isinstance(item, dict):
+            continue
+
+        interfaces = item.get("multi_interfaces")
+        if isinstance(interfaces, list):
+            for iface in interfaces:
+                add(iface)
+
+        add(item.get("interface"))
+
+        arguments = item.get("arguments")
+        if isinstance(arguments, dict):
+            add(arguments.get("interface"))
+            arg_interfaces = arguments.get("interfaces")
+            if isinstance(arg_interfaces, list):
+                for iface in arg_interfaces:
+                    add(iface)
+
+        command = _v16e_safe_text(item.get("command"))
+        if not command:
+            continue
+
+        for pattern in (
+            r"^\s*show\s+interfaces?\s+(?!description\b|status\b)(\S+)(?:\s+counters\s+errors)?\s*$",
+            r"^\s*display\s+interface\s+(?!brief\b)(\S+)\s*$",
+        ):
+            m = _v16e_re.match(pattern, command, flags=_v16e_re.IGNORECASE)
+            if m:
+                add(m.group(1))
+
+    return result if len(result) >= 2 else []
+
+
 def _v16e_extract_multi_interfaces(execution_data):
     # 优先从 command_results 的 multi_interfaces 字段取。
     for item in execution_data.get("command_results", []) or []:
@@ -1460,6 +1516,10 @@ def _v16e_extract_multi_interfaces(execution_data):
         interfaces = item.get("multi_interfaces")
         if isinstance(interfaces, list) and len(interfaces) >= 2:
             return [x for x in interfaces if _v16e_safe_text(x)]
+
+    interfaces_from_commands = _v16e_extract_interfaces_from_commands(execution_data)
+    if len(interfaces_from_commands) >= 2:
+        return interfaces_from_commands
 
     text = _v16e_text_blob(execution_data)
 
@@ -1737,18 +1797,25 @@ def _v16e_enrich_multi_interface_traffic_summary(summary, execution_data):
     summary["notify_lines"] = notify_lines[:16]
     summary["key_findings"] = key_findings[:20]
 
-    conclusion = _v16e_safe_text(summary.get("conclusion"))
-    if direction == "in" and input_business_util is not None:
-        summary["conclusion"] = (
-            conclusion
-            + f" 多接口汇总后，取证时入向告警口径估算利用率约 {input_business_util}%。"
-        ).strip()
+    conclusion_parts = [
+        "多接口只读取证完成；本次告警涉及 "
+        + "、".join(interfaces)
+        + "，已按这些接口进行汇总分析"
+    ]
 
-    if direction == "out" and output_business_util is not None:
-        summary["conclusion"] = (
-            conclusion
-            + f" 多接口汇总后，取证时出向告警口径估算利用率约 {output_business_util}%。"
-        ).strip()
+    if direction == "in" and input_business_util is not None:
+        conclusion_parts.append(f"多接口汇总后，取证时入向告警口径估算利用率约 {input_business_util}%")
+    elif direction == "out" and output_business_util is not None:
+        conclusion_parts.append(f"多接口汇总后，取证时出向告警口径估算利用率约 {output_business_util}%")
+    elif input_found or output_found:
+        conclusion_parts.append(
+            "多接口汇总设备侧实时速率："
+            f"input={_v16e_format_bps(input_sum) if input_found else '未知'}，"
+            f"output={_v16e_format_bps(output_sum) if output_found else '未知'}"
+        )
+
+    conclusion_parts.append("建议结合告警时间窗口的指标曲线判断是否为持续高利用率或瞬时峰值")
+    summary["conclusion"] = "。".join(conclusion_parts) + "。"
 
     return summary
 
@@ -1917,3 +1984,151 @@ if _v62_original_build_interface_evidence_summary is not None:
             return base_summary
 # ===== v6.2 batch4 parsed facts first bridge end =====
 
+# ===== v5 multi-interface recommendation consistency guard begin =====
+# 修复场景：
+# 多接口告警已经按多个接口汇总出 aggregate_* 利用率后，
+# recommendations 里仍可能残留旧的单接口建议，例如：
+# “取证时出向利用率已低于阈值，建议结合 Prometheus 告警窗口确认是否为瞬时峰值”。
+# 这会和 “多接口出向汇总利用率仍处于高利用率状态” 冲突。
+try:
+    _v19m_original_build_interface_evidence_summary = build_interface_evidence_summary
+except NameError:
+    _v19m_original_build_interface_evidence_summary = None
+
+
+def _v19m_safe_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v19m_dedup_texts(items):
+    result = []
+    seen = set()
+
+    for item in items or []:
+        text = _v19m_safe_text(item)
+        if not text:
+            continue
+
+        if text in seen:
+            continue
+
+        seen.add(text)
+        result.append(text)
+
+    return result
+
+
+def _v19m_is_old_single_interface_recommendation(text):
+    text = _v19m_safe_text(text)
+
+    if not text:
+        return False
+
+    # 新的多接口建议必须保留。
+    if "多接口" in text or "汇总口径" in text:
+        return False
+
+    old_prefixes = [
+        "按告警口径计算，取证时入向利用率",
+        "按告警口径计算，取证时出向利用率",
+        "取证时设备侧入向利用率",
+        "取证时设备侧出向利用率",
+    ]
+
+    if any(text.startswith(prefix) for prefix in old_prefixes):
+        return True
+
+    old_keywords = [
+        "本次取证时接口入向实时速率已经较低",
+        "本次取证时接口出向实时速率已经较低",
+        "取证时入向利用率已低于阈值",
+        "取证时出向利用率已低于阈值",
+        "设备侧入向利用率已低于阈值",
+        "设备侧出向利用率已低于阈值",
+    ]
+
+    if any(keyword in text for keyword in old_keywords):
+        return True
+
+    return False
+
+
+def _v19m_pick_multi_interface_direction_and_util(facts):
+    direction = _v19m_safe_text(facts.get("alarm_direction")).lower()
+
+    input_util = facts.get("aggregate_input_utilization_percent_business_estimated")
+    output_util = facts.get("aggregate_output_utilization_percent_business_estimated")
+
+    if direction in ("in", "input", "inbound", "入向"):
+        return "in", input_util
+
+    if direction in ("out", "output", "outbound", "出向"):
+        return "out", output_util
+
+    if isinstance(output_util, (int, float)):
+        return "out", output_util
+
+    if isinstance(input_util, (int, float)):
+        return "in", input_util
+
+    return "", None
+
+
+def _v19m_build_multi_interface_recommendation(direction, util):
+    if direction == "in":
+        if isinstance(util, (int, float)) and util >= 80:
+            return (
+                f"按多接口汇总口径计算，取证时入向利用率约 {util}%，仍处于高利用率状态；"
+                "建议继续定位入向流量来源、业务高峰和线路容量，并结合 Prometheus 告警窗口确认持续性。"
+            )
+        if isinstance(util, (int, float)):
+            return (
+                f"按多接口汇总口径计算，取证时入向利用率约 {util}%，已低于80%阈值；"
+                "建议结合 Prometheus 告警窗口确认是否为瞬时峰值或已恢复。"
+            )
+
+    if direction == "out":
+        if isinstance(util, (int, float)) and util >= 80:
+            return (
+                f"按多接口汇总口径计算，取证时出向利用率约 {util}%，仍处于高利用率状态；"
+                "建议继续定位出向流量来源、业务高峰和线路容量，并结合 Prometheus 告警窗口确认持续性。"
+            )
+        if isinstance(util, (int, float)):
+            return (
+                f"按多接口汇总口径计算，取证时出向利用率约 {util}%，已低于80%阈值；"
+                "建议结合 Prometheus 告警窗口确认是否为瞬时峰值或已恢复。"
+            )
+
+    return "已按多接口汇总口径完成取证分析，建议结合告警时间窗口继续核查流量趋势和业务高峰情况。"
+
+
+def _v19m_fix_multi_interface_recommendations(summary, execution_data):
+    summary = dict(summary or {})
+    facts = dict(summary.get("facts", {}) or {})
+
+    interfaces = facts.get("multi_interfaces")
+    if not isinstance(interfaces, list) or len(interfaces) < 2:
+        return summary
+
+    recommendations = list(summary.get("recommendations", []) or [])
+
+    # 删除旧的单接口利用率建议，避免与多接口汇总结果冲突。
+    cleaned = [
+        item for item in recommendations
+        if not _v19m_is_old_single_interface_recommendation(item)
+    ]
+
+    direction, util = _v19m_pick_multi_interface_direction_and_util(facts)
+    multi_rec = _v19m_build_multi_interface_recommendation(direction, util)
+
+    summary["recommendations"] = _v19m_dedup_texts([multi_rec] + cleaned)[:8]
+    return summary
+
+
+if _v19m_original_build_interface_evidence_summary is not None:
+    def build_interface_evidence_summary(execution_data):
+        base_summary = _v19m_original_build_interface_evidence_summary(execution_data)
+        return _v19m_fix_multi_interface_recommendations(base_summary, execution_data)
+# ===== v5 multi-interface recommendation consistency guard end =====

@@ -1,0 +1,454 @@
+{
+  "api_route_status": {
+    "missing": [],
+    "routes": [
+      {
+        "exists": true,
+        "route": "/v7/memory/incidents"
+      },
+      {
+        "exists": true,
+        "route": "/v7/relations/incidents"
+      },
+      {
+        "exists": true,
+        "route": "/v7/skill-proposals"
+      },
+      {
+        "exists": true,
+        "route": "/v7/skill-proposal-reviews"
+      },
+      {
+        "exists": true,
+        "route": "/v7/skill-drafts"
+      },
+      {
+        "exists": true,
+        "route": "/v7/learning/report"
+      },
+      {
+        "exists": true,
+        "route": "/v7/learning/reports"
+      },
+      {
+        "exists": true,
+        "route": "/v7/release/audit"
+      }
+    ]
+  },
+  "base_dir": "/opt/netaiops-webhook",
+  "created_at": "2026-05-21T09:26:29.727552+00:00",
+  "executable_status": {
+    "not_executable": [],
+    "scripts": [
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/build_incident_memory.py"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/query_incident_memory.py"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/build_incident_relations.py"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/query_incident_relations.py"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/build_skill_proposals.py"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/query_skill_proposals.py"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/review_skill_proposal.py"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/build_skill_drafts.py"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/build_learning_report.py"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/v7_release_audit.py"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/regress_v7_1.sh"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/regress_v7_2.sh"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/regress_v7_3.sh"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/regress_v7_4.sh"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/regress_v7_5.sh"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/regress_v7_6.sh"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/regress_v7_7.sh"
+      },
+      {
+        "executable": true,
+        "exists": true,
+        "path": "tools/regress_v7_all.sh"
+      }
+    ]
+  },
+  "purpose": "v7 Hermes-style sidecar release and Git cleanup precheck",
+  "recommended_release_order": [
+    "run bash tools/regress_v7_all.sh",
+    "run bash tools/regress_v6_all.sh",
+    "review docs/v7_7_release_audit_snapshot.json",
+    "review git status --short",
+    "review git diff --stat",
+    "confirm runtime sidecar files are not tracked",
+    "confirm /health",
+    "commit only after manual Git review"
+  ],
+  "release_boundaries": {
+    "adaptive_execution_enabled": false,
+    "adaptive_mode": "skill_constrained_dry_run",
+    "draft_writes_formal_skill": false,
+    "formal_skill_dir_write_in_v7_7": false,
+    "git_commit_in_this_batch": false,
+    "llm_free_command_generation": false,
+    "proposal_auto_merge_enabled": false,
+    "readonly_only": true
+  },
+  "required_path_status": {
+    "files": [
+      {
+        "exists": true,
+        "path": "docs/v7_1_incident_memory_runbook.md",
+        "size_bytes": 1111
+      },
+      {
+        "exists": true,
+        "path": "docs/v7_2_relation_engine_runbook.md",
+        "size_bytes": 1397
+      },
+      {
+        "exists": true,
+        "path": "docs/v7_3_skill_proposal_builder_runbook.md",
+        "size_bytes": 1872
+      },
+      {
+        "exists": true,
+        "path": "docs/v7_4_skill_proposal_review_runbook.md",
+        "size_bytes": 1022
+      },
+      {
+        "exists": true,
+        "path": "docs/v7_5_skill_draft_builder_runbook.md",
+        "size_bytes": 878
+      },
+      {
+        "exists": true,
+        "path": "docs/v7_6_learning_report_runbook.md",
+        "size_bytes": 808
+      },
+      {
+        "exists": true,
+        "path": "docs/v7_7_release_audit_runbook.md",
+        "size_bytes": 920
+      },
+      {
+        "exists": true,
+        "path": "netaiops/memory_store.py",
+        "size_bytes": 24422
+      },
+      {
+        "exists": true,
+        "path": "netaiops/memory_api.py",
+        "size_bytes": 2513
+      },
+      {
+        "exists": true,
+        "path": "netaiops/relation_engine.py",
+        "size_bytes": 15885
+      },
+      {
+        "exists": true,
+        "path": "netaiops/relation_api.py",
+        "size_bytes": 1667
+      },
+      {
+        "exists": true,
+        "path": "netaiops/skill_proposal_builder.py",
+        "size_bytes": 25685
+      },
+      {
+        "exists": true,
+        "path": "netaiops/skill_proposal_api.py",
+        "size_bytes": 2271
+      },
+      {
+        "exists": true,
+        "path": "netaiops/skill_proposal_review.py",
+        "size_bytes": 9284
+      },
+      {
+        "exists": true,
+        "path": "netaiops/skill_proposal_review_api.py",
+        "size_bytes": 2252
+      },
+      {
+        "exists": true,
+        "path": "netaiops/skill_draft_builder.py",
+        "size_bytes": 16112
+      },
+      {
+        "exists": true,
+        "path": "netaiops/skill_draft_api.py",
+        "size_bytes": 1451
+      },
+      {
+        "exists": true,
+        "path": "netaiops/learning_report.py",
+        "size_bytes": 18237
+      },
+      {
+        "exists": true,
+        "path": "netaiops/learning_report_api.py",
+        "size_bytes": 1866
+      },
+      {
+        "exists": true,
+        "path": "netaiops/v7_release_audit.py",
+        "size_bytes": 14321
+      },
+      {
+        "exists": true,
+        "path": "netaiops/v7_release_audit_api.py",
+        "size_bytes": 658
+      },
+      {
+        "exists": true,
+        "path": "tools/build_incident_memory.py",
+        "size_bytes": 2191
+      },
+      {
+        "exists": true,
+        "path": "tools/query_incident_memory.py",
+        "size_bytes": 2077
+      },
+      {
+        "exists": true,
+        "path": "tools/build_incident_relations.py",
+        "size_bytes": 1292
+      },
+      {
+        "exists": true,
+        "path": "tools/query_incident_relations.py",
+        "size_bytes": 2443
+      },
+      {
+        "exists": true,
+        "path": "tools/build_skill_proposals.py",
+        "size_bytes": 2769
+      },
+      {
+        "exists": true,
+        "path": "tools/query_skill_proposals.py",
+        "size_bytes": 2909
+      },
+      {
+        "exists": true,
+        "path": "tools/review_skill_proposal.py",
+        "size_bytes": 4283
+      },
+      {
+        "exists": true,
+        "path": "tools/build_skill_drafts.py",
+        "size_bytes": 3033
+      },
+      {
+        "exists": true,
+        "path": "tools/build_learning_report.py",
+        "size_bytes": 2778
+      },
+      {
+        "exists": true,
+        "path": "tools/v7_release_audit.py",
+        "size_bytes": 1986
+      },
+      {
+        "exists": true,
+        "path": "tools/regress_v7_1.sh",
+        "size_bytes": 538
+      },
+      {
+        "exists": true,
+        "path": "tools/regress_v7_2.sh",
+        "size_bytes": 637
+      },
+      {
+        "exists": true,
+        "path": "tools/regress_v7_3.sh",
+        "size_bytes": 726
+      },
+      {
+        "exists": true,
+        "path": "tools/regress_v7_4.sh",
+        "size_bytes": 966
+      },
+      {
+        "exists": true,
+        "path": "tools/regress_v7_5.sh",
+        "size_bytes": 773
+      },
+      {
+        "exists": true,
+        "path": "tools/regress_v7_6.sh",
+        "size_bytes": 781
+      },
+      {
+        "exists": true,
+        "path": "tools/regress_v7_7.sh",
+        "size_bytes": 587
+      },
+      {
+        "exists": true,
+        "path": "tools/regress_v7_all.sh",
+        "size_bytes": 378
+      },
+      {
+        "exists": true,
+        "path": "tests/test_memory_store.py",
+        "size_bytes": 3375
+      },
+      {
+        "exists": true,
+        "path": "tests/test_relation_engine.py",
+        "size_bytes": 3663
+      },
+      {
+        "exists": true,
+        "path": "tests/test_skill_proposal_builder.py",
+        "size_bytes": 4287
+      },
+      {
+        "exists": true,
+        "path": "tests/test_skill_proposal_review.py",
+        "size_bytes": 2984
+      },
+      {
+        "exists": true,
+        "path": "tests/test_skill_draft_builder.py",
+        "size_bytes": 4364
+      },
+      {
+        "exists": true,
+        "path": "tests/test_learning_report.py",
+        "size_bytes": 5074
+      },
+      {
+        "exists": true,
+        "path": "tests/test_v7_release_audit.py",
+        "size_bytes": 2193
+      }
+    ],
+    "missing": []
+  },
+  "runtime_git_status": {
+    "git_status_short": [],
+    "runtime_ignore_status": [
+      {
+        "ignored": true,
+        "path": "data/memory"
+      },
+      {
+        "ignored": true,
+        "path": "data/skill_proposals"
+      },
+      {
+        "ignored": true,
+        "path": "data/skill_proposal_reviews"
+      },
+      {
+        "ignored": true,
+        "path": "data/skill_drafts"
+      },
+      {
+        "ignored": true,
+        "path": "data/learning_reports"
+      }
+    ],
+    "tracked_runtime_count": 0,
+    "tracked_runtime_files": []
+  },
+  "schema_version": "v7.7.release_audit.v1",
+  "sensitive_sidecar_scan": {
+    "violations": [],
+    "warnings": [
+      {
+        "count": 2,
+        "file": "data/memory/incidents.jsonl",
+        "note": "memory sidecar may contain historical IP-like hostnames; published reports/proposals/drafts must stay sanitized",
+        "type": "raw_ipv4_in_memory_sidecar_warning"
+      },
+      {
+        "count": 1,
+        "file": "data/memory/incident_relations.json",
+        "note": "memory sidecar may contain historical IP-like hostnames; published reports/proposals/drafts must stay sanitized",
+        "type": "raw_ipv4_in_memory_sidecar_warning"
+      }
+    ]
+  },
+  "stage": "v7.7_release_audit",
+  "verdict": "pass",
+  "violations": [],
+  "warnings": [
+    {
+      "count": 2,
+      "file": "data/memory/incidents.jsonl",
+      "note": "memory sidecar may contain historical IP-like hostnames; published reports/proposals/drafts must stay sanitized",
+      "type": "raw_ipv4_in_memory_sidecar_warning"
+    },
+    {
+      "count": 1,
+      "file": "data/memory/incident_relations.json",
+      "note": "memory sidecar may contain historical IP-like hostnames; published reports/proposals/drafts must stay sanitized",
+      "type": "raw_ipv4_in_memory_sidecar_warning"
+    }
+  ]
+}
