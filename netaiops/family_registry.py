@@ -776,3 +776,198 @@ if _v16f_original_classify_family is not None:
 
         return original
 # ===== v5 PromQL interface utilization family final classifier end =====
+
+# ===== v7.8 optical power final classifier begin =====
+# 目标：
+# - “NXOS光功率 / 光功率异常 / transceiver / Rx Power / Tx Power” 必须优先归类为 optical_power_abnormal。
+# - 避免因为文本里含 power / 功率 被误归到 hardware_power_abnormal。
+# - 尽量从告警文本、object_name、labels、annotations 中提取 Ethernet1/10 等接口名。
+import json as _v78_json
+import re as _v78_re
+import urllib.parse as _v78_urlparse
+
+try:
+    _v78_original_classify_family = classify_family
+except NameError:
+    _v78_original_classify_family = None
+
+
+def _v78_safe_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            return _v78_json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+    return str(value).strip()
+
+
+def _v78_walk_text(obj, max_depth=5):
+    parts = []
+
+    def walk(value, depth=0):
+        if depth > max_depth or value is None:
+            return
+
+        if isinstance(value, dict):
+            for k, v in value.items():
+                parts.append(_v78_safe_text(k))
+                walk(v, depth + 1)
+            return
+
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                walk(item, depth + 1)
+            return
+
+        parts.append(_v78_safe_text(value))
+
+    walk(obj)
+    return _v78_urlparse.unquote(" ".join(x for x in parts if x))
+
+
+def _v78_normalize_interface(value):
+    text = _v78_safe_text(value).replace(" ", "")
+    if not text:
+        return ""
+
+    lower = text.lower()
+
+    replacements = [
+        ("ethernet", "Ethernet"),
+        ("eth", "Ethernet"),
+        ("tengigabitethernet", "TenGigabitEthernet"),
+        ("te", "TenGigabitEthernet"),
+        ("gigabitethernet", "GigabitEthernet"),
+        ("gi", "GigabitEthernet"),
+    ]
+
+    for prefix, full in replacements:
+        if lower.startswith(prefix):
+            return full + text[len(prefix):]
+
+    return text
+
+
+def _v78_extract_interface(event, original=None):
+    candidates = []
+
+    if isinstance(original, dict):
+        scope = original.get("target_scope")
+        if isinstance(scope, dict):
+            for key in ("interface", "object_name", "ifName", "if_name", "port"):
+                candidates.append(scope.get(key))
+
+    if isinstance(event, dict):
+        for key in ("interface", "object_name", "ifName", "if_name", "port"):
+            candidates.append(event.get(key))
+
+        labels = event.get("labels")
+        if isinstance(labels, dict):
+            for key in ("interface", "object_name", "ifName", "if_name", "port"):
+                candidates.append(labels.get(key))
+
+        annotations = event.get("annotations")
+        if isinstance(annotations, dict):
+            for key in ("interface", "object_name", "ifName", "if_name", "port"):
+                candidates.append(annotations.get(key))
+
+    for item in candidates:
+        iface = _v78_normalize_interface(item)
+        if _v78_re.match(r"^(Ethernet|Eth|TenGigabitEthernet|Te|GigabitEthernet|Gi)\d+(?:/\d+)+$", iface, flags=_v78_re.I):
+            return iface
+
+    text = _v78_walk_text(event) + " " + _v78_walk_text(original)
+    patterns = [
+        r"\b(Ethernet\s*\d+(?:/\d+)+)\b",
+        r"\b(Eth\s*\d+(?:/\d+)+)\b",
+        r"\b(TenGigabitEthernet\s*\d+(?:/\d+)+)\b",
+        r"\b(Te\s*\d+(?:/\d+)+)\b",
+        r"\b(GigabitEthernet\s*\d+(?:/\d+)+)\b",
+        r"\b(Gi\s*\d+(?:/\d+)+)\b",
+    ]
+
+    for pattern in patterns:
+        m = _v78_re.search(pattern, text, flags=_v78_re.I)
+        if m:
+            return _v78_normalize_interface(m.group(1))
+
+    return ""
+
+
+def _v78_is_optical_power_alert(event):
+    text = _v78_walk_text(event)
+    lower = text.lower()
+
+    strong_keywords = [
+        "光功率",
+        "收光",
+        "发光",
+        "光模块",
+        "transceiver",
+        "rx power",
+        "tx power",
+        "rxpower",
+        "txpower",
+        "rxdbm",
+        "txdbm",
+        "receive power",
+        "transmit power",
+        "ddm",
+    ]
+
+    return any(k in lower or k in text for k in strong_keywords)
+
+
+if _v78_original_classify_family is not None:
+    def classify_family(event):
+        original = _v78_original_classify_family(event)
+        if not isinstance(original, dict):
+            original = {}
+
+        if not _v78_is_optical_power_alert(event):
+            return original
+
+        target_scope = dict(original.get("target_scope") or {})
+
+        if isinstance(event, dict):
+            for key in (
+                "device_ip",
+                "hostname",
+                "instance",
+                "vendor",
+                "platform",
+                "os_family",
+                "job",
+                "alarm_type",
+                "raw_text",
+                "summary",
+                "description",
+                "object_name",
+            ):
+                value = event.get(key)
+                if value and key not in target_scope:
+                    target_scope[key] = value
+
+        interface = _v78_extract_interface(event, original)
+        if interface:
+            target_scope["interface"] = interface
+            target_scope["interfaces"] = [interface]
+
+        return {
+            "family": "optical_power_abnormal",
+            "family_confidence": "high",
+            "match_source": "v7_8_optical_power_final_classifier",
+            "match_reason": "matched optical/transceiver/RxPower/TxPower keywords; override hardware power classification",
+            "catalog_rule_id": original.get("catalog_rule_id", ""),
+            "legacy_playbook_type": "optical_power_abnormal",
+            "target_kind": "interface",
+            "auto_execute_allowed": True,
+            "default_capabilities": [
+                "show_interface_transceiver",
+                "show_interface_detail",
+            ],
+            "target_scope": target_scope,
+        }
+# ===== v7.8 optical power final classifier end =====

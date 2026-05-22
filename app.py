@@ -596,6 +596,29 @@ def v4_execution_result(request_id: str, payload: dict):
             "error": str(exc),
         }
 
+    interface_error_delta_schedule_result = {
+        "ok": True,
+        "enabled": True,
+        "stage": "v7.9",
+        "scheduled": False,
+        "reason": "not_evaluated",
+    }
+    try:
+        from netaiops.interface_error_delta import maybe_schedule_from_callback
+        interface_error_delta_schedule_result = maybe_schedule_from_callback(
+            request_id=request_id,
+            callback_result=callback_result,
+            base_dir=BASE_DIR,
+        )
+    except Exception as exc:
+        interface_error_delta_schedule_result = {
+            "ok": False,
+            "enabled": True,
+            "stage": "v7.9",
+            "scheduled": False,
+            "error": str(exc),
+        }
+
     return {
         "status": "ok",
         "stage": "v4_execution_result",
@@ -606,6 +629,7 @@ def v4_execution_result(request_id: str, payload: dict):
         "summary": summary,
         "notify_result": notify_result,
         "investigation_result": investigation_result,
+        "interface_error_delta_schedule_result": interface_error_delta_schedule_result,
     }
 
 
@@ -1208,4 +1232,58 @@ def v7_release_audit(write: bool = False):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 # ===== v7.7 release audit APIs end =====
+
+# ===== v7.9 interface error delta APIs begin =====
+@app.get("/v7/interface-error-delta")
+def v7_interface_error_delta_list(limit: int = 20):
+    try:
+        from netaiops.interface_error_delta import list_delta_results
+        rows = list_delta_results(base_dir=BASE_DIR, limit=limit)
+        return {
+            "status": "ok",
+            "stage": "v7.9_interface_error_delta_recheck",
+            "count": len(rows),
+            "records": rows,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/v7/interface-error-delta/{request_id}")
+def v7_interface_error_delta_detail(request_id: str):
+    try:
+        from netaiops.interface_error_delta import read_delta_result
+        return {
+            "status": "ok",
+            "stage": "v7.9_interface_error_delta_recheck",
+            "request_id": request_id,
+            "data": read_delta_result(request_id, base_dir=BASE_DIR),
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/v7/interface-error-delta/{request_id}/run")
+def v7_interface_error_delta_run(request_id: str, delay_seconds: int = 0):
+    try:
+        from netaiops.interface_error_delta import run_delta_check
+        result = run_delta_check(
+            request_id=request_id,
+            base_dir=BASE_DIR,
+            delay_seconds=delay_seconds,
+            execute=True,
+        )
+        return {
+            "status": "ok",
+            "stage": "v7.9_interface_error_delta_recheck",
+            "request_id": request_id,
+            "data": result,
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+# ===== v7.9 interface error delta APIs end =====
 

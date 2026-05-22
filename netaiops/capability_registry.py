@@ -649,3 +649,167 @@ if _v16c_original_build_capability_plan is not None:
 
         return original_plan
 # ===== v5 PromQL interface utilization capability final planner end =====
+
+# ===== v7.8 optical power capability planner begin =====
+# 目标：optical_power_abnormal 必须优先生成 show_interface_transceiver，并携带接口参数。
+import json as _v78c_json
+import re as _v78c_re
+import urllib.parse as _v78c_urlparse
+
+try:
+    _v78c_original_build_capability_plan = build_capability_plan
+except NameError:
+    _v78c_original_build_capability_plan = None
+
+
+def _v78c_safe_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            return _v78c_json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+    return str(value).strip()
+
+
+def _v78c_walk_text(obj, max_depth=5):
+    parts = []
+
+    def walk(value, depth=0):
+        if depth > max_depth or value is None:
+            return
+
+        if isinstance(value, dict):
+            for k, v in value.items():
+                parts.append(_v78c_safe_text(k))
+                walk(v, depth + 1)
+            return
+
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                walk(item, depth + 1)
+            return
+
+        parts.append(_v78c_safe_text(value))
+
+    walk(obj)
+    return _v78c_urlparse.unquote(" ".join(x for x in parts if x))
+
+
+def _v78c_normalize_interface(value):
+    text = _v78c_safe_text(value).replace(" ", "")
+    if not text:
+        return ""
+
+    lower = text.lower()
+
+    replacements = [
+        ("ethernet", "Ethernet"),
+        ("eth", "Ethernet"),
+        ("tengigabitethernet", "TenGigabitEthernet"),
+        ("te", "TenGigabitEthernet"),
+        ("gigabitethernet", "GigabitEthernet"),
+        ("gi", "GigabitEthernet"),
+    ]
+
+    for prefix, full in replacements:
+        if lower.startswith(prefix):
+            return full + text[len(prefix):]
+
+    return text
+
+
+def _v78c_extract_interface(event, family_result):
+    candidates = []
+
+    if isinstance(family_result, dict):
+        scope = family_result.get("target_scope")
+        if isinstance(scope, dict):
+            for key in ("interface", "object_name", "ifName", "if_name", "port"):
+                candidates.append(scope.get(key))
+
+    if isinstance(event, dict):
+        for key in ("interface", "object_name", "ifName", "if_name", "port"):
+            candidates.append(event.get(key))
+
+        labels = event.get("labels")
+        if isinstance(labels, dict):
+            for key in ("interface", "object_name", "ifName", "if_name", "port"):
+                candidates.append(labels.get(key))
+
+        annotations = event.get("annotations")
+        if isinstance(annotations, dict):
+            for key in ("interface", "object_name", "ifName", "if_name", "port"):
+                candidates.append(annotations.get(key))
+
+    for item in candidates:
+        iface = _v78c_normalize_interface(item)
+        if _v78c_re.match(r"^(Ethernet|Eth|TenGigabitEthernet|Te|GigabitEthernet|Gi)\d+(?:/\d+)+$", iface, flags=_v78c_re.I):
+            return iface
+
+    text = _v78c_walk_text(event) + " " + _v78c_walk_text(family_result)
+    for pattern in (
+        r"\b(Ethernet\s*\d+(?:/\d+)+)\b",
+        r"\b(Eth\s*\d+(?:/\d+)+)\b",
+        r"\b(TenGigabitEthernet\s*\d+(?:/\d+)+)\b",
+        r"\b(Te\s*\d+(?:/\d+)+)\b",
+        r"\b(GigabitEthernet\s*\d+(?:/\d+)+)\b",
+        r"\b(Gi\s*\d+(?:/\d+)+)\b",
+    ):
+        m = _v78c_re.search(pattern, text, flags=_v78c_re.I)
+        if m:
+            return _v78c_normalize_interface(m.group(1))
+
+    return ""
+
+
+def _v78c_build_item(capability, order, arguments):
+    meta = CAPABILITY_REGISTRY.get(capability, {}) or {}
+    return {
+        "order": order,
+        "capability": capability,
+        "readonly": bool(meta.get("readonly", True)),
+        "required_args": meta.get("required_args", []) or [],
+        "arguments": dict(arguments),
+        "judge_profile": meta.get("judge_profile", "network_cli_generic"),
+        "reason": "v7_8_optical_power_forced_capability_plan",
+    }
+
+
+if _v78c_original_build_capability_plan is not None:
+    def build_capability_plan(event, family_result):
+        family = ""
+        if isinstance(family_result, dict):
+            family = _v78c_safe_text(family_result.get("family"))
+
+        if family != "optical_power_abnormal":
+            return _v78c_original_build_capability_plan(event, family_result)
+
+        interface = _v78c_extract_interface(event, family_result)
+
+        arguments = {}
+        if isinstance(event, dict):
+            for key in ("device_ip", "hostname", "vendor", "platform", "os_family", "job"):
+                value = event.get(key)
+                if value:
+                    arguments[key] = value
+
+        if interface:
+            arguments["interface"] = interface
+
+        selected = []
+        if interface:
+            selected.append(_v78c_build_item("show_interface_transceiver", 1, arguments))
+            selected.append(_v78c_build_item("show_interface_detail", 2, arguments))
+
+        return {
+            "family": "optical_power_abnormal",
+            "plan_source": "v7_8_optical_power_capability_registry",
+            "readonly_only": True,
+            "auto_execute_allowed": bool((family_result or {}).get("auto_execute_allowed", True)),
+            "selected_capabilities": selected,
+            "capability_count": len(selected),
+            "missing_required": [] if interface else ["interface"],
+        }
+# ===== v7.8 optical power capability planner end =====

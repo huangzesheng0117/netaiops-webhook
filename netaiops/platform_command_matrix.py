@@ -1769,3 +1769,12 @@ def _v19_interfaces_from_config_best_match(event, family_result=None, plan=None)
 def _v18_interfaces_from_config(event, family_result=None, plan=None):
     return _v19_interfaces_from_config_best_match(event, family_result, plan)
 # ===== v5 interface group best-match final override end =====
+
+# ===== v7.8 optical power command matrix guard begin =====
+# 确保 NX-OS 光功率能力渲染为 show interface <iface> transceiver details。
+try:
+    PLATFORM_COMMAND_MATRIX.setdefault("cisco_nxos", {})["show_interface_transceiver"] = "show interface {interface} transceiver details"
+    PLATFORM_COMMAND_MATRIX.setdefault("generic_network", {})["show_interface_transceiver"] = "show interface {interface} transceiver details"
+except Exception:
+    pass
+# ===== v7.8 optical power command matrix guard end =====

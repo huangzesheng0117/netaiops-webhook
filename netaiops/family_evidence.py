@@ -929,3 +929,358 @@ if _v8_original_build_family_evidence_summary is not None:
 
         return _v8_original_build_family_evidence_summary(execution_data)
 # ===== v5 expanded family evidence parser end =====
+
+# ===== v7.8 optical power evidence parser begin =====
+# 目标：
+# - 针对 show interface Ethernet1/10 transceiver details 输出解析 Tx Power / Rx Power。
+# - 区分收光异常和发光异常。
+# - 输出更准确的 notify_lines、key_findings、recommendations、conclusion。
+import re as _v78e_re
+from typing import Any as _V78EAny, Dict as _V78EDict, List as _V78EList
+
+try:
+    _v78e_original_build_family_evidence_summary = build_family_evidence_summary
+except NameError:
+    _v78e_original_build_family_evidence_summary = None
+
+
+def _v78e_safe_text(value: _V78EAny) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v78e_get_family(execution_data: _V78EDict[str, _V78EAny]) -> str:
+    return _v78e_safe_text(
+        ((execution_data.get("family_result") or {}).get("family"))
+        or ((execution_data.get("classification") or {}).get("family"))
+        or ((execution_data.get("classification") or {}).get("playbook_type"))
+        or ((execution_data.get("playbook") or {}).get("playbook_id"))
+    )
+
+
+def _v78e_extract_command_outputs(execution_data: _V78EDict[str, _V78EAny]) -> _V78EList[_V78EDict[str, str]]:
+    rows = []
+
+    for item in execution_data.get("command_results", []) or []:
+        if not isinstance(item, dict):
+            continue
+
+        rows.append({
+            "capability": _v78e_safe_text(item.get("capability")),
+            "command": _v78e_safe_text(item.get("command")),
+            "output": _v78e_safe_text(item.get("output")),
+            "error": _v78e_safe_text(item.get("error")),
+            "status": _v78e_safe_text(item.get("dispatch_status") or item.get("status")),
+        })
+
+    return rows
+
+
+def _v78e_all_text(execution_data: _V78EDict[str, _V78EAny]) -> str:
+    parts = []
+    for row in _v78e_extract_command_outputs(execution_data):
+        for key in ("command", "output", "error"):
+            value = _v78e_safe_text(row.get(key))
+            if value:
+                parts.append(value)
+    return "\n".join(parts)
+
+
+def _v78e_float(value):
+    try:
+        return float(str(value).strip())
+    except Exception:
+        return None
+
+
+def _v78e_status_by_threshold(current, high_alarm, low_alarm, high_warning, low_warning, marker):
+    marker = _v78e_safe_text(marker)
+
+    if marker == "++":
+        return "high_alarm"
+    if marker == "--":
+        return "low_alarm"
+    if marker == "+":
+        return "high_warning"
+    if marker == "-":
+        return "low_warning"
+
+    if current is None:
+        return "unknown"
+
+    if high_alarm is not None and current >= high_alarm:
+        return "high_alarm"
+    if low_alarm is not None and current <= low_alarm:
+        return "low_alarm"
+    if high_warning is not None and current >= high_warning:
+        return "high_warning"
+    if low_warning is not None and current <= low_warning:
+        return "low_warning"
+
+    return "normal"
+
+
+def _v78e_parse_transceiver_details(text: str) -> _V78EDict[str, _V78EAny]:
+    facts: _V78EDict[str, _V78EAny] = {}
+
+    m = _v78e_re.search(r"^\s*(Ethernet\S+)\s*$", text or "", flags=_v78e_re.I | _v78e_re.M)
+    if m:
+        facts["interface"] = m.group(1)
+
+    if _v78e_re.search(r"transceiver\s+is\s+present", text or "", flags=_v78e_re.I):
+        facts["transceiver_present"] = True
+    elif _v78e_re.search(r"transceiver\s+is\s+not\s+present|not\s+inserted|absent", text or "", flags=_v78e_re.I):
+        facts["transceiver_present"] = False
+
+    for key, pattern in [
+        ("transceiver_type", r"\btype\s+is\s+([^\n]+)"),
+        ("transceiver_vendor", r"\bname\s+is\s+([^\n]+)"),
+        ("transceiver_part_number", r"\bpart number\s+is\s+([^\n]+)"),
+        ("transceiver_serial_number", r"\bserial number\s+is\s+([^\n]+)"),
+        ("transceiver_product_id", r"\bcisco product id\s+is\s+([^\n]+)"),
+    ]:
+        m = _v78e_re.search(pattern, text or "", flags=_v78e_re.I)
+        if m:
+            facts[key] = m.group(1).strip()
+
+    row_pattern = _v78e_re.compile(
+        r"^\s*(Temperature|Voltage|Current|Tx\s+Power|Rx\s+Power)\s+"
+        r"(-?\d+(?:\.\d+)?)\s+([A-Za-z]+)\s*([+\-]{1,2})?\s+"
+        r"(-?\d+(?:\.\d+)?)\s+[A-Za-z]+\s+"
+        r"(-?\d+(?:\.\d+)?)\s+[A-Za-z]+\s+"
+        r"(-?\d+(?:\.\d+)?)\s+[A-Za-z]+\s+"
+        r"(-?\d+(?:\.\d+)?)\s+[A-Za-z]+",
+        flags=_v78e_re.I | _v78e_re.M,
+    )
+
+    measurements = {}
+
+    for m in row_pattern.finditer(text or ""):
+        raw_name = _v78e_re.sub(r"\s+", " ", m.group(1).strip()).lower()
+        key = {
+            "temperature": "temperature",
+            "voltage": "voltage",
+            "current": "bias_current",
+            "tx power": "tx_power",
+            "rx power": "rx_power",
+        }.get(raw_name, raw_name.replace(" ", "_"))
+
+        current = _v78e_float(m.group(2))
+        unit = m.group(3)
+        marker = _v78e_safe_text(m.group(4))
+        high_alarm = _v78e_float(m.group(5))
+        low_alarm = _v78e_float(m.group(6))
+        high_warning = _v78e_float(m.group(7))
+        low_warning = _v78e_float(m.group(8))
+
+        status = _v78e_status_by_threshold(
+            current=current,
+            high_alarm=high_alarm,
+            low_alarm=low_alarm,
+            high_warning=high_warning,
+            low_warning=low_warning,
+            marker=marker,
+        )
+
+        item = {
+            "current": current,
+            "unit": unit,
+            "marker": marker,
+            "high_alarm": high_alarm,
+            "low_alarm": low_alarm,
+            "high_warning": high_warning,
+            "low_warning": low_warning,
+            "status": status,
+        }
+
+        measurements[key] = item
+
+        prefix = key
+        facts[f"{prefix}_current"] = current
+        facts[f"{prefix}_unit"] = unit
+        facts[f"{prefix}_status"] = status
+        facts[f"{prefix}_high_alarm"] = high_alarm
+        facts[f"{prefix}_low_alarm"] = low_alarm
+        facts[f"{prefix}_high_warning"] = high_warning
+        facts[f"{prefix}_low_warning"] = low_warning
+
+    if measurements:
+        facts["measurements"] = measurements
+
+    m = _v78e_re.search(r"Transmit Fault Count\s*=\s*(\d+)", text or "", flags=_v78e_re.I)
+    if m:
+        try:
+            facts["transmit_fault_count"] = int(m.group(1))
+        except Exception:
+            pass
+
+    return facts
+
+
+def _v78e_fmt_measure(name, item):
+    if not item:
+        return ""
+
+    current = item.get("current")
+    unit = item.get("unit") or ""
+    status = item.get("status") or "unknown"
+    low_alarm = item.get("low_alarm")
+    high_alarm = item.get("high_alarm")
+    low_warning = item.get("low_warning")
+    high_warning = item.get("high_warning")
+
+    return (
+        f"{name}={current} {unit}，status={status}，"
+        f"alarm_low={low_alarm}，alarm_high={high_alarm}，"
+        f"warn_low={low_warning}，warn_high={high_warning}"
+    )
+
+
+def _v78e_build_optical_evidence_summary(execution_data: _V78EDict[str, _V78EAny]) -> _V78EDict[str, _V78EAny]:
+    family = _v78e_get_family(execution_data)
+    text = _v78e_all_text(execution_data)
+    rows = _v78e_extract_command_outputs(execution_data)
+
+    facts = _v78e_parse_transceiver_details(text)
+    facts["family"] = family
+    facts["command_count"] = len(rows)
+
+    target_scope = execution_data.get("target_scope") or {}
+    interface = _v78e_safe_text(facts.get("interface")) or _v78e_safe_text(target_scope.get("interface"))
+
+    measurements = facts.get("measurements") or {}
+    tx = measurements.get("tx_power") or {}
+    rx = measurements.get("rx_power") or {}
+
+    key_findings = []
+    notify_lines = []
+    recommendations = []
+
+    if rows:
+        notify_lines.append(f"光功率取证：已执行 {len(rows)} 条只读命令，优先查看接口光模块 DDM 信息。")
+        key_findings.append(f"已采集接口 {interface or '未知接口'} 的光模块/光功率只读输出。")
+    else:
+        notify_lines.append("光功率取证：当前未产生 MCP 设备命令输出，无法判断收发光。")
+        key_findings.append("光功率告警需要执行接口 transceiver details 命令补充证据。")
+
+    if interface:
+        notify_lines.append(f"光功率接口：{interface}")
+
+    if facts.get("transceiver_present") is False:
+        notify_lines.append("光模块状态：transceiver not present / absent。")
+        key_findings.append("接口未检测到光模块或光模块缺失。")
+        recommendations.append("优先确认本端光模块是否在位、是否被拔出或识别异常。")
+
+    if tx or rx:
+        tx_line = _v78e_fmt_measure("Tx Power", tx)
+        rx_line = _v78e_fmt_measure("Rx Power", rx)
+
+        if tx_line:
+            notify_lines.append("发光功率：" + tx_line)
+        if rx_line:
+            notify_lines.append("收光功率：" + rx_line)
+
+    tx_status = _v78e_safe_text(tx.get("status"))
+    rx_status = _v78e_safe_text(rx.get("status"))
+
+    if rx_status in ("low_alarm", "low_warning"):
+        level = "低告警" if rx_status == "low_alarm" else "低预警"
+        key_findings.append(
+            f"接口 {interface or '未知接口'} 收光功率异常：Rx Power={rx.get('current')} {rx.get('unit')}，"
+            f"低告警阈值={rx.get('low_alarm')}，低预警阈值={rx.get('low_warning')}，状态={rx_status}。"
+        )
+        recommendations.append(
+            f"本端收光功率处于{level}：优先检查对端发光功率、对端端口/光模块、链路中间 ODF/跳纤/光纤衰耗、跳线弯折或端面污染。"
+        )
+        recommendations.append(
+            "建议两端同时执行 transceiver details 对比：本端 Rx 低时，重点看对端 Tx 是否偏低；如对端 Tx 正常，则重点排查中间链路和本端接收侧。"
+        )
+
+    elif rx_status in ("high_alarm", "high_warning"):
+        level = "高告警" if rx_status == "high_alarm" else "高预警"
+        key_findings.append(
+            f"接口 {interface or '未知接口'} 收光功率过高：Rx Power={rx.get('current')} {rx.get('unit')}，状态={rx_status}。"
+        )
+        recommendations.append(
+            f"本端收光功率处于{level}：检查链路距离是否过短、是否需要衰减器、对端发光是否过强。"
+        )
+
+    if tx_status in ("low_alarm", "low_warning"):
+        level = "低告警" if tx_status == "low_alarm" else "低预警"
+        key_findings.append(
+            f"接口 {interface or '未知接口'} 发光功率异常：Tx Power={tx.get('current')} {tx.get('unit')}，"
+            f"低告警阈值={tx.get('low_alarm')}，低预警阈值={tx.get('low_warning')}，状态={tx_status}。"
+        )
+        recommendations.append(
+            f"本端发光功率处于{level}：优先检查本端光模块发射侧、端口状态、光模块温度/电流，必要时更换本端光模块或跳线后复测。"
+        )
+        recommendations.append(
+            "让对端同步查看 Rx Power：如果对端收光也低，基本可定位为本端发光或中间链路问题。"
+        )
+
+    elif tx_status in ("high_alarm", "high_warning"):
+        level = "高告警" if tx_status == "high_alarm" else "高预警"
+        key_findings.append(
+            f"接口 {interface or '未知接口'} 发光功率过高：Tx Power={tx.get('current')} {tx.get('unit')}，状态={tx_status}。"
+        )
+        recommendations.append(
+            f"本端发光功率处于{level}：检查光模块型号、对端接收能力和链路距离，避免对端收光过强。"
+        )
+
+    if tx_status == "normal" and rx_status == "normal":
+        key_findings.append(f"接口 {interface or '未知接口'} 当前 Tx/Rx 光功率均在阈值范围内。")
+        recommendations.append("当前设备侧光功率未见越限，建议结合 Prometheus 告警窗口确认是否为瞬时抖动或已恢复。")
+
+    if not recommendations:
+        recommendations.append("已采集光模块 DDM 输出，但未解析到明确 Tx/Rx 越限；建议人工复核完整 transceiver details 输出和告警窗口。")
+
+    if rx_status in ("low_alarm", "low_warning", "high_alarm", "high_warning"):
+        conclusion = "光功率只读取证完成；本端收光功率异常，下一步应优先对比对端发光与链路衰耗。"
+    elif tx_status in ("low_alarm", "low_warning", "high_alarm", "high_warning"):
+        conclusion = "光功率只读取证完成；本端发光功率异常，下一步应优先检查本端光模块发射侧和对端收光。"
+    else:
+        conclusion = "光功率只读取证完成；未解析到明确收发光越限，建议结合告警窗口和完整输出继续确认。"
+
+    return {
+        "has_facts": True,
+        "family": family,
+        "facts": facts,
+        "key_findings": key_findings[:10],
+        "recommendations": recommendations[:8],
+        "notify_lines": notify_lines[:8],
+        "conclusion": conclusion,
+    }
+
+
+if _v78e_original_build_family_evidence_summary is not None:
+    def build_family_evidence_summary(execution_data):
+        family = _v78e_get_family(execution_data)
+        if family == "optical_power_abnormal":
+            return _v78e_build_optical_evidence_summary(execution_data)
+        return _v78e_original_build_family_evidence_summary(execution_data)
+# ===== v7.8 optical power evidence parser end =====
+
+# ===== v7.9 interface error delta evidence enrichment begin =====
+try:
+    _v79_original_build_family_evidence_summary = build_family_evidence_summary
+except NameError:
+    _v79_original_build_family_evidence_summary = None
+
+if _v79_original_build_family_evidence_summary is not None:
+    def build_family_evidence_summary(execution_data):
+        summary = _v79_original_build_family_evidence_summary(execution_data)
+        try:
+            family = (
+                ((execution_data.get("family_result") or {}).get("family"))
+                or ((execution_data.get("classification") or {}).get("family"))
+                or ((execution_data.get("classification") or {}).get("playbook_type"))
+                or ""
+            )
+            if family == "interface_packet_loss_or_discards_high":
+                from netaiops.interface_error_delta import enrich_summary_with_delta
+                summary = enrich_summary_with_delta(summary, execution_data)
+        except Exception:
+            pass
+        return summary
+# ===== v7.9 interface error delta evidence enrichment end =====
