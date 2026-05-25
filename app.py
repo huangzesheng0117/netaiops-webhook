@@ -1287,3 +1287,26 @@ def v7_interface_error_delta_run(request_id: str, delay_seconds: int = 0):
         raise HTTPException(status_code=500, detail=str(exc))
 # ===== v7.9 interface error delta APIs end =====
 
+# ===== v7.10 LLM resilience APIs begin =====
+@app.get("/v7/llm/health")
+def v7_llm_health(include_models: bool = False, chat_smoke: bool = False):
+    try:
+        from netaiops.llm_client import check_llm_health
+
+        return {
+            "status": "ok",
+            "stage": "v7.10_llm_resilience",
+            "data": check_llm_health(
+                CONFIG,
+                include_models=include_models,
+                chat_smoke=chat_smoke,
+            ),
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "stage": "v7.10_llm_resilience",
+            "error": str(exc),
+        }
+# ===== v7.10 LLM resilience APIs end =====
+

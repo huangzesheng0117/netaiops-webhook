@@ -20,6 +20,17 @@ llm:
   api_key_env: "NETAIOPS_LLM_API_KEY"
   model: "replace-with-your-model"
   timeout: 60
+  # v7.10 LLM resilience options.
+  # model 名称仍由生产 config.yaml 控制，例如 qwen3-max。
+  # endpoints 为空时仍兼容 base_url；配置后会按顺序 fallback。
+  endpoints: []
+  retry: 1
+  connect_timeout: 10
+  read_timeout: 60
+  write_timeout: 60
+  pool_timeout: 10
+  channel_names: []
+  extra_body: {}
 
 runner:
   backend: "mcp"
