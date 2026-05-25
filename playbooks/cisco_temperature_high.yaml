@@ -1,0 +1,12 @@
+playbook_id: cisco_temperature_high
+match:
+  vendor: cisco
+  alertname_regex: "^(非路由器温度|路由器温度|温度异常)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 5
+  commands:
+    - "show environment temperature"
+    - "show environment"
+    - "show logging | include Temp|temperature|thermal|overheat"

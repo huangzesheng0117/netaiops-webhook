@@ -1,0 +1,12 @@
+playbook_id: cisco_bfd_neighbor_down
+match:
+  vendor: cisco
+  alertname_regex: "^(BFD邻居状态|BFD邻居异常|BFD Neighbor Down)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "show bfd neighbors"
+    - "show bfd neighbors details"
+    - "show logging | include BFD|bfd|neighbor|Neighbor|Down|Session"

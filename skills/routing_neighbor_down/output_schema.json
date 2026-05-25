@@ -1,0 +1,40 @@
+{
+  "facts": {
+    "area": "string",
+    "bfd_session_state": "string",
+    "device_ip": "string",
+    "family": "string",
+    "hold_timer": "string",
+    "hostname": "string",
+    "interface": "string",
+    "mcp_commands": "array",
+    "neighbor_id": "string",
+    "neighbor_state": "string",
+    "peer_ip": "string",
+    "prometheus_window_state": "string",
+    "protocol": "string",
+    "recent_log_keywords": "array",
+    "route_count": "integer",
+    "vrf": "string"
+  },
+  "family": "routing_neighbor_down",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "告警名称和路由协议",
+      "设备名称和设备 IP",
+      "邻居或 Peer 对象",
+      "MCP 只读取证命令",
+      "当前邻居状态",
+      "最近协议日志",
+      "是否仍处于异常状态",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "routing_neighbor_down",
+  "version": "v6.3.0"
+}

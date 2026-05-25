@@ -1,0 +1,13 @@
+playbook_id: cisco_bgp_neighbor_down
+match:
+  vendor: cisco
+  alertname_regex: "^(BGP邻居状态|BGP邻居异常|BGP Peer Down)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "show bgp ipv4 unicast summary"
+    - "show bgp summary"
+    - "show bgp sessions"
+    - "show logging | include BGP|bgp|neighbor|Neighbor|Established|Idle|Active"

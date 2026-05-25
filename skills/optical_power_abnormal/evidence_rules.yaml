@@ -1,0 +1,57 @@
+skill_name: optical_power_abnormal
+version: v6.3.0
+family: optical_power_abnormal
+required_facts:
+  - hostname
+  - device_ip
+  - interface
+  - rx_power_status
+  - tx_power_status
+  - mcp_commands
+preferred_facts:
+  - transceiver_present
+  - transceiver_type
+  - transceiver_vendor
+  - transceiver_product_id
+  - transceiver_serial_number
+  - rx_power_current
+  - rx_power_low_alarm
+  - rx_power_low_warning
+  - rx_power_high_warning
+  - rx_power_high_alarm
+  - tx_power_current
+  - tx_power_low_alarm
+  - tx_power_low_warning
+  - tx_power_high_warning
+  - tx_power_high_alarm
+  - temperature_current
+  - bias_current
+  - prometheus_window_state
+  - recent_log_keywords
+status_rules:
+  rx_low_alarm:
+    condition: "rx_power_status is low_alarm or low_warning"
+    severity: warning
+    message: "local receive optical power is too low; compare remote Tx and fiber path"
+  tx_low_alarm:
+    condition: "tx_power_status is low_alarm or low_warning"
+    severity: warning
+    message: "local transmit optical power is too low; check local transceiver transmitter side"
+  high_power:
+    condition: "rx_power_status or tx_power_status is high_alarm or high_warning"
+    severity: warning
+    message: "optical power is too high; check short-distance link or attenuator requirement"
+  normal_now:
+    condition: "both rx_power_status and tx_power_status are normal"
+    severity: info
+    message: "current optical power appears normal; correlate Prometheus window"
+  inconclusive:
+    condition: "required optical facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing interface"
+  - "transceiver details command failed"
+  - "parser status is error"
+  - "Rx/Tx thresholds cannot be parsed"
+  - "Prometheus and device evidence conflict"

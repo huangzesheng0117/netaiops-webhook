@@ -1,10 +1,13 @@
 playbook_id: cisco_device_cpu_high
 match:
   vendor: cisco
-  playbook_type: device_cpu_high
+  alertname_regex: "^(全局CPU利用率|CPU利用率)$"
 execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 5
   commands:
     - "show processes cpu sort"
     - "show processes cpu history"
     - "show system resources"
-    - "show logging | include CPU|HOG|Process"
+    - "show logging | include CPU|HOG|Process|high cpu"

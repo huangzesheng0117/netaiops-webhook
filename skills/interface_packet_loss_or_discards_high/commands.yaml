@@ -1,0 +1,98 @@
+skill_name: interface_packet_loss_or_discards_high
+version: v6.3.0
+family: interface_packet_loss_or_discards_high
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_interface_detail
+  - show_interface_error_counters
+  - show_interface_transceiver
+  - show_port_channel_summary
+  - show_recent_interface_error_logs
+  - interface_error_delta_recheck
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  cisco_nxos:
+    show_interface_detail:
+      template: "show interface {interface}"
+      readonly: true
+    show_interface_error_counters:
+      template: "show interface {interface} counters errors"
+      readonly: true
+    show_interface_transceiver:
+      template: "show interface {interface} transceiver details"
+      readonly: true
+    show_port_channel_summary:
+      template: "show port-channel summary"
+      readonly: true
+    show_recent_interface_error_logs:
+      template: "show logging | include {interface}|CRC|FCS|error|Error|drop|Drop|LINK|flap"
+      readonly: true
+  cisco_iosxe:
+    show_interface_detail:
+      template: "show interfaces {interface}"
+      readonly: true
+    show_interface_error_counters:
+      template: "show interfaces {interface} counters errors"
+      readonly: true
+    show_interface_transceiver:
+      template: "show interfaces {interface} transceiver details"
+      readonly: true
+    show_port_channel_summary:
+      template: "show etherchannel summary"
+      readonly: true
+    show_recent_interface_error_logs:
+      template: "show logging | include {interface}|CRC|FCS|error|Error|drop|Drop|LINK|flap"
+      readonly: true
+  cisco_ios:
+    show_interface_detail:
+      template: "show interfaces {interface}"
+      readonly: true
+    show_interface_error_counters:
+      template: "show interfaces {interface} counters errors"
+      readonly: true
+    show_interface_transceiver:
+      template: "show interfaces {interface} transceiver details"
+      readonly: true
+    show_port_channel_summary:
+      template: "show etherchannel summary"
+      readonly: true
+    show_recent_interface_error_logs:
+      template: "show logging | include {interface}|CRC|FCS|error|Error|drop|Drop|LINK|flap"
+      readonly: true
+  aci:
+    show_interface_detail:
+      template: "show interface {interface}"
+      readonly: true
+    show_interface_error_counters:
+      template: "show interface {interface} counters errors"
+      readonly: true
+    show_interface_transceiver:
+      template: "show interface {interface} transceiver details"
+      readonly: true
+    show_port_channel_summary:
+      template: "show port-channel summary"
+      readonly: true
+    show_recent_interface_error_logs:
+      template: "show logging | include {interface}|CRC|FCS|error|Error|drop|Drop|LINK|flap"
+      readonly: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "configure terminal"
+  - "conf t"
+  - "shutdown"
+  - "no shutdown"
+  - "clear"
+  - "reload"
+  - "write memory"
+  - "copy running-config startup-config"
+  - "delete"
+  - "erase"
+  - "debug"

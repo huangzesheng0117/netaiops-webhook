@@ -1,0 +1,50 @@
+{
+  "facts": {
+    "bias_current": "number",
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "interface": "string",
+    "mcp_commands": "array",
+    "prometheus_window_state": "string",
+    "recent_log_keywords": "array",
+    "rx_power_current": "number",
+    "rx_power_high_alarm": "number",
+    "rx_power_high_warning": "number",
+    "rx_power_low_alarm": "number",
+    "rx_power_low_warning": "number",
+    "rx_power_status": "string",
+    "temperature_current": "number",
+    "transceiver_present": "boolean",
+    "transceiver_product_id": "string",
+    "transceiver_serial_number": "string",
+    "transceiver_type": "string",
+    "transceiver_vendor": "string",
+    "tx_power_current": "number",
+    "tx_power_high_alarm": "number",
+    "tx_power_high_warning": "number",
+    "tx_power_low_alarm": "number",
+    "tx_power_low_warning": "number",
+    "tx_power_status": "string"
+  },
+  "family": "optical_power_abnormal",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "告警名称",
+      "设备名称和设备 IP",
+      "接口名称",
+      "MCP 只读取证命令",
+      "Rx Power 当前值和阈值",
+      "Tx Power 当前值和阈值",
+      "当前是收光异常还是发光异常",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "optical_power_abnormal",
+  "version": "v6.3.0"
+}

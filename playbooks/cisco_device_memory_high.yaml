@@ -1,0 +1,13 @@
+playbook_id: cisco_device_memory_high
+match:
+  vendor: cisco
+  alertname_regex: "^(全局内存利用率|内存利用率)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 5
+  commands:
+    - "show processes memory"
+    - "show processes memory sorted"
+    - "show system resources"
+    - "show logging | include Memory|memory|malloc|OOM|Low memory"

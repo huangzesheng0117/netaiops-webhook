@@ -1,11 +1,14 @@
 playbook_id: cisco_interface_packet_loss_or_discards_high
 match:
   vendor: cisco
-  playbook_type: interface_packet_loss_or_discards_high
+  alertname_regex: "^(5m错包数-入向|5m错包数-出向|端口CRC错包|接口错包|端口错包|接口错误包|接口丢包|端口丢包)$"
 execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
   commands:
     - "show interface {interface_each}"
     - "show interface {interface_each} counters errors"
-    - "show interface description | include {interface_each}"
-    - "show logging | include {interface_each}|CRC|error|discard"
-    - "show processes cpu sort"
+    - "show interface {interface_each} transceiver details"
+    - "show port-channel summary"
+    - "show logging | include {interface_each}|CRC|FCS|error|Error|drop|Drop|LINK|flap"

@@ -1,0 +1,46 @@
+{
+  "facts": {
+    "admin_status": "string",
+    "crc": "integer",
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "input_errors": "integer",
+    "interface": "string",
+    "interface_class": "string",
+    "last_link_change": "string",
+    "line_protocol": "string",
+    "mcp_commands": "array",
+    "member_interfaces": "array",
+    "oper_status": "string",
+    "output_drops": "integer",
+    "output_errors": "integer",
+    "port_channel": "string",
+    "prometheus_window_state": "string",
+    "recent_log_keywords": "array",
+    "rx_power_status": "string",
+    "transceiver_present": "boolean",
+    "tx_power_status": "string"
+  },
+  "family": "interface_down_or_oper_status",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "告警名称和端口类别",
+      "设备名称和设备 IP",
+      "接口名称",
+      "admin/oper 状态",
+      "MCP 只读取证命令",
+      "端口聚合关系",
+      "物理层或光模块证据",
+      "是否仍处于异常状态",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "interface_down_or_oper_status",
+  "version": "v6.3.0"
+}

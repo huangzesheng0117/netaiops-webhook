@@ -1,0 +1,49 @@
+skill_name: interface_down_or_oper_status
+version: v6.3.0
+family: interface_down_or_oper_status
+required_facts:
+  - hostname
+  - device_ip
+  - interface
+  - oper_status
+  - admin_status
+  - mcp_commands
+preferred_facts:
+  - interface_class
+  - port_channel
+  - member_interfaces
+  - line_protocol
+  - last_link_change
+  - input_errors
+  - crc
+  - output_errors
+  - output_drops
+  - transceiver_present
+  - rx_power_status
+  - tx_power_status
+  - prometheus_window_state
+  - recent_log_keywords
+status_rules:
+  active:
+    condition: "oper_status is down or line protocol is down"
+    severity: warning
+    message: "current evidence indicates the interface status issue is still active"
+  recovered_or_transient:
+    condition: "oper_status is up while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  physical_layer_suspected:
+    condition: "interface is down with transceiver issue, CRC growth, or link flap logs"
+    severity: warning
+    message: "physical layer or peer-side issue should be checked"
+  inconclusive:
+    condition: "required interface or status facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing interface"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "interface belongs to a port-channel but member relation is not clear"
+  - "fabric-facing link down on Leaf-Spine or Spine class"

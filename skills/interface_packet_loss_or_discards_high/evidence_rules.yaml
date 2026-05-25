@@ -1,0 +1,53 @@
+skill_name: interface_packet_loss_or_discards_high
+version: v6.3.0
+family: interface_packet_loss_or_discards_high
+required_facts:
+  - hostname
+  - device_ip
+  - interface
+  - input_errors
+  - crc
+  - mcp_commands
+preferred_facts:
+  - fcs_err
+  - rcv_err
+  - output_errors
+  - output_drops
+  - output_discards
+  - port_channel
+  - member_interfaces
+  - transceiver_present
+  - rx_power_status
+  - tx_power_status
+  - prometheus_window_state
+  - interface_error_delta_status
+  - interface_error_delta_values
+  - recent_log_keywords
+status_rules:
+  still_increasing:
+    condition: "interface_error_delta_status is still_increasing"
+    severity: warning
+    message: "interface error counters are still increasing"
+  not_increasing:
+    condition: "interface_error_delta_status is not_increasing"
+    severity: info
+    message: "error counters are not increasing in the recheck window"
+  physical_error_suspected:
+    condition: "crc, fcs_err, or input_errors are high or increasing"
+    severity: warning
+    message: "physical layer, transceiver, fiber path or peer port should be checked"
+  congestion_or_queue_suspected:
+    condition: "output_drops or output_discards are high or increasing"
+    severity: warning
+    message: "queue, congestion, microburst or bandwidth utilization should be checked"
+  inconclusive:
+    condition: "required counter facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing interface"
+  - "mcp command failed"
+  - "parser status is error"
+  - "baseline/latest counter cannot be compared"
+  - "Prometheus and device evidence conflict"
+  - "port-channel member relation is not clear"

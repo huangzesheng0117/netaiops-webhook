@@ -1,0 +1,45 @@
+{
+  "facts": {
+    "crc": "integer",
+    "device_ip": "string",
+    "family": "string",
+    "fcs_err": "integer",
+    "hostname": "string",
+    "input_errors": "integer",
+    "interface": "string",
+    "interface_error_delta_status": "string",
+    "interface_error_delta_values": "object",
+    "mcp_commands": "array",
+    "member_interfaces": "array",
+    "output_discards": "integer",
+    "output_drops": "integer",
+    "output_errors": "integer",
+    "port_channel": "string",
+    "prometheus_window_state": "string",
+    "rcv_err": "integer",
+    "recent_log_keywords": "array",
+    "rx_power_status": "string",
+    "transceiver_present": "boolean",
+    "tx_power_status": "string"
+  },
+  "family": "interface_packet_loss_or_discards_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "告警名称和方向",
+      "设备名称和设备 IP",
+      "接口名称",
+      "MCP 只读取证命令",
+      "接口错包和丢弃计数",
+      "v7.9 二次复查状态",
+      "是否仍在持续增长",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "interface_packet_loss_or_discards_high",
+  "version": "v6.3.0"
+}

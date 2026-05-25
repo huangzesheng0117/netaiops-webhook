@@ -1,0 +1,70 @@
+skill_name: hardware_temperature_high
+version: v6.3.0
+family: hardware_temperature_high
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_environment_temperature
+  - show_environment
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  cisco_nxos:
+    show_environment_temperature:
+      template: "show environment temperature"
+      readonly: true
+    show_environment:
+      template: "show environment"
+      readonly: true
+    show_recent_logs:
+      template: "show logging | include Temp|temperature|thermal|overheat"
+      readonly: true
+  cisco_iosxe:
+    show_environment_temperature:
+      template: "show environment temperature"
+      readonly: true
+    show_environment:
+      template: "show environment"
+      readonly: true
+    show_recent_logs:
+      template: "show logging | include Temp|temperature|thermal|overheat"
+      readonly: true
+  cisco_ios:
+    show_environment_temperature:
+      template: "show environment temperature"
+      readonly: true
+    show_environment:
+      template: "show environment"
+      readonly: true
+    show_recent_logs:
+      template: "show logging | include Temp|temperature|thermal|overheat"
+      readonly: true
+  aci:
+    show_environment_temperature:
+      template: "show environment temperature"
+      readonly: true
+    show_environment:
+      template: "show environment"
+      readonly: true
+    show_recent_logs:
+      template: "show logging | include Temp|temperature|thermal|overheat"
+      readonly: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "configure terminal"
+  - "conf t"
+  - "shutdown"
+  - "no shutdown"
+  - "clear counters"
+  - "reload"
+  - "write memory"
+  - "copy running-config startup-config"
+  - "delete"
+  - "erase"
+  - "debug"

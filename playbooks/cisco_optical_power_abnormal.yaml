@@ -1,0 +1,13 @@
+playbook_id: cisco_optical_power_abnormal
+match:
+  vendor: cisco
+  alertname_regex: "^(NXOS光功率|Catalyst光功率|光功率异常|光模块光功率异常)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "show interface {interface_each} transceiver details"
+    - "show interface {interface_each}"
+    - "show interface {interface_each} counters errors"
+    - "show logging | include {interface_each}|transceiver|SFP|DOM|Rx Power|Tx Power|low-alarm|high-alarm"

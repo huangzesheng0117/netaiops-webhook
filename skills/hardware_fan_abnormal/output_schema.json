@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "device_ip": "string",
+    "family": "string",
+    "fan_direction": "string",
+    "fan_module": "string",
+    "fan_status": "string",
+    "hostname": "string",
+    "log_keywords": "array",
+    "mcp_commands": "array",
+    "prometheus_window_state": "string"
+  },
+  "family": "hardware_fan_abnormal",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "告警名称",
+      "设备名称和设备 IP",
+      "MCP 只读取证命令",
+      "关键证据事实",
+      "当前是否仍异常",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "hardware_fan_abnormal",
+  "version": "v6.3.0"
+}

@@ -1,0 +1,83 @@
+skill_name: device_cpu_high
+version: v6.3.0
+family: device_cpu_high
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_device_cpu
+  - show_device_cpu_history
+  - show_system_resources
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  cisco_nxos:
+    show_device_cpu:
+      template: "show processes cpu sort"
+      readonly: true
+    show_device_cpu_history:
+      template: "show processes cpu history"
+      readonly: true
+    show_system_resources:
+      template: "show system resources"
+      readonly: true
+    show_recent_logs:
+      template: "show logging | include CPU|HOG|Process|high cpu"
+      readonly: true
+  cisco_iosxe:
+    show_device_cpu:
+      template: "show processes cpu sort"
+      readonly: true
+    show_device_cpu_history:
+      template: "show processes cpu history"
+      readonly: true
+    show_system_resources:
+      template: "show system resources"
+      readonly: true
+    show_recent_logs:
+      template: "show logging | include CPU|HOG|Process|high cpu"
+      readonly: true
+  cisco_ios:
+    show_device_cpu:
+      template: "show processes cpu sort"
+      readonly: true
+    show_device_cpu_history:
+      template: "show processes cpu history"
+      readonly: true
+    show_system_resources:
+      template: "show system resources"
+      readonly: true
+    show_recent_logs:
+      template: "show logging | include CPU|HOG|Process|high cpu"
+      readonly: true
+  aci:
+    show_device_cpu:
+      template: "show processes cpu sort"
+      readonly: true
+    show_device_cpu_history:
+      template: "show processes cpu history"
+      readonly: true
+    show_system_resources:
+      template: "show system resources"
+      readonly: true
+    show_recent_logs:
+      template: "show logging | include CPU|HOG|Process|high cpu"
+      readonly: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "configure terminal"
+  - "conf t"
+  - "shutdown"
+  - "no shutdown"
+  - "clear counters"
+  - "reload"
+  - "write memory"
+  - "copy running-config startup-config"
+  - "delete"
+  - "erase"
+  - "debug"

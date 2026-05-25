@@ -1,0 +1,13 @@
+playbook_id: cisco_ospf_neighbor_down
+match:
+  vendor: cisco
+  alertname_regex: "^(OSPF邻居状态|OSPF邻居异常|OSPF Neighbor Down)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "show ip ospf neighbor"
+    - "show ip ospf interface brief"
+    - "show ip route ospf"
+    - "show logging | include OSPF|ospf|neighbor|Neighbor|FULL|DOWN"

@@ -1,0 +1,13 @@
+playbook_id: cisco_hardware_component_fault
+match:
+  vendor: cisco
+  alertname_regex: "^(电源状态|风扇状态)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 5
+  commands:
+    - "show environment"
+    - "show environment power"
+    - "show environment fan"
+    - "show logging | include Fan|Power|PSU|failed|absent|fault"

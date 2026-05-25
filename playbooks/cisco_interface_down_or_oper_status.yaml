@@ -1,0 +1,15 @@
+playbook_id: cisco_interface_down_or_oper_status
+match:
+  vendor: cisco
+  alertname_regex: "^(非ACI端口状态|Leaf-Spine互联端口状态|BorderLeaf端口状态|Spine端口状态|接口状态异常|端口状态异常)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 7
+  commands:
+    - "show interface {interface_each}"
+    - "show interface {interface_each} status"
+    - "show interface {interface_each} counters errors"
+    - "show interface {interface_each} transceiver details"
+    - "show port-channel summary"
+    - "show logging | include {interface_each}|LINK|Link|link|changed state|flap|down|up"

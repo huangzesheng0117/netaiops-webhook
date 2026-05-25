@@ -1,0 +1,40 @@
+skill_name: routing_neighbor_down
+version: v6.3.0
+family: routing_neighbor_down
+required_facts:
+  - hostname
+  - device_ip
+  - protocol
+  - neighbor_state
+  - mcp_commands
+preferred_facts:
+  - peer_ip
+  - neighbor_id
+  - interface
+  - vrf
+  - area
+  - route_count
+  - hold_timer
+  - bfd_session_state
+  - prometheus_window_state
+  - recent_log_keywords
+status_rules:
+  active:
+    condition: "neighbor state is not established/full/up or BFD session is down"
+    severity: warning
+    message: "current evidence indicates the routing neighbor issue is still active"
+  recovered_or_transient:
+    condition: "current neighbor state is established/full/up while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "required protocol or neighbor facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing peer_ip or neighbor_id"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "neighbor belongs to a VRF that cannot be inferred"
+  - "BFD down while BGP or OSPF still appears established"

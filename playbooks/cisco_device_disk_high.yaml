@@ -1,0 +1,12 @@
+playbook_id: cisco_device_disk_high
+match:
+  vendor: cisco
+  alertname_regex: "^(磁盘利用率|Flash利用率|存储空间利用率)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 5
+  commands:
+    - "show file systems"
+    - "show version | include System image|bootflash|flash|image"
+    - "show logging | include flash|bootflash|disk|filesystem|No space"

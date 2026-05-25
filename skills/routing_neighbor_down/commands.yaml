@@ -1,0 +1,136 @@
+skill_name: routing_neighbor_down
+version: v6.3.0
+family: routing_neighbor_down
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_bgp_summary
+  - show_bgp_sessions
+  - show_ospf_neighbor
+  - show_ospf_interface_brief
+  - show_ospf_routes
+  - show_bfd_neighbors
+  - show_bfd_neighbors_detail
+  - show_recent_routing_logs
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  cisco_nxos:
+    show_bgp_summary:
+      template: "show bgp ipv4 unicast summary"
+      readonly: true
+    show_bgp_sessions:
+      template: "show bgp sessions"
+      readonly: true
+    show_ospf_neighbor:
+      template: "show ip ospf neighbor"
+      readonly: true
+    show_ospf_interface_brief:
+      template: "show ip ospf interface brief"
+      readonly: true
+    show_ospf_routes:
+      template: "show ip route ospf"
+      readonly: true
+    show_bfd_neighbors:
+      template: "show bfd neighbors"
+      readonly: true
+    show_bfd_neighbors_detail:
+      template: "show bfd neighbors details"
+      readonly: true
+    show_recent_routing_logs:
+      template: "show logging | include BGP|OSPF|BFD|neighbor|Neighbor|Established|FULL|Down"
+      readonly: true
+  cisco_iosxe:
+    show_bgp_summary:
+      template: "show bgp ipv4 unicast summary"
+      readonly: true
+    show_bgp_sessions:
+      template: "show bgp summary"
+      readonly: true
+    show_ospf_neighbor:
+      template: "show ip ospf neighbor"
+      readonly: true
+    show_ospf_interface_brief:
+      template: "show ip ospf interface brief"
+      readonly: true
+    show_ospf_routes:
+      template: "show ip route ospf"
+      readonly: true
+    show_bfd_neighbors:
+      template: "show bfd neighbors"
+      readonly: true
+    show_bfd_neighbors_detail:
+      template: "show bfd neighbors details"
+      readonly: true
+    show_recent_routing_logs:
+      template: "show logging | include BGP|OSPF|BFD|neighbor|Neighbor|Established|FULL|Down"
+      readonly: true
+  cisco_ios:
+    show_bgp_summary:
+      template: "show bgp ipv4 unicast summary"
+      readonly: true
+    show_bgp_sessions:
+      template: "show ip bgp summary"
+      readonly: true
+    show_ospf_neighbor:
+      template: "show ip ospf neighbor"
+      readonly: true
+    show_ospf_interface_brief:
+      template: "show ip ospf interface brief"
+      readonly: true
+    show_ospf_routes:
+      template: "show ip route ospf"
+      readonly: true
+    show_bfd_neighbors:
+      template: "show bfd neighbors"
+      readonly: true
+    show_bfd_neighbors_detail:
+      template: "show bfd neighbors details"
+      readonly: true
+    show_recent_routing_logs:
+      template: "show logging | include BGP|OSPF|BFD|neighbor|Neighbor|Established|FULL|Down"
+      readonly: true
+  aci:
+    show_bgp_summary:
+      template: "show bgp ipv4 unicast summary"
+      readonly: true
+    show_bgp_sessions:
+      template: "show bgp sessions"
+      readonly: true
+    show_ospf_neighbor:
+      template: "show ip ospf neighbor"
+      readonly: true
+    show_ospf_interface_brief:
+      template: "show ip ospf interface brief"
+      readonly: true
+    show_ospf_routes:
+      template: "show ip route ospf"
+      readonly: true
+    show_bfd_neighbors:
+      template: "show bfd neighbors"
+      readonly: true
+    show_bfd_neighbors_detail:
+      template: "show bfd neighbors details"
+      readonly: true
+    show_recent_routing_logs:
+      template: "show logging | include BGP|OSPF|BFD|neighbor|Neighbor|Established|FULL|Down"
+      readonly: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "configure terminal"
+  - "conf t"
+  - "shutdown"
+  - "no shutdown"
+  - "clear"
+  - "reload"
+  - "write memory"
+  - "copy running-config startup-config"
+  - "delete"
+  - "erase"
+  - "debug"
