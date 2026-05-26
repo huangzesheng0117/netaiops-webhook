@@ -1,0 +1,13 @@
+playbook_id: f5_dns_request_rate_high
+match:
+  vendor: f5
+  alertname_regex: '^(DNS请求率|F5-DNS请求率|DNS每秒请求率高|DNS请求数过高)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "tmsh show gtm wideip"
+    - "tmsh show gtm pool"
+    - "tmsh show gtm server"
+    - "tmsh show gtm listener"

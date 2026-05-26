@@ -1,0 +1,13 @@
+playbook_id: f5_http_request_rate_high
+match:
+  vendor: f5
+  alertname_regex: '^(新建HTTP请求数|F5新建HTTP请求数|HTTP请求数)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "tmsh show ltm virtual"
+    - "tmsh show ltm profile http"
+    - "tmsh show sys performance throughput"
+    - "tmsh show sys performance connections"

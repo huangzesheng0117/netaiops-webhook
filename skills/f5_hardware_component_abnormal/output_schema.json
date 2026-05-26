@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "component_name": "string",
+    "component_status": "string",
+    "component_type": "string",
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "prometheus_window_state": "string",
+    "redundancy_state": "string",
+    "slot_state": "string"
+  },
+  "family": "f5_hardware_component_abnormal",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "异常部件类型",
+      "异常部件名称",
+      "当前状态",
+      "冗余是否下降",
+      "是否需要现场/厂商处理"
+    ]
+  },
+  "skill_name": "f5_hardware_component_abnormal",
+  "version": "v6.3.0"
+}

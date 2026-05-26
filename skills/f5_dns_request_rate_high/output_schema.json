@@ -1,0 +1,33 @@
+{
+  "facts": {
+    "device_ip": "string",
+    "dns_request_rate": "number",
+    "family": "string",
+    "hostname": "string",
+    "listener_top": "array",
+    "mcp_commands": "array",
+    "pool_top": "array",
+    "prometheus_window_state": "string",
+    "server_top": "array",
+    "threshold": "number",
+    "wideip_top": "array"
+  },
+  "family": "f5_dns_request_rate_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "DNS 请求率",
+      "设备名称和设备 IP",
+      "Wide IP / Pool / Listener 证据",
+      "Prometheus 窗口状态",
+      "是否仍处于高请求率",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "f5_dns_request_rate_high",
+  "version": "v6.3.0"
+}

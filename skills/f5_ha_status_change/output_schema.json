@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "active_device": "string",
+    "alarm_type": "string",
+    "device_ip": "string",
+    "failover_state": "string",
+    "family": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "prometheus_window_state": "string",
+    "standby_device": "string",
+    "sync_status": "string",
+    "traffic_group_state": "string"
+  },
+  "family": "f5_ha_status_change",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "当前主备角色",
+      "同步状态",
+      "traffic-group 状态",
+      "是否发生切换",
+      "是否需要检查对端或业务影响"
+    ]
+  },
+  "skill_name": "f5_ha_status_change",
+  "version": "v6.3.0"
+}

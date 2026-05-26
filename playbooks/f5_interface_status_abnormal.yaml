@@ -1,0 +1,13 @@
+playbook_id: f5_interface_status_abnormal
+match:
+  vendor: f5
+  alertname_regex: '^(f5端口状态|F5端口状态|F5接口状态|端口状态|接口状态)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "tmsh show net interface"
+    - "tmsh show net trunk"
+    - "tmsh show net vlan"
+    - "tmsh show sys hardware"

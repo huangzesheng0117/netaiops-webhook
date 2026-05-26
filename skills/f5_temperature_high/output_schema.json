@@ -1,0 +1,33 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "device_ip": "string",
+    "family": "string",
+    "fan_status": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "prometheus_window_state": "string",
+    "sensor_name": "string",
+    "temperature_current": "number",
+    "temperature_status": "string",
+    "temperature_threshold": "number"
+  },
+  "family": "f5_temperature_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "温度传感器",
+      "当前温度",
+      "阈值",
+      "风扇状态",
+      "是否仍高温",
+      "是否存在硬件风险"
+    ]
+  },
+  "skill_name": "f5_temperature_high",
+  "version": "v6.3.0"
+}

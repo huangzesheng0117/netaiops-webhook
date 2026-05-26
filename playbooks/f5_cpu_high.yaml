@@ -1,0 +1,13 @@
+playbook_id: f5_cpu_high
+match:
+  vendor: f5
+  alertname_regex: "^(全局CPU利用率|数据平面CPU利用率|控制平面CPU利用率|F5全局CPU利用率|F5数据平面CPU利用率|F5控制平面CPU利用率)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "tmsh show sys cpu"
+    - "tmsh show sys tmm-info"
+    - "tmsh show sys performance system"
+    - "tmsh show sys proc-info"

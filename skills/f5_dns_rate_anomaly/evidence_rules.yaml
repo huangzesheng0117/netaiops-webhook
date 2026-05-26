@@ -1,0 +1,40 @@
+skill_name: f5_dns_rate_anomaly
+version: v6.3.0
+family: f5_dns_rate_anomaly
+required_facts:
+  - hostname
+  - device_ip
+  - anomaly_direction
+  - dns_metric_name
+  - mcp_commands
+preferred_facts:
+  - current_value
+  - previous_value
+  - change_ratio
+  - wideip_top
+  - pool_top
+  - listener_top
+  - prometheus_window_state
+status_rules:
+  spike_active:
+    condition: "anomaly_direction is spike and current DNS rate remains high"
+    severity: warning
+    message: "DNS metric is still spiking"
+  drop_active:
+    condition: "anomaly_direction is drop and current DNS rate remains much lower than baseline"
+    severity: warning
+    message: "DNS metric is still dropping"
+  recovered_or_transient:
+    condition: "current value has returned close to baseline"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "baseline or current value is missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing current or previous value"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "Wide IP or listener cannot be identified"

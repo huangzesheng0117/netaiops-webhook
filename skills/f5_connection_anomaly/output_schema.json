@@ -1,0 +1,36 @@
+{
+  "facts": {
+    "anomaly_direction": "string",
+    "change_ratio": "number",
+    "current_value": "number",
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "metric_name": "string",
+    "pool_top": "array",
+    "previous_value": "number",
+    "prometheus_window_state": "string",
+    "throughput_bps": "number",
+    "virtual_server_top": "array"
+  },
+  "family": "f5_connection_anomaly",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "突增/突降方向",
+      "指标类型",
+      "当前值和上一窗口值",
+      "设备名称和设备 IP",
+      "Top virtual server / pool",
+      "是否仍处于异常变化状态",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "f5_connection_anomaly",
+  "version": "v6.3.0"
+}

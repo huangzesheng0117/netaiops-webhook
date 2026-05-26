@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "device_ip": "string",
+    "direction": "string",
+    "family": "string",
+    "hostname": "string",
+    "interface_top": "array",
+    "mcp_commands": "array",
+    "pool_top": "array",
+    "prometheus_window_state": "string",
+    "throughput_bps": "number",
+    "virtual_server_top": "array"
+  },
+  "family": "f5_throughput_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "吞吐量方向",
+      "当前吞吐量",
+      "Top interface / virtual server / pool",
+      "是否仍高位",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "f5_throughput_high",
+  "version": "v6.3.0"
+}

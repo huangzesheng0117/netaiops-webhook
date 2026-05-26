@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "client_ssl_profile": "string",
+    "current_connections": "integer",
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "prometheus_window_state": "string",
+    "ssl_new_connection_rate": "number",
+    "throughput_bps": "number",
+    "virtual_server_top": "array"
+  },
+  "family": "f5_ssl_connection_rate_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "SSL 新建连接数",
+      "Top virtual server",
+      "Client SSL profile",
+      "是否伴随 CPU/TMM 压力",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "f5_ssl_connection_rate_high",
+  "version": "v6.3.0"
+}

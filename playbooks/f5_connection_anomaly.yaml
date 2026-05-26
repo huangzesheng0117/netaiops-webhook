@@ -1,0 +1,13 @@
+playbook_id: f5_connection_anomaly
+match:
+  vendor: f5
+  alertname_regex: '^(F5活跃连接数突增|F5活跃连接数突降|F5新建连接数突增|F5新建连接数突降)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "tmsh show sys performance connections"
+    - "tmsh show sys performance throughput"
+    - "tmsh show ltm virtual"
+    - "tmsh show ltm pool"

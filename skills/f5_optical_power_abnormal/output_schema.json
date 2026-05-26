@@ -1,0 +1,38 @@
+{
+  "facts": {
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "interface": "string",
+    "mcp_commands": "array",
+    "optical_direction": "string",
+    "prometheus_window_state": "string",
+    "recent_log_keywords": "array",
+    "rx_power_current": "number",
+    "rx_power_status": "string",
+    "sensor_name": "string",
+    "transceiver_present": "boolean",
+    "transceiver_type": "string",
+    "tx_power_current": "number",
+    "tx_power_status": "string"
+  },
+  "family": "f5_optical_power_abnormal",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "告警名称和光功率方向",
+      "设备名称和设备 IP",
+      "接口或传感器名称",
+      "MCP 只读取证命令",
+      "当前收光/发光证据",
+      "是否仍处于异常状态",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "f5_optical_power_abnormal",
+  "version": "v6.3.0"
+}

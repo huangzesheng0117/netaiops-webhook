@@ -1,0 +1,14 @@
+playbook_id: f5_dns_resolution_quality_low
+match:
+  vendor: f5
+  alertname_regex: '^(DNS解析率|DNS优选解析率|F5-DNS解析率|F5-DNS优选解析率|DNS解析成功率低|DNS优选解析成功率低)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "tmsh show gtm wideip"
+    - "tmsh show gtm pool"
+    - "tmsh show gtm server"
+    - "tmsh show gtm datacenter"
+    - "tmsh show gtm listener"

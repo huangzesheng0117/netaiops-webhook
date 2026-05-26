@@ -1,0 +1,34 @@
+skill_name: f5_dns_request_rate_high
+version: v6.3.0
+family: f5_dns_request_rate_high
+required_facts:
+  - hostname
+  - device_ip
+  - dns_request_rate
+  - mcp_commands
+preferred_facts:
+  - wideip_top
+  - pool_top
+  - server_top
+  - listener_top
+  - prometheus_window_state
+  - threshold
+status_rules:
+  active:
+    condition: "dns_request_rate is still above threshold"
+    severity: warning
+    message: "DNS request rate is still high"
+  recovered_or_transient:
+    condition: "current evidence is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "required DNS request facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing DNS request rate"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "Wide IP or listener cannot be identified"

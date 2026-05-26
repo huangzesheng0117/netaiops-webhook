@@ -1,0 +1,11 @@
+playbook_id: f5_temperature_high
+match:
+  vendor: f5
+  alertname_regex: "^(CPU温度|机框温度|机框板卡温度|F5CPU温度|F5机框温度|F5机框板卡温度)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 5
+  commands:
+    - "tmsh show sys hardware"
+    - "tmsh show sys chassis"

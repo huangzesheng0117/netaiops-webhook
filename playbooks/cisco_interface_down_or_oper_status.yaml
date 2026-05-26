@@ -1,7 +1,7 @@
 playbook_id: cisco_interface_down_or_oper_status
 match:
   vendor: cisco
-  alertname_regex: "^(非ACI端口状态|Leaf-Spine互联端口状态|BorderLeaf端口状态|Spine端口状态|接口状态异常|端口状态异常)$"
+  alertname_regex: "^(非ACI端口|非ACI端口状态|Leaf-Spine互联端口|Leaf-Spine互联端口状态|BorderLeaf端口|BorderLeaf端口状态|Spine端口|Spine端口状态|接口状态异常|端口状态异常)$"
 execution:
   readonly_only: true
   auto_execute_allowed: true

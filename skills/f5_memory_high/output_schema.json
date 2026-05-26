@@ -1,0 +1,31 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "device_ip": "string",
+    "family": "string",
+    "host_memory_percent": "number",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "memory_current_percent": "number",
+    "memory_type": "string",
+    "prometheus_window_state": "string",
+    "tmm_memory_percent": "number"
+  },
+  "family": "f5_memory_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "内存类型",
+      "当前内存利用率",
+      "TMM 内存",
+      "Host 内存",
+      "是否持续高位"
+    ]
+  },
+  "skill_name": "f5_memory_high",
+  "version": "v6.3.0"
+}

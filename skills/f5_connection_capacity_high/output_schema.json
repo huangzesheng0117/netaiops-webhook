@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "current_connections": "integer",
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "new_connections_rate": "number",
+    "pool_top": "array",
+    "prometheus_window_state": "string",
+    "throughput_bps": "number",
+    "virtual_server_top": "array"
+  },
+  "family": "f5_connection_capacity_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "当前连接数或新建连接数",
+      "Top virtual server / pool",
+      "是否仍高位",
+      "是否可能为业务突增或异常流量",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "f5_connection_capacity_high",
+  "version": "v6.3.0"
+}

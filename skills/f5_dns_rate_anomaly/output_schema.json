@@ -1,0 +1,36 @@
+{
+  "facts": {
+    "anomaly_direction": "string",
+    "change_ratio": "number",
+    "current_value": "number",
+    "device_ip": "string",
+    "dns_metric_name": "string",
+    "family": "string",
+    "hostname": "string",
+    "listener_top": "array",
+    "mcp_commands": "array",
+    "pool_top": "array",
+    "previous_value": "number",
+    "prometheus_window_state": "string",
+    "wideip_top": "array"
+  },
+  "family": "f5_dns_rate_anomaly",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "DNS 指标类型",
+      "突增/突降方向",
+      "当前值和上一窗口值",
+      "设备名称和设备 IP",
+      "Wide IP / Pool / Listener 证据",
+      "是否仍处于异常变化状态",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "f5_dns_rate_anomaly",
+  "version": "v6.3.0"
+}

@@ -1,0 +1,37 @@
+{
+  "facts": {
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "interface": "string",
+    "interface_class": "string",
+    "interface_status": "string",
+    "link_status": "string",
+    "mcp_commands": "array",
+    "media_status": "string",
+    "prometheus_window_state": "string",
+    "recent_log_keywords": "array",
+    "trunk": "string",
+    "vlan": "string"
+  },
+  "family": "f5_interface_status_abnormal",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "告警名称和接口类别",
+      "设备名称和设备 IP",
+      "接口名称",
+      "MCP 只读取证命令",
+      "当前接口状态",
+      "Trunk/VLAN 关系",
+      "是否仍处于异常状态",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "f5_interface_status_abnormal",
+  "version": "v6.3.0"
+}

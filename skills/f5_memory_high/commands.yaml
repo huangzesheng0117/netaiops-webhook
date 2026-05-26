@@ -1,0 +1,62 @@
+skill_name: f5_memory_high
+version: v6.3.0
+family: f5_memory_high
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_f5_memory
+  - show_f5_tmm_info
+  - show_f5_performance_system
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  f5_tmos:
+    show_f5_memory:
+      template: "tmsh show sys memory"
+      readonly: true
+    show_f5_tmm_info:
+      template: "tmsh show sys tmm-info"
+      readonly: true
+    show_f5_performance_system:
+      template: "tmsh show sys performance system"
+      readonly: true
+  f5_bigip:
+    show_f5_memory:
+      template: "tmsh show sys memory"
+      readonly: true
+    show_f5_tmm_info:
+      template: "tmsh show sys tmm-info"
+      readonly: true
+    show_f5_performance_system:
+      template: "tmsh show sys performance system"
+      readonly: true
+  f5:
+    show_f5_memory:
+      template: "tmsh show sys memory"
+      readonly: true
+    show_f5_tmm_info:
+      template: "tmsh show sys tmm-info"
+      readonly: true
+    show_f5_performance_system:
+      template: "tmsh show sys performance system"
+      readonly: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "modify"
+  - "create"
+  - "delete"
+  - "save"
+  - "load"
+  - "reboot"
+  - "restart"
+  - "reset"
+  - "run util"
+  - "bash"
+  - "edit"
+  - "merge"

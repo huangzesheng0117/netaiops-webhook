@@ -1,0 +1,82 @@
+skill_name: f5_dns_resolution_quality_low
+version: v6.3.0
+family: f5_dns_resolution_quality_low
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_f5_gtm_wideip
+  - show_f5_gtm_pool
+  - show_f5_gtm_server
+  - show_f5_gtm_datacenter
+  - show_f5_gtm_listener
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  f5_tmos:
+    show_f5_gtm_wideip:
+      template: "tmsh show gtm wideip"
+      readonly: true
+    show_f5_gtm_pool:
+      template: "tmsh show gtm pool"
+      readonly: true
+    show_f5_gtm_server:
+      template: "tmsh show gtm server"
+      readonly: true
+    show_f5_gtm_datacenter:
+      template: "tmsh show gtm datacenter"
+      readonly: true
+    show_f5_gtm_listener:
+      template: "tmsh show gtm listener"
+      readonly: true
+  f5_bigip:
+    show_f5_gtm_wideip:
+      template: "tmsh show gtm wideip"
+      readonly: true
+    show_f5_gtm_pool:
+      template: "tmsh show gtm pool"
+      readonly: true
+    show_f5_gtm_server:
+      template: "tmsh show gtm server"
+      readonly: true
+    show_f5_gtm_datacenter:
+      template: "tmsh show gtm datacenter"
+      readonly: true
+    show_f5_gtm_listener:
+      template: "tmsh show gtm listener"
+      readonly: true
+  f5:
+    show_f5_gtm_wideip:
+      template: "tmsh show gtm wideip"
+      readonly: true
+    show_f5_gtm_pool:
+      template: "tmsh show gtm pool"
+      readonly: true
+    show_f5_gtm_server:
+      template: "tmsh show gtm server"
+      readonly: true
+    show_f5_gtm_datacenter:
+      template: "tmsh show gtm datacenter"
+      readonly: true
+    show_f5_gtm_listener:
+      template: "tmsh show gtm listener"
+      readonly: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "modify"
+  - "create"
+  - "delete"
+  - "save"
+  - "load"
+  - "reboot"
+  - "restart"
+  - "reset"
+  - "run util"
+  - "bash"
+  - "edit"
+  - "merge"

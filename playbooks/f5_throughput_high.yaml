@@ -1,0 +1,13 @@
+playbook_id: f5_throughput_high
+match:
+  vendor: f5
+  alertname_regex: '^(吞吐量-入向|吞吐量-出向|F5吞吐量-入向|F5吞吐量-出向|吞吐量异常)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "tmsh show sys performance throughput"
+    - "tmsh show net interface"
+    - "tmsh show ltm virtual"
+    - "tmsh show ltm pool"

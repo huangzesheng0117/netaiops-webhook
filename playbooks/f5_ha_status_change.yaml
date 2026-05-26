@@ -1,0 +1,13 @@
+playbook_id: f5_ha_status_change
+match:
+  vendor: f5
+  alertname_regex: "^(主备状态变化|F5主备状态变化|F5 HA状态变化|F5 Failover状态变化)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "tmsh show sys failover"
+    - "tmsh show cm sync-status"
+    - "tmsh show cm device"
+    - "tmsh show cm traffic-group"

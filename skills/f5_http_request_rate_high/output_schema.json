@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "current_connections": "integer",
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "http_profile": "string",
+    "http_request_rate": "number",
+    "mcp_commands": "array",
+    "prometheus_window_state": "string",
+    "throughput_bps": "number",
+    "virtual_server_top": "array"
+  },
+  "family": "f5_http_request_rate_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "HTTP 请求速率",
+      "Top virtual server",
+      "吞吐量和连接数",
+      "是否仍高位",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "f5_http_request_rate_high",
+  "version": "v6.3.0"
+}

@@ -1,0 +1,12 @@
+playbook_id: f5_hardware_component_abnormal
+match:
+  vendor: f5
+  alertname_regex: "^(机框风扇状态|机框电源状态|机框板卡状态|F5机框风扇状态|F5机框电源状态|F5机框板卡状态)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "tmsh show sys hardware"
+    - "tmsh show sys chassis"
+    - "tmsh show sys cluster"

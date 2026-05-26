@@ -1,0 +1,42 @@
+skill_name: f5_optical_power_abnormal
+version: v6.3.0
+family: f5_optical_power_abnormal
+required_facts:
+  - hostname
+  - device_ip
+  - optical_direction
+  - mcp_commands
+preferred_facts:
+  - interface
+  - sensor_name
+  - rx_power_current
+  - tx_power_current
+  - rx_power_status
+  - tx_power_status
+  - transceiver_present
+  - transceiver_type
+  - prometheus_window_state
+  - recent_log_keywords
+status_rules:
+  rx_abnormal:
+    condition: "optical_direction is rx or rx_power_status is abnormal"
+    severity: warning
+    message: "receive optical power is abnormal; check remote Tx and fiber path"
+  tx_abnormal:
+    condition: "optical_direction is tx or tx_power_status is abnormal"
+    severity: warning
+    message: "transmit optical power is abnormal; check local transceiver and remote Rx"
+  recovered_or_transient:
+    condition: "current device evidence is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "interface, sensor or optical power facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing interface or sensor name"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "optical direction cannot be inferred"

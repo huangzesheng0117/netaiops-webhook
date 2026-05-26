@@ -1,0 +1,32 @@
+skill_name: f5_memory_high
+version: v6.3.0
+family: f5_memory_high
+required_facts:
+  - hostname
+  - device_ip
+  - memory_current_percent
+  - mcp_commands
+preferred_facts:
+  - memory_type
+  - tmm_memory_percent
+  - host_memory_percent
+  - prometheus_window_state
+status_rules:
+  active:
+    condition: "device evidence still exceeds threshold or status is abnormal"
+    severity: warning
+    message: "current evidence indicates the alert is still active"
+  recovered_or_transient:
+    condition: "device evidence is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "required facts are missing or command output cannot be parsed"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing required facts"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "device object cannot be identified"

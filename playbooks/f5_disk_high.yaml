@@ -1,0 +1,11 @@
+playbook_id: f5_disk_high
+match:
+  vendor: f5
+  alertname_regex: "^(磁盘利用率|F5磁盘利用率|F5设备磁盘利用率)$"
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 5
+  commands:
+    - "tmsh show sys disk"
+    - "tmsh show sys software status"

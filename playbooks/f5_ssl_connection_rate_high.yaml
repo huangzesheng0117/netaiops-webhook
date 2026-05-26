@@ -1,0 +1,13 @@
+playbook_id: f5_ssl_connection_rate_high
+match:
+  vendor: f5
+  alertname_regex: '^(新建连接数\(SSL\)|F5新建连接数\(SSL\)|SSL新建连接数)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "tmsh show ltm virtual"
+    - "tmsh show ltm profile client-ssl"
+    - "tmsh show sys performance connections"
+    - "tmsh show sys performance throughput"

@@ -1,0 +1,33 @@
+skill_name: f5_http_request_rate_high
+version: v6.3.0
+family: f5_http_request_rate_high
+required_facts:
+  - hostname
+  - device_ip
+  - mcp_commands
+preferred_facts:
+  - http_request_rate
+  - virtual_server_top
+  - http_profile
+  - throughput_bps
+  - current_connections
+  - prometheus_window_state
+status_rules:
+  active:
+    condition: "Prometheus and device evidence indicate the metric is still high"
+    severity: warning
+    message: "current evidence indicates the traffic or capacity alert is still active"
+  recovered_or_transient:
+    condition: "device evidence is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "required facts are missing or command output cannot be parsed"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing required facts"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "top virtual server or pool cannot be identified"

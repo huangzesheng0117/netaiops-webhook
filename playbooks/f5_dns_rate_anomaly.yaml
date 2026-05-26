@@ -1,0 +1,13 @@
+playbook_id: f5_dns_rate_anomaly
+match:
+  vendor: f5
+  alertname_regex: '^(DNS每秒请求率突增|DNS每秒请求率突降|DNS每秒响应率突增|DNS每秒响应率突降)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "tmsh show gtm wideip"
+    - "tmsh show gtm pool"
+    - "tmsh show gtm server"
+    - "tmsh show gtm listener"

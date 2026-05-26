@@ -1,0 +1,72 @@
+skill_name: f5_throughput_high
+version: v6.3.0
+family: f5_throughput_high
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_f5_throughput_performance
+  - show_f5_net_interface
+  - show_f5_ltm_virtual
+  - show_f5_ltm_pool
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  f5_tmos:
+    show_f5_throughput_performance:
+      template: "tmsh show sys performance throughput"
+      readonly: true
+    show_f5_net_interface:
+      template: "tmsh show net interface"
+      readonly: true
+    show_f5_ltm_virtual:
+      template: "tmsh show ltm virtual"
+      readonly: true
+    show_f5_ltm_pool:
+      template: "tmsh show ltm pool"
+      readonly: true
+  f5_bigip:
+    show_f5_throughput_performance:
+      template: "tmsh show sys performance throughput"
+      readonly: true
+    show_f5_net_interface:
+      template: "tmsh show net interface"
+      readonly: true
+    show_f5_ltm_virtual:
+      template: "tmsh show ltm virtual"
+      readonly: true
+    show_f5_ltm_pool:
+      template: "tmsh show ltm pool"
+      readonly: true
+  f5:
+    show_f5_throughput_performance:
+      template: "tmsh show sys performance throughput"
+      readonly: true
+    show_f5_net_interface:
+      template: "tmsh show net interface"
+      readonly: true
+    show_f5_ltm_virtual:
+      template: "tmsh show ltm virtual"
+      readonly: true
+    show_f5_ltm_pool:
+      template: "tmsh show ltm pool"
+      readonly: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "modify"
+  - "create"
+  - "delete"
+  - "save"
+  - "load"
+  - "reboot"
+  - "restart"
+  - "reset"
+  - "run util"
+  - "bash"
+  - "edit"
+  - "merge"

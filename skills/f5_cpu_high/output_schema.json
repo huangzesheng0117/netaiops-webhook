@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "cpu_current_percent": "number",
+    "cpu_plane": "string",
+    "device_ip": "string",
+    "family": "string",
+    "host_cpu_percent": "number",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "prometheus_window_state": "string",
+    "tmm_cpu_percent": "number",
+    "top_process": "string"
+  },
+  "family": "f5_cpu_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "CPU 类型",
+      "当前 CPU",
+      "是否 TMM/data-plane 压力",
+      "是否 control-plane 压力",
+      "是否持续高位"
+    ]
+  },
+  "skill_name": "f5_cpu_high",
+  "version": "v6.3.0"
+}

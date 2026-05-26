@@ -1,0 +1,35 @@
+{
+  "facts": {
+    "datacenter_state": "string",
+    "device_ip": "string",
+    "dns_preferred_ratio": "number",
+    "dns_resolution_ratio": "number",
+    "family": "string",
+    "hostname": "string",
+    "listener_state": "string",
+    "mcp_commands": "array",
+    "pool_state": "string",
+    "prometheus_window_state": "string",
+    "server_state": "string",
+    "threshold": "number",
+    "wideip_state": "string"
+  },
+  "family": "f5_dns_resolution_quality_low",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "DNS 解析率或优选解析率",
+      "设备名称和设备 IP",
+      "Wide IP / Pool / Server 状态",
+      "Prometheus 窗口状态",
+      "是否仍低于阈值",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "f5_dns_resolution_quality_low",
+  "version": "v6.3.0"
+}

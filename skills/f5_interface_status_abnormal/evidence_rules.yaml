@@ -1,0 +1,36 @@
+skill_name: f5_interface_status_abnormal
+version: v6.3.0
+family: f5_interface_status_abnormal
+required_facts:
+  - hostname
+  - device_ip
+  - interface_status
+  - mcp_commands
+preferred_facts:
+  - interface
+  - interface_class
+  - trunk
+  - vlan
+  - media_status
+  - link_status
+  - prometheus_window_state
+  - recent_log_keywords
+status_rules:
+  active:
+    condition: "interface_status is down or abnormal"
+    severity: warning
+    message: "current evidence indicates the F5 interface issue is still active"
+  recovered_or_transient:
+    condition: "interface_status is up while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "interface facts are missing or command output cannot be parsed"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing interface"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "interface appears to be intentionally unused"

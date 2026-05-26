@@ -1,0 +1,36 @@
+skill_name: f5_dns_resolution_quality_low
+version: v6.3.0
+family: f5_dns_resolution_quality_low
+required_facts:
+  - hostname
+  - device_ip
+  - dns_resolution_ratio
+  - mcp_commands
+preferred_facts:
+  - dns_preferred_ratio
+  - wideip_state
+  - pool_state
+  - server_state
+  - datacenter_state
+  - listener_state
+  - prometheus_window_state
+  - threshold
+status_rules:
+  active:
+    condition: "dns_resolution_ratio or dns_preferred_ratio is below threshold"
+    severity: warning
+    message: "DNS resolution quality is still below threshold"
+  recovered_or_transient:
+    condition: "current ratio is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "required DNS resolution facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing DNS ratio"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "wideip/pool/server state cannot be identified"

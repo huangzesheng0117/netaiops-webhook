@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "device_ip": "string",
+    "disk_free": "string",
+    "disk_total": "string",
+    "disk_used_percent": "number",
+    "family": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "partition": "string",
+    "prometheus_window_state": "string",
+    "software_volume_status": "string"
+  },
+  "family": "f5_disk_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "高利用率分区",
+      "当前磁盘利用率",
+      "剩余空间",
+      "是否影响日志/core/软件卷",
+      "是否需要人工清理"
+    ]
+  },
+  "skill_name": "f5_disk_high",
+  "version": "v6.3.0"
+}
