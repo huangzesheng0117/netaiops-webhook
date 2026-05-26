@@ -1,0 +1,33 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "asic_version": "string",
+    "device_ip": "string",
+    "family": "string",
+    "hardware_model": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "power_or_fan_status": "string",
+    "prometheus_window_state": "string",
+    "sensor_name": "string",
+    "sensor_status": "string",
+    "temperature_status": "string"
+  },
+  "family": "fortigate_hardware_sensor_abnormal",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "异常传感器",
+      "设备型号",
+      "当前硬件状态",
+      "是否存在温度/电源/风扇风险",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "fortigate_hardware_sensor_abnormal",
+  "version": "v6.3.0"
+}

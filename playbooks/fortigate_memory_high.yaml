@@ -1,0 +1,12 @@
+playbook_id: fortigate_memory_high
+match:
+  vendor: fortigate
+  alertname_regex: '^(内存利用率|飞塔防火墙内存利用率|FortiGate内存利用率)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "get system performance status"
+    - "diagnose hardware sysinfo memory"
+    - "diagnose sys top 1 10 1"

@@ -131,3 +131,45 @@ def build_execution_candidates_from_playbook(playbook: Dict[str, Any], event: Di
             )
             idx += 1
     return result
+
+# ===== v7.11 FortiGate readonly wrapper begin =====
+# FortiGate uses some "diagnose" commands for read-only evidence collection.
+# They are not configuration commands, but the legacy playbook loader may not
+# classify them as readonly by default. Wrap candidate generation and mark only
+# explicitly allowlisted FortiGate diagnostic commands as readonly.
+_FORTIGATE_READONLY_DIAGNOSE_PREFIXES_V711 = (
+    "diagnose sys ha checksum show",
+    "diagnose sys top",
+    "diagnose hardware sysinfo memory",
+    "diagnose sys session stat",
+    "diagnose sys session full-stat",
+    "diagnose sys session session stat",
+)
+
+
+def _v711_is_fortigate_readonly_diagnose(command: str) -> bool:
+    normalized = " ".join(str(command or "").strip().lower().split())
+    return any(
+        normalized.startswith(prefix)
+        for prefix in _FORTIGATE_READONLY_DIAGNOSE_PREFIXES_V711
+    )
+
+
+try:
+    _v711_original_build_execution_candidates_from_playbook = build_execution_candidates_from_playbook
+except NameError:
+    _v711_original_build_execution_candidates_from_playbook = None
+
+
+if _v711_original_build_execution_candidates_from_playbook is not None:
+    def build_execution_candidates_from_playbook(playbook, event):
+        candidates = _v711_original_build_execution_candidates_from_playbook(playbook, event)
+
+        for item in candidates or []:
+            command = item.get("command") or item.get("cmd") or ""
+            if _v711_is_fortigate_readonly_diagnose(command):
+                item["readonly"] = True
+                item.setdefault("readonly_reason", "fortigate_v7_11_diagnose_allowlist")
+
+        return candidates
+# ===== v7.11 FortiGate readonly wrapper end =====

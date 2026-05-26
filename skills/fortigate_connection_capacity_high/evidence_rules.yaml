@@ -1,0 +1,39 @@
+skill_name: fortigate_connection_capacity_high
+version: v6.3.0
+family: fortigate_connection_capacity_high
+required_facts:
+  - hostname
+  - device_ip
+  - mcp_commands
+preferred_facts:
+  - active_sessions
+  - session_setup_rate
+  - tcp_new_connection_rate
+  - session_count_limit
+  - cpu_average_percent
+  - memory_current_percent
+  - ha_role
+  - prometheus_window_state
+status_rules:
+  active:
+    condition: "active sessions or new connection rate is still above threshold"
+    severity: warning
+    message: "FortiGate connection pressure is still active"
+  recovered_or_transient:
+    condition: "current session evidence is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  capacity_risk:
+    condition: "active sessions are close to platform or policy capacity"
+    severity: warning
+    message: "session capacity risk should be evaluated"
+  inconclusive:
+    condition: "required session facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing session count or setup rate"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "VDOM or HA member context cannot be identified"

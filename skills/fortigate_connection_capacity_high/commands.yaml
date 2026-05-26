@@ -1,0 +1,75 @@
+skill_name: fortigate_connection_capacity_high
+version: v6.3.0
+family: fortigate_connection_capacity_high
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_fortigate_performance_status
+  - show_fortigate_session_stat
+  - show_fortigate_session_full_stat
+  - show_fortigate_system_status
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  fortigate:
+    show_fortigate_performance_status:
+      template: "get system performance status"
+      readonly: true
+    show_fortigate_session_stat:
+      template: "diagnose sys session stat"
+      readonly: true
+    show_fortigate_session_full_stat:
+      template: "diagnose sys session full-stat"
+      readonly: true
+    show_fortigate_system_status:
+      template: "get system status"
+      readonly: true
+  fortinet_fortigate:
+    show_fortigate_performance_status:
+      template: "get system performance status"
+      readonly: true
+    show_fortigate_session_stat:
+      template: "diagnose sys session stat"
+      readonly: true
+    show_fortigate_session_full_stat:
+      template: "diagnose sys session full-stat"
+      readonly: true
+    show_fortigate_system_status:
+      template: "get system status"
+      readonly: true
+  fortios:
+    show_fortigate_performance_status:
+      template: "get system performance status"
+      readonly: true
+    show_fortigate_session_stat:
+      template: "diagnose sys session stat"
+      readonly: true
+    show_fortigate_session_full_stat:
+      template: "diagnose sys session full-stat"
+      readonly: true
+    show_fortigate_system_status:
+      template: "get system status"
+      readonly: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "config"
+  - "edit"
+  - "set"
+  - "unset"
+  - "next"
+  - "end"
+  - "delete"
+  - "purge"
+  - "execute reboot"
+  - "execute shutdown"
+  - "execute factoryreset"
+  - "diagnose sys kill"
+  - "diagnose debug enable"
+  - "diagnose debug reset"
+  - "diagnose debug disable"

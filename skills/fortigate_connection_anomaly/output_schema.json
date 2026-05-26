@@ -1,0 +1,38 @@
+{
+  "facts": {
+    "active_sessions": "integer",
+    "anomaly_direction": "string",
+    "change_ratio": "number",
+    "cpu_average_percent": "number",
+    "current_value": "number",
+    "device_ip": "string",
+    "family": "string",
+    "ha_role": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "memory_current_percent": "number",
+    "metric_name": "string",
+    "previous_value": "number",
+    "prometheus_window_state": "string",
+    "session_setup_rate": "number"
+  },
+  "family": "fortigate_connection_anomaly",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "突增/突降方向",
+      "指标类型",
+      "当前值和上一窗口值",
+      "设备名称和设备 IP",
+      "当前会话统计",
+      "是否仍处于异常变化状态",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "fortigate_connection_anomaly",
+  "version": "v6.3.0"
+}

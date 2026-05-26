@@ -1,0 +1,32 @@
+skill_name: fortigate_ha_sync_abnormal
+version: v6.3.0
+family: fortigate_ha_sync_abnormal
+required_facts:
+  - hostname
+  - device_ip
+  - sync_status
+  - mcp_commands
+preferred_facts:
+  - configuration_status
+  - out_of_sync_member
+  - checksum_match
+  - prometheus_window_state
+status_rules:
+  active:
+    condition: "Prometheus and device evidence indicate the condition is still abnormal"
+    severity: warning
+    message: "current evidence indicates the FortiGate alert is still active"
+  recovered_or_transient:
+    condition: "device evidence is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "required facts are missing or command output cannot be parsed"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing required facts"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "VDOM or HA member context cannot be identified"

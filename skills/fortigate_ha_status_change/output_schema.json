@@ -1,0 +1,33 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "cluster_uptime": "string",
+    "device_ip": "string",
+    "family": "string",
+    "ha_health_status": "string",
+    "ha_mode": "string",
+    "ha_role": "string",
+    "hostname": "string",
+    "master_device": "string",
+    "mcp_commands": "array",
+    "prometheus_window_state": "string",
+    "slave_device": "string"
+  },
+  "family": "fortigate_ha_status_change",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "当前主备角色",
+      "HA 健康状态",
+      "集群成员状态",
+      "是否发生切换",
+      "是否需要检查对端和业务影响"
+    ]
+  },
+  "skill_name": "fortigate_ha_status_change",
+  "version": "v6.3.0"
+}

@@ -1,0 +1,12 @@
+playbook_id: fortigate_ha_sync_abnormal
+match:
+  vendor: fortigate
+  alertname_regex: '^(同步状态|飞塔防火墙同步状态异常|FortiGate同步状态异常|FortiGate HA同步异常)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "get sys ha status"
+    - "diagnose sys ha checksum show"
+    - "get system status"

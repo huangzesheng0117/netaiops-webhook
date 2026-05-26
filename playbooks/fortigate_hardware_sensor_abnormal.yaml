@@ -1,0 +1,12 @@
+playbook_id: fortigate_hardware_sensor_abnormal
+match:
+  vendor: fortigate
+  alertname_regex: '^(硬件传感器状态|飞塔防火墙硬件状态异常|FortiGate硬件传感器状态|FortiGate硬件状态异常)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "get hardware status"
+    - "get system status"
+    - "get system performance status"

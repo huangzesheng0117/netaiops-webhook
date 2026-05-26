@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "cpu_average_percent": "number",
+    "cpu_core_percent": "number",
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "prometheus_window_state": "string",
+    "system_load": "string",
+    "top_process": "string"
+  },
+  "family": "fortigate_cpu_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "CPU 类型",
+      "当前 CPU 利用率",
+      "Top 进程",
+      "是否仍高位",
+      "是否为短时峰值",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "fortigate_cpu_high",
+  "version": "v6.3.0"
+}

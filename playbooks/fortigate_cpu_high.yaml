@@ -1,0 +1,12 @@
+playbook_id: fortigate_cpu_high
+match:
+  vendor: fortigate
+  alertname_regex: '^(CPU平均利用率|CPU单核利用率|飞塔防火墙CPU平均利用率|飞塔防火墙CPU单核利用率|FortiGate CPU利用率)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "get system performance status"
+    - "diagnose sys top 1 10 1"
+    - "get system status"

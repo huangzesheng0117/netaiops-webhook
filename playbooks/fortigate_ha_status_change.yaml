@@ -1,0 +1,12 @@
+playbook_id: fortigate_ha_status_change
+match:
+  vendor: fortigate
+  alertname_regex: '^(主备状态切换|飞塔防火墙主备状态切换|FortiGate主备状态切换|FortiGate HA状态切换)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "get system status"
+    - "get sys ha status"
+    - "diagnose sys ha checksum show"

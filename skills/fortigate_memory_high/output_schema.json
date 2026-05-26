@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "conserve_mode": "string",
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "memory_current_percent": "number",
+    "memory_free": "string",
+    "memory_used": "string",
+    "prometheus_window_state": "string",
+    "top_memory_process": "string"
+  },
+  "family": "fortigate_memory_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "当前内存利用率",
+      "内存使用/剩余",
+      "是否存在 conserve mode 风险",
+      "Top 进程",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "fortigate_memory_high",
+  "version": "v6.3.0"
+}

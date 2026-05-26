@@ -1,0 +1,13 @@
+playbook_id: fortigate_connection_capacity_high
+match:
+  vendor: fortigate
+  alertname_regex: '^(活动连接数|新建连接数\(TCP\)|飞塔防火墙活动连接数|飞塔防火墙新建连接数\(TCP\)|FortiGate活动连接数|FortiGate新建连接数\(TCP\))$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "get system performance status"
+    - "diagnose sys session stat"
+    - "diagnose sys session full-stat"
+    - "get system status"

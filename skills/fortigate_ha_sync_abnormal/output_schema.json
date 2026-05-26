@@ -1,0 +1,31 @@
+{
+  "facts": {
+    "alarm_type": "string",
+    "checksum_match": "boolean",
+    "configuration_status": "string",
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "out_of_sync_member": "string",
+    "prometheus_window_state": "string",
+    "sync_status": "string"
+  },
+  "family": "fortigate_ha_sync_abnormal",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "HA 同步状态",
+      "Configuration Status",
+      "是否存在 out-of-sync 成员",
+      "checksum 是否一致",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "fortigate_ha_sync_abnormal",
+  "version": "v6.3.0"
+}

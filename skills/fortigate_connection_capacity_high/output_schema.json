@@ -1,0 +1,34 @@
+{
+  "facts": {
+    "active_sessions": "integer",
+    "cpu_average_percent": "number",
+    "device_ip": "string",
+    "family": "string",
+    "ha_role": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "memory_current_percent": "number",
+    "prometheus_window_state": "string",
+    "session_count_limit": "integer",
+    "session_setup_rate": "number",
+    "tcp_new_connection_rate": "number"
+  },
+  "family": "fortigate_connection_capacity_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "活动连接数或新建连接数",
+      "设备名称和设备 IP",
+      "会话统计和系统性能状态",
+      "是否仍处于高位",
+      "是否伴随 CPU / 内存 / HA 异常",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "fortigate_connection_capacity_high",
+  "version": "v6.3.0"
+}

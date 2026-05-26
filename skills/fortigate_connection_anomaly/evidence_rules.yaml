@@ -1,0 +1,42 @@
+skill_name: fortigate_connection_anomaly
+version: v6.3.0
+family: fortigate_connection_anomaly
+required_facts:
+  - hostname
+  - device_ip
+  - anomaly_direction
+  - metric_name
+  - mcp_commands
+preferred_facts:
+  - current_value
+  - previous_value
+  - change_ratio
+  - active_sessions
+  - session_setup_rate
+  - cpu_average_percent
+  - memory_current_percent
+  - ha_role
+  - prometheus_window_state
+status_rules:
+  spike_active:
+    condition: "anomaly_direction is spike and current value remains high"
+    severity: warning
+    message: "FortiGate connection metric is still spiking"
+  drop_active:
+    condition: "anomaly_direction is drop and current value remains much lower than baseline"
+    severity: warning
+    message: "FortiGate connection metric is still dropping"
+  recovered_or_transient:
+    condition: "current value has returned close to baseline"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "current value or baseline is missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing current or previous value"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "VDOM or HA member context cannot be identified"
