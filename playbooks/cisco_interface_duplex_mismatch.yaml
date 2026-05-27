@@ -1,0 +1,13 @@
+playbook_id: cisco_interface_duplex_mismatch
+match:
+  vendor: cisco
+  alertname_regex: '^(双工模式)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "show interface {interface_each}"
+    - "show interface {interface_each} status"
+    - "show interface {interface_each} counters errors"
+    - "show logging | include {interface_each}|duplex|Duplex|speed|Speed|LINK|UPDOWN"

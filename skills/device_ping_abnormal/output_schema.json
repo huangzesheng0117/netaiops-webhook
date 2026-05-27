@@ -1,0 +1,30 @@
+{
+  "facts": {
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "interface_summary": "string",
+    "mcp_commands": "array",
+    "mcp_connectivity_status": "string",
+    "ping_latency_ms": "number",
+    "ping_loss_percent": "number",
+    "prometheus_window_state": "string"
+  },
+  "family": "device_ping_abnormal",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "设备名称和设备 IP",
+      "Ping 丢包或时延证据",
+      "MCP 只读取证结果",
+      "是否仍处于 Ping 异常",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "device_ping_abnormal",
+  "version": "v6.3.0"
+}

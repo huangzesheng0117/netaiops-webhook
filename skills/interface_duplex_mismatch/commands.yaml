@@ -1,0 +1,81 @@
+skill_name: interface_duplex_mismatch
+version: v6.3.0
+family: interface_duplex_mismatch
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_interface_detail
+  - show_interface_status
+  - show_interface_error_counters
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  cisco_nxos:
+    show_interface_detail:
+      template: "show interface {interface}"
+      readonly: true
+    show_interface_status:
+      template: "show interface {interface} status"
+      readonly: true
+    show_interface_error_counters:
+      template: "show interface {interface} counters errors"
+      readonly: true
+  cisco_iosxe:
+    show_interface_detail:
+      template: "show interfaces {interface}"
+      readonly: true
+    show_interface_status:
+      template: "show interfaces {interface} status"
+      readonly: true
+    show_interface_error_counters:
+      template: "show interfaces {interface} counters errors"
+      readonly: true
+  f5_tmos:
+    show_interface_detail:
+      template: "tmsh show net interface"
+      readonly: true
+    show_interface_status:
+      template: "tmsh show net trunk"
+      readonly: true
+    show_interface_error_counters:
+      template: "tmsh show sys hardware"
+      readonly: true
+  fortios:
+    show_interface_detail:
+      template: "get system interface physical"
+      readonly: true
+    show_interface_status:
+      template: "get hardware nic {interface}"
+      readonly: true
+    show_interface_error_counters:
+      template: "get system status"
+      readonly: true
+  h3c:
+    show_interface_detail:
+      template: "display interface {interface}"
+      readonly: true
+    show_interface_status:
+      template: "display interface brief"
+      readonly: true
+    show_interface_error_counters:
+      template: "display logbuffer | include {interface}|duplex|Duplex|speed|Speed|DOWN|UPDOWN"
+      readonly: true
+command_limits:
+  max_commands_per_request: 6
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "configure"
+  - "config"
+  - "edit"
+  - "set"
+  - "delete"
+  - "reload"
+  - "reboot"
+  - "shutdown"
+  - "save"
+  - "commit"
+  - "debug"

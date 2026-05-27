@@ -1,0 +1,12 @@
+playbook_id: h3c_device_reachability_down
+match:
+  vendor: h3c
+  alertname_regex: '^(up)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 5
+  commands:
+    - "display version"
+    - "display clock"
+    - "display logbuffer | include reboot|DOWN|UPDOWN|down"

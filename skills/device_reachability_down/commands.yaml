@@ -1,0 +1,81 @@
+skill_name: device_reachability_down
+version: v6.3.0
+family: device_reachability_down
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_device_status
+  - show_device_clock
+  - show_device_logs
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  cisco_nxos:
+    show_device_status:
+      template: "show version"
+      readonly: true
+    show_device_clock:
+      template: "show clock"
+      readonly: true
+    show_device_logs:
+      template: "show logging | include reload|RELOAD|LINK|UPDOWN|down|Down"
+      readonly: true
+  cisco_iosxe:
+    show_device_status:
+      template: "show version"
+      readonly: true
+    show_device_clock:
+      template: "show clock"
+      readonly: true
+    show_device_logs:
+      template: "show logging | include reload|RELOAD|LINK|UPDOWN|down|Down"
+      readonly: true
+  f5_tmos:
+    show_device_status:
+      template: "tmsh show sys version"
+      readonly: true
+    show_device_clock:
+      template: "tmsh show sys failover"
+      readonly: true
+    show_device_logs:
+      template: "tmsh show sys performance system"
+      readonly: true
+  fortios:
+    show_device_status:
+      template: "get system status"
+      readonly: true
+    show_device_clock:
+      template: "get system performance status"
+      readonly: true
+    show_device_logs:
+      template: "get sys ha status"
+      readonly: true
+  h3c:
+    show_device_status:
+      template: "display version"
+      readonly: true
+    show_device_clock:
+      template: "display clock"
+      readonly: true
+    show_device_logs:
+      template: "display logbuffer | include reboot|DOWN|UPDOWN|down"
+      readonly: true
+command_limits:
+  max_commands_per_request: 6
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "configure"
+  - "config"
+  - "edit"
+  - "set"
+  - "delete"
+  - "reload"
+  - "reboot"
+  - "shutdown"
+  - "save"
+  - "commit"
+  - "debug"

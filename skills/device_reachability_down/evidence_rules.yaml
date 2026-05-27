@@ -1,0 +1,33 @@
+skill_name: device_reachability_down
+version: v6.3.0
+family: device_reachability_down
+required_facts:
+  - hostname
+  - device_ip
+  - mcp_commands
+preferred_facts:
+  - up_value
+  - prometheus_window_state
+  - exporter_status
+  - mcp_connectivity_status
+  - device_uptime
+  - ha_status
+  - recent_log_keywords
+status_rules:
+  active:
+    condition: "up value is 0 or MCP cannot connect"
+    severity: warning
+    message: "device or exporter reachability issue is still active"
+  recovered_or_transient:
+    condition: "current up value is 1 while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "Prometheus and MCP evidence conflict or required facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing device_ip"
+  - "MCP connection failed"
+  - "Prometheus up metric and device evidence conflict"
+  - "exporter status cannot be distinguished from device status"

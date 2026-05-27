@@ -1,0 +1,33 @@
+{
+  "facts": {
+    "device_ip": "string",
+    "device_uptime": "string",
+    "exporter_status": "string",
+    "family": "string",
+    "ha_status": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "mcp_connectivity_status": "string",
+    "prometheus_window_state": "string",
+    "recent_log_keywords": "array",
+    "up_value": "number"
+  },
+  "family": "device_reachability_down",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "设备名称和设备 IP",
+      "up 指标当前状态",
+      "MCP 只读取证结果",
+      "是否为设备不可达或采集器异常",
+      "是否仍处于不可达状态",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "device_reachability_down",
+  "version": "v6.3.0"
+}

@@ -1,0 +1,12 @@
+playbook_id: f5_interface_duplex_mismatch
+match:
+  vendor: f5
+  alertname_regex: '^(双工模式)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "tmsh show net interface"
+    - "tmsh show net trunk"
+    - "tmsh show sys hardware"

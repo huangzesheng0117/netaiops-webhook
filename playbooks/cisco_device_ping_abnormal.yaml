@@ -1,0 +1,13 @@
+playbook_id: cisco_device_ping_abnormal
+match:
+  vendor: cisco
+  alertname_regex: '^(Ping)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 5
+  commands:
+    - "show version"
+    - "show clock"
+    - "show interface status"
+    - "show logging | include ICMP|ping|LINK|UPDOWN|down|Down"

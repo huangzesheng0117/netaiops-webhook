@@ -1,0 +1,12 @@
+playbook_id: h3c_device_ping_abnormal
+match:
+  vendor: h3c
+  alertname_regex: '^(Ping)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 5
+  commands:
+    - "display version"
+    - "display clock"
+    - "display interface brief"

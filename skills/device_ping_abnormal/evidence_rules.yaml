@@ -1,0 +1,31 @@
+skill_name: device_ping_abnormal
+version: v6.3.0
+family: device_ping_abnormal
+required_facts:
+  - hostname
+  - device_ip
+  - mcp_commands
+preferred_facts:
+  - ping_loss_percent
+  - ping_latency_ms
+  - prometheus_window_state
+  - mcp_connectivity_status
+  - interface_summary
+status_rules:
+  active:
+    condition: "Ping loss or latency remains abnormal"
+    severity: warning
+    message: "Ping abnormality is still active"
+  recovered_or_transient:
+    condition: "current Ping evidence is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "Ping facts are missing or MCP/Prometheus evidence conflicts"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing device_ip"
+  - "Prometheus Ping data missing"
+  - "MCP connection failed"
+  - "Ping abnormality may be path-related rather than device-related"

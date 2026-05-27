@@ -1,0 +1,12 @@
+playbook_id: fortigate_interface_duplex_mismatch
+match:
+  vendor: fortigate
+  alertname_regex: '^(双工模式)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "get system interface physical"
+    - "get hardware nic {interface_each}"
+    - "get system status"

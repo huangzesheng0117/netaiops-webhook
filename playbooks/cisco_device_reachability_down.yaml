@@ -1,0 +1,12 @@
+playbook_id: cisco_device_reachability_down
+match:
+  vendor: cisco
+  alertname_regex: '^(up)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 5
+  commands:
+    - "show version"
+    - "show clock"
+    - "show logging | include reload|RELOAD|LINK|UPDOWN|down|Down"

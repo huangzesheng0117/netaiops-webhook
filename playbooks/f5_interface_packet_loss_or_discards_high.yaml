@@ -1,12 +1,12 @@
-playbook_id: h3c_interface_packet_loss_or_discards_high
+playbook_id: f5_interface_packet_loss_or_discards_high
 match:
-  vendor: h3c
+  vendor: f5
   alertname_regex: '^(丢包率-入向|丢包率-出向|错包率-入向|错包率-出向|5m错包数-入向|5m错包数-出向|接口错包|端口错包|接口错误包|接口丢包|端口丢包)$'
 execution:
   readonly_only: true
   auto_execute_allowed: true
   max_commands: 6
   commands:
-    - "display interface {interface_each}"
-    - "display interface brief"
-    - "display logbuffer | include {interface_each}|CRC|FCS|error|Error|drop|Drop|discard|Discard|DOWN|UPDOWN"
+    - "tmsh show net interface"
+    - "tmsh show net trunk"
+    - "tmsh show sys hardware"

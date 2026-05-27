@@ -1,0 +1,12 @@
+playbook_id: f5_device_ping_abnormal
+match:
+  vendor: f5
+  alertname_regex: '^(Ping)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 5
+  commands:
+    - "tmsh show sys version"
+    - "tmsh show sys failover"
+    - "tmsh show net interface"

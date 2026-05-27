@@ -1,11 +1,14 @@
 playbook_id: cisco_interface_or_link_utilization_high
 match:
   vendor: cisco
-  playbook_type: interface_or_link_utilization_high
+  alertname_regex: '^(利用率-入向|利用率-出向|接口利用率-入向|接口利用率-出向|线路利用率-入向|线路利用率-出向|.*利用率.*入向|.*利用率.*出向)$'
 execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
   commands:
     - "show interface {interface_each}"
-    - "show interface {interface_each} counters"
-    - "show interface description | include {interface_each}"
-    - "show logging | include {interface_each}|LINK|LINEPROTO"
-    - "show processes cpu sort"
+    - "show interface {interface_each} status"
+    - "show interface {interface_each} counters errors"
+    - "show port-channel summary"
+    - "show logging | include {interface_each}|LINK|UPDOWN|flap"

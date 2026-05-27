@@ -1,12 +1,12 @@
-playbook_id: h3c_interface_or_link_utilization_high
+playbook_id: fortigate_interface_or_link_utilization_high
 match:
-  vendor: h3c
+  vendor: fortigate
   alertname_regex: '^(利用率-入向|利用率-出向|接口利用率-入向|接口利用率-出向|线路利用率-入向|线路利用率-出向|.*利用率.*入向|.*利用率.*出向)$'
 execution:
   readonly_only: true
   auto_execute_allowed: true
   max_commands: 6
   commands:
-    - "display interface {interface_each}"
-    - "display interface brief"
-    - "display logbuffer | include {interface_each}|DOWN|UPDOWN|flap"
+    - "get system interface physical"
+    - "get hardware nic {interface_each}"
+    - "get system performance status"

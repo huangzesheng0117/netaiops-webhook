@@ -1,0 +1,35 @@
+{
+  "facts": {
+    "admin_status": "string",
+    "crc": "integer",
+    "device_ip": "string",
+    "duplex_state": "string",
+    "family": "string",
+    "hostname": "string",
+    "input_errors": "integer",
+    "interface": "string",
+    "mcp_commands": "array",
+    "oper_status": "string",
+    "output_errors": "integer",
+    "prometheus_window_state": "string",
+    "speed_state": "string"
+  },
+  "family": "interface_duplex_mismatch",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "设备名称和设备 IP",
+      "接口名称",
+      "speed / duplex 当前状态",
+      "接口错误计数",
+      "是否仍存在双工不匹配",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "interface_duplex_mismatch",
+  "version": "v6.3.0"
+}

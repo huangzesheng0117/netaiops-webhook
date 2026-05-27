@@ -1,0 +1,40 @@
+skill_name: interface_duplex_mismatch
+version: v6.3.0
+family: interface_duplex_mismatch
+required_facts:
+  - hostname
+  - device_ip
+  - interface
+  - mcp_commands
+preferred_facts:
+  - duplex_state
+  - speed_state
+  - admin_status
+  - oper_status
+  - input_errors
+  - crc
+  - output_errors
+  - prometheus_window_state
+status_rules:
+  active:
+    condition: "duplex mismatch is still present"
+    severity: warning
+    message: "interface duplex mismatch is still active"
+  recovered_or_transient:
+    condition: "current duplex state is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  physical_layer_suspected:
+    condition: "duplex mismatch with CRC or input errors"
+    severity: warning
+    message: "physical layer, peer-side configuration, or negotiation issue should be checked"
+  inconclusive:
+    condition: "interface or duplex facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing interface"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "peer-side configuration cannot be verified"
