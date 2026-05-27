@@ -1,0 +1,43 @@
+skill_name: hillstone_connection_capacity_high
+version: v6.3.0
+family: hillstone_connection_capacity_high
+required_facts:
+  - hostname
+  - device_ip
+  - mcp_commands
+preferred_facts:
+  - active_sessions
+  - new_tcp_connection_rate
+  - session_limit
+  - session_utilization
+  - cpu_current_percent
+  - memory_current_percent
+  - ha_role
+  - prometheus_window_state
+status_rules:
+  active:
+    condition: "active sessions or new TCP connection rate remains above threshold"
+    severity: warning
+    message: "Hillstone connection pressure is still active"
+  recovered_or_transient:
+    condition: "current connection evidence is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  capacity_risk:
+    condition: "session utilization is close to capacity"
+    severity: warning
+    message: "session capacity risk should be evaluated"
+  traffic_pressure:
+    condition: "connection high with CPU or memory pressure"
+    severity: warning
+    message: "connection high may be traffic-driven and correlated with resource pressure"
+  inconclusive:
+    condition: "required session facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing session evidence"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "HA role or VSYS context cannot be identified"

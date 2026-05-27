@@ -1,0 +1,14 @@
+playbook_id: hillstone_ha_status_change
+match:
+  vendor: hillstone
+  alertname_regex: '^(主备状态变化|山石防火墙主备状态变化|Hillstone主备状态变化|Hillstone HA状态变化)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "show ha cluster"
+    - "show ha group config"
+    - "show ha link status"
+    - "show ha traffic"
+    - "show module"

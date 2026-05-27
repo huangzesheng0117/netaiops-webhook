@@ -1,0 +1,34 @@
+{
+  "facts": {
+    "device_ip": "string",
+    "family": "string",
+    "ha_cluster_state": "string",
+    "ha_group_state": "string",
+    "ha_link_state": "string",
+    "ha_role": "string",
+    "ha_traffic_state": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "module_role": "string",
+    "peer_state": "string",
+    "prometheus_window_state": "string"
+  },
+  "family": "hillstone_ha_status_change",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "当前主备角色",
+      "HA cluster/group 状态",
+      "HA link 状态",
+      "HA traffic 状态",
+      "是否发生切换",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "hillstone_ha_status_change",
+  "version": "v6.3.0"
+}

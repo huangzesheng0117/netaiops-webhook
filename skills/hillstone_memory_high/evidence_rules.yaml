@@ -1,0 +1,36 @@
+skill_name: hillstone_memory_high
+version: v6.3.0
+family: hillstone_memory_high
+required_facts:
+  - hostname
+  - device_ip
+  - memory_current_percent
+  - mcp_commands
+preferred_facts:
+  - memory_history
+  - session_current
+  - session_utilization
+  - ha_role
+  - prometheus_window_state
+status_rules:
+  active:
+    condition: "memory utilization is still above threshold"
+    severity: warning
+    message: "Hillstone memory utilization is still high"
+  recovered_or_transient:
+    condition: "current memory is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  capacity_risk:
+    condition: "memory high with session pressure"
+    severity: warning
+    message: "memory high may indicate capacity or traffic pressure"
+  inconclusive:
+    condition: "memory facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing memory evidence"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"

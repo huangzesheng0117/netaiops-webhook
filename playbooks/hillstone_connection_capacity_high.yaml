@@ -1,0 +1,13 @@
+playbook_id: hillstone_connection_capacity_high
+match:
+  vendor: hillstone
+  alertname_regex: '^(活动连接数|新建连接数\(TCP\)|山石防火墙活动连接数|山石防火墙新建连接数\(TCP\)|Hillstone活动连接数|Hillstone新建连接数\(TCP\))$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "show session generic"
+    - "show system resource"
+    - "show system resource history"
+    - "show ha cluster"

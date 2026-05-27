@@ -1,0 +1,66 @@
+skill_name: hillstone_ha_status_change
+version: v6.3.0
+family: hillstone_ha_status_change
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_hillstone_ha_cluster
+  - show_hillstone_ha_group
+  - show_hillstone_ha_link
+  - show_hillstone_ha_traffic
+  - show_hillstone_module
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  hillstone:
+    show_hillstone_ha_cluster:
+      template: "show ha cluster"
+      readonly: true
+    show_hillstone_ha_group:
+      template: "show ha group config"
+      readonly: true
+    show_hillstone_ha_link:
+      template: "show ha link status"
+      readonly: true
+    show_hillstone_ha_traffic:
+      template: "show ha traffic"
+      readonly: true
+    show_hillstone_module:
+      template: "show module"
+      readonly: true
+  stoneos:
+    show_hillstone_ha_cluster:
+      template: "show ha cluster"
+      readonly: true
+    show_hillstone_ha_group:
+      template: "show ha group config"
+      readonly: true
+    show_hillstone_ha_link:
+      template: "show ha link status"
+      readonly: true
+    show_hillstone_ha_traffic:
+      template: "show ha traffic"
+      readonly: true
+    show_hillstone_module:
+      template: "show module"
+      readonly: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "configure"
+  - "config"
+  - "set"
+  - "unset"
+  - "no "
+  - "delete"
+  - "clear"
+  - "reboot"
+  - "shutdown"
+  - "debug"
+  - "save"
+  - "commit"

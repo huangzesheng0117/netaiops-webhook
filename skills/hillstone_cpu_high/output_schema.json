@@ -1,0 +1,32 @@
+{
+  "facts": {
+    "cpu_current_percent": "number",
+    "cpu_history": "string",
+    "device_ip": "string",
+    "family": "string",
+    "ha_role": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "prometheus_window_state": "string",
+    "session_current": "integer",
+    "session_utilization": "number"
+  },
+  "family": "hillstone_cpu_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "当前 CPU 利用率",
+      "系统资源状态",
+      "session 压力",
+      "Prometheus 窗口趋势",
+      "是否仍处于高 CPU",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "hillstone_cpu_high",
+  "version": "v6.3.0"
+}

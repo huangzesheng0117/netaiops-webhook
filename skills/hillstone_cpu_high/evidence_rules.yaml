@@ -1,0 +1,36 @@
+skill_name: hillstone_cpu_high
+version: v6.3.0
+family: hillstone_cpu_high
+required_facts:
+  - hostname
+  - device_ip
+  - cpu_current_percent
+  - mcp_commands
+preferred_facts:
+  - cpu_history
+  - session_current
+  - session_utilization
+  - ha_role
+  - prometheus_window_state
+status_rules:
+  active:
+    condition: "CPU utilization is still above threshold"
+    severity: warning
+    message: "Hillstone CPU utilization is still high"
+  recovered_or_transient:
+    condition: "current CPU is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  traffic_pressure:
+    condition: "CPU high with session pressure"
+    severity: warning
+    message: "CPU high may be related to traffic or session pressure"
+  inconclusive:
+    condition: "CPU facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing CPU evidence"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"

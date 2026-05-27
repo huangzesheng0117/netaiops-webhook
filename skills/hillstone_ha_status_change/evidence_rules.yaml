@@ -1,0 +1,35 @@
+skill_name: hillstone_ha_status_change
+version: v6.3.0
+family: hillstone_ha_status_change
+required_facts:
+  - hostname
+  - device_ip
+  - ha_role
+  - mcp_commands
+preferred_facts:
+  - ha_cluster_state
+  - ha_group_state
+  - ha_link_state
+  - ha_traffic_state
+  - module_role
+  - peer_state
+  - prometheus_window_state
+status_rules:
+  active:
+    condition: "HA role or HA group state is abnormal"
+    severity: warning
+    message: "Hillstone HA status change or abnormal state is still active"
+  recovered_or_transient:
+    condition: "current HA evidence is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  inconclusive:
+    condition: "required HA facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing HA role"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"
+  - "HA peer or heartbeat link cannot be identified"

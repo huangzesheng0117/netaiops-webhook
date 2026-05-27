@@ -1,0 +1,59 @@
+skill_name: hillstone_cpu_high
+version: v6.3.0
+family: hillstone_cpu_high
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_hillstone_system_resource
+  - show_hillstone_resource_history
+  - show_hillstone_session_generic
+  - show_hillstone_ha_cluster
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  hillstone:
+    show_hillstone_system_resource:
+      template: "show system resource"
+      readonly: true
+    show_hillstone_resource_history:
+      template: "show system resource history"
+      readonly: true
+    show_hillstone_session_generic:
+      template: "show session generic"
+      readonly: true
+    show_hillstone_ha_cluster:
+      template: "show ha cluster"
+      readonly: true
+  stoneos:
+    show_hillstone_system_resource:
+      template: "show system resource"
+      readonly: true
+    show_hillstone_resource_history:
+      template: "show system resource history"
+      readonly: true
+    show_hillstone_session_generic:
+      template: "show session generic"
+      readonly: true
+    show_hillstone_ha_cluster:
+      template: "show ha cluster"
+      readonly: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "configure"
+  - "config"
+  - "set"
+  - "unset"
+  - "no "
+  - "delete"
+  - "clear"
+  - "reboot"
+  - "shutdown"
+  - "debug"
+  - "save"
+  - "commit"

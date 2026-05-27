@@ -1,0 +1,35 @@
+{
+  "facts": {
+    "active_sessions": "integer",
+    "cpu_current_percent": "number",
+    "device_ip": "string",
+    "family": "string",
+    "ha_role": "string",
+    "hostname": "string",
+    "mcp_commands": "array",
+    "memory_current_percent": "number",
+    "new_tcp_connection_rate": "number",
+    "prometheus_window_state": "string",
+    "session_limit": "integer",
+    "session_utilization": "number"
+  },
+  "family": "hillstone_connection_capacity_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "当前活动连接数或新建连接数",
+      "session 概览",
+      "CPU / 内存资源状态",
+      "HA 状态",
+      "Prometheus 窗口趋势",
+      "是否仍处于高位",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "hillstone_connection_capacity_high",
+  "version": "v6.3.0"
+}
