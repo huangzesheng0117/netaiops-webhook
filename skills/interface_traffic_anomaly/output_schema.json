@@ -1,0 +1,42 @@
+{
+  "facts": {
+    "anomaly_direction": "string",
+    "change_ratio": "number",
+    "current_rate_bps": "number",
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "input_errors": "integer",
+    "input_rate_bps": "number",
+    "interface": "string",
+    "interface_bandwidth_bps": "number",
+    "line_name": "string",
+    "mcp_commands": "array",
+    "output_errors": "integer",
+    "output_rate_bps": "number",
+    "port_channel": "string",
+    "previous_rate_bps": "number",
+    "prometheus_window_state": "string",
+    "recent_log_keywords": "array",
+    "utilization_percent": "number"
+  },
+  "family": "interface_traffic_anomaly",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "线路名称",
+      "突增/突降方向",
+      "当前流量和历史基线",
+      "设备名称和设备 IP",
+      "接口状态和速率",
+      "是否仍处于异常变化状态",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "interface_traffic_anomaly",
+  "version": "v6.3.0"
+}

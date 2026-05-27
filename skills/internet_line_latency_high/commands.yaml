@@ -1,0 +1,81 @@
+skill_name: internet_line_latency_high
+version: v6.3.0
+family: internet_line_latency_high
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - show_ip_sla_statistics
+  - show_ip_sla_configuration
+  - show_interface_detail
+  - show_interface_error_counters
+  - show_recent_interface_or_sla_logs
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  cisco_iosxe:
+    show_ip_sla_statistics:
+      template: "show ip sla statistics"
+      readonly: true
+    show_ip_sla_configuration:
+      template: "show ip sla configuration"
+      readonly: true
+    show_interface_detail:
+      template: "show interface {interface}"
+      readonly: true
+    show_interface_error_counters:
+      template: "show interface {interface} counters errors"
+      readonly: true
+    show_recent_interface_or_sla_logs:
+      template: "show logging | include {interface}|IPSLAs|SLA|RTT|timeout|Timeout|LINK|UPDOWN|flap"
+      readonly: true
+  cisco_ios:
+    show_ip_sla_statistics:
+      template: "show ip sla statistics"
+      readonly: true
+    show_ip_sla_configuration:
+      template: "show ip sla configuration"
+      readonly: true
+    show_interface_detail:
+      template: "show interface {interface}"
+      readonly: true
+    show_interface_error_counters:
+      template: "show interface {interface} counters errors"
+      readonly: true
+    show_recent_interface_or_sla_logs:
+      template: "show logging | include {interface}|IPSLAs|SLA|RTT|timeout|Timeout|LINK|UPDOWN|flap"
+      readonly: true
+  cisco_nxos:
+    show_ip_sla_statistics:
+      template: "show ip sla statistics"
+      readonly: true
+    show_ip_sla_configuration:
+      template: "show ip sla configuration"
+      readonly: true
+    show_interface_detail:
+      template: "show interface {interface}"
+      readonly: true
+    show_interface_error_counters:
+      template: "show interface {interface} counters errors"
+      readonly: true
+    show_recent_interface_or_sla_logs:
+      template: "show logging | include {interface}|IPSLAs|SLA|RTT|timeout|Timeout|LINK|UPDOWN|flap"
+      readonly: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "configure"
+  - "conf t"
+  - "clear"
+  - "reload"
+  - "shutdown"
+  - "no shutdown"
+  - "debug"
+  - "write"
+  - "copy"
+  - "delete"
+  - "erase"

@@ -1,0 +1,14 @@
+playbook_id: cisco_interface_traffic_anomaly
+match:
+  vendor: cisco
+  alertname_regex: '^(互联网线路流量突增|互联网线路流量突降|互联网链路流量突增|互联网链路流量突降|.*流量突增|.*流量突降)$'
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 6
+  commands:
+    - "show interface {interface_each}"
+    - "show interface {interface_each} status"
+    - "show interface {interface_each} counters errors"
+    - "show port-channel summary"
+    - "show logging | include {interface_each}|LINK|UPDOWN|flap|rate|traffic"

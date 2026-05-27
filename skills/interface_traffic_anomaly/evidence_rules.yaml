@@ -1,0 +1,50 @@
+skill_name: interface_traffic_anomaly
+version: v6.3.0
+family: interface_traffic_anomaly
+required_facts:
+  - hostname
+  - device_ip
+  - interface
+  - anomaly_direction
+  - mcp_commands
+preferred_facts:
+  - line_name
+  - current_rate_bps
+  - previous_rate_bps
+  - change_ratio
+  - input_rate_bps
+  - output_rate_bps
+  - interface_bandwidth_bps
+  - utilization_percent
+  - input_errors
+  - output_errors
+  - port_channel
+  - prometheus_window_state
+  - recent_log_keywords
+status_rules:
+  spike_active:
+    condition: "anomaly_direction is spike and current traffic remains much higher than baseline"
+    severity: warning
+    message: "traffic spike is still active"
+  drop_active:
+    condition: "anomaly_direction is drop and current traffic remains much lower than baseline"
+    severity: warning
+    message: "traffic drop is still active"
+  recovered_or_transient:
+    condition: "current traffic has returned close to baseline"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  link_or_failover_suspected:
+    condition: "traffic drop with interface down, flap or port-channel change"
+    severity: warning
+    message: "line, interface, port-channel or failover should be checked"
+  inconclusive:
+    condition: "baseline/current traffic facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing interface"
+  - "missing current or previous traffic value"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"

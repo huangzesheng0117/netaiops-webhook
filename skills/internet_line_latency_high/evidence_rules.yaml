@@ -1,0 +1,48 @@
+skill_name: internet_line_latency_high
+version: v6.3.0
+family: internet_line_latency_high
+required_facts:
+  - hostname
+  - device_ip
+  - mcp_commands
+preferred_facts:
+  - line_name
+  - interface
+  - latency_ms
+  - packet_loss_percent
+  - ip_sla_state
+  - ip_sla_return_code
+  - interface_oper_status
+  - input_rate_bps
+  - output_rate_bps
+  - input_errors
+  - output_errors
+  - prometheus_window_state
+  - recent_log_keywords
+status_rules:
+  active:
+    condition: "latency remains above threshold or IP SLA return code is abnormal"
+    severity: warning
+    message: "internet line latency abnormality is still active"
+  recovered_or_transient:
+    condition: "current latency is normal while Prometheus fired in a previous window"
+    severity: info
+    message: "current evidence looks recovered or transient"
+  interface_related:
+    condition: "latency abnormal with interface errors, drops or link flap"
+    severity: warning
+    message: "interface physical or link stability issue should be checked"
+  provider_side_suspected:
+    condition: "interface is healthy but latency remains abnormal"
+    severity: warning
+    message: "carrier/provider path should be checked"
+  inconclusive:
+    condition: "latency or IP SLA facts are missing"
+    severity: warning
+    message: "manual review is required"
+manual_review_conditions:
+  - "missing IP SLA or Prometheus latency evidence"
+  - "missing interface"
+  - "mcp command failed"
+  - "parser status is error"
+  - "Prometheus and device evidence conflict"

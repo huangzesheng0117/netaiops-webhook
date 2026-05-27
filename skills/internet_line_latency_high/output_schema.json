@@ -1,0 +1,41 @@
+{
+  "facts": {
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "input_errors": "integer",
+    "input_rate_bps": "number",
+    "interface": "string",
+    "interface_oper_status": "string",
+    "ip_sla_return_code": "string",
+    "ip_sla_state": "string",
+    "latency_ms": "number",
+    "line_name": "string",
+    "mcp_commands": "array",
+    "output_errors": "integer",
+    "output_rate_bps": "number",
+    "packet_loss_percent": "number",
+    "prometheus_window_state": "string",
+    "recent_log_keywords": "array"
+  },
+  "family": "internet_line_latency_high",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "线路名称",
+      "设备名称和设备 IP",
+      "接口名称",
+      "延迟 / IP SLA 状态",
+      "Prometheus 窗口趋势",
+      "接口状态和错误计数",
+      "是否仍处于延迟异常",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "internet_line_latency_high",
+  "version": "v6.3.0"
+}
