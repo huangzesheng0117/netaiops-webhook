@@ -1,0 +1,43 @@
+skill_name: cisco_device_reachability_down
+version: v6.3.0
+family: cisco_device_reachability_down
+required_facts:
+  - hostname
+  - device_ip
+  - local_ping_status
+  - ssh_login_status
+preferred_facts:
+  - mcp_commands
+  - cpu_current_percent
+  - memory_current_percent
+  - mgmt_interface_status
+  - ha_status
+  - routing_protocol_state
+  - recent_log_keywords
+  - prometheus_window_state
+status_rules:
+  ping_failed:
+    condition: "management IP ping failed"
+    severity: critical
+    message: "Stop further CLI evidence collection and report device/power/management-path/monitoring-path issue."
+  ssh_failed:
+    condition: "ping succeeds but SSH login failed"
+    severity: warning
+    message: "Stop deeper CLI evidence collection and report management-plane, AAA, SSH service or high CPU/memory suspicion."
+  cli_health_abnormal:
+    condition: "SSH succeeds and CPU, memory, management interface, HA, routing or logs are abnormal"
+    severity: warning
+    message: "Device reachable but health inspection indicates abnormal state."
+  recovered_or_transient:
+    condition: "current ping, SSH and health inspection are normal while Prometheus fired earlier"
+    severity: info
+    message: "Current evidence looks recovered or transient."
+  inconclusive:
+    condition: "required reachability facts are missing or evidence conflicts"
+    severity: warning
+    message: "Manual review is required."
+manual_review_conditions:
+  - "missing ping result"
+  - "missing SSH login result"
+  - "Prometheus up metric and local reachability evidence conflict"
+  - "MCP command failed after SSH succeeded"

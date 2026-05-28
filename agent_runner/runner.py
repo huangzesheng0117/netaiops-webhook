@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from agent_runner.executors import execute_commands
+from agent_runner.reachability_precheck import apply_reachability_precheck
 
 
 BASE_DIR = Path("/opt/netaiops-webhook")
@@ -50,11 +51,21 @@ def run_dispatch_request(request_id: str) -> Dict[str, Any]:
     backend = get_runner_backend()
     os.environ["MCP_MODE"] = normalize_mcp_mode(backend)
 
-    command_results = execute_commands(
+    precheck_result = apply_reachability_precheck(
         request_id=request_id,
         target_scope=target_scope,
-        execution_candidates=execution_candidates,
+        dispatch_payload=dispatch_payload,
     )
+
+    if precheck_result.get("stop"):
+        command_results = precheck_result.get("command_results", [])
+    else:
+        precheck_command_results = precheck_result.get("command_results", [])
+        command_results = precheck_command_results + execute_commands(
+            request_id=request_id,
+            target_scope=target_scope,
+            execution_candidates=execution_candidates,
+        )
 
     result = {
         "request_id": request_id,
@@ -67,6 +78,7 @@ def run_dispatch_request(request_id: str) -> Dict[str, Any]:
         "execution_source": dispatch_payload.get("execution_source", ""),
         "readonly_only": dispatch_payload.get("readonly_only"),
         "policy_result": dispatch_payload.get("policy_result", {}),
+        "precheck_result": precheck_result,
         "guard_result": dispatch_payload.get("guard_result", {}),
         "command_results": command_results,
         "completed_at": now_utc_str(),

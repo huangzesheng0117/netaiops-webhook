@@ -201,6 +201,7 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
 
     request_id = analysis_data.get("request_id", "")
     source = analysis_data.get("source", "")
+
     summary = result.get("summary", "")
     recommended_next_step = result.get("recommended_next_step", "")
     command_plan = result.get("command_plan", []) or []
@@ -217,6 +218,7 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
 
     capability_plan = build_capability_plan(event_for_plan, family_result)
     capability_plan = refine_capability_plan(event_for_plan, family_result, capability_plan)
+
     registry_execution_candidates = resolve_execution_candidates(
         event_for_plan,
         family_result,
@@ -225,6 +227,7 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
 
     playbook = find_best_playbook(event_for_plan, classification)
     policy_playbook = None
+
     playbook_meta = {
         "matched": False,
         "playbook_id": "",
@@ -232,17 +235,11 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
         "mode": "",
     }
 
-    if registry_execution_candidates:
-        execution_candidates = registry_execution_candidates
-        execution_source = "capability_registry"
-        policy_playbook = _build_registry_policy_playbook(family_result, capability_plan)
-        playbook_meta = {
-            "matched": True,
-            "playbook_id": family_result.get("legacy_playbook_type") or family_result.get("family", ""),
-            "playbook_file": "",
-            "mode": "capability_registry",
-        }
-    elif playbook:
+    # v7.12:
+    # Explicit playbook must win over generic capability_registry.
+    # Otherwise broad registry families such as ha_or_cluster_state_abnormal can
+    # swallow new rule-driven playbooks like cisco_device_reachability_down.
+    if playbook:
         execution_candidates = build_execution_candidates_from_playbook(playbook, event_for_plan)
         execution_source = "playbook"
         policy_playbook = playbook
@@ -251,6 +248,16 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
             "playbook_id": (playbook or {}).get("playbook_id", ""),
             "playbook_file": (playbook or {}).get("_file", ""),
             "mode": "legacy_playbook",
+        }
+    elif registry_execution_candidates:
+        execution_candidates = registry_execution_candidates
+        execution_source = "capability_registry"
+        policy_playbook = _build_registry_policy_playbook(family_result, capability_plan)
+        playbook_meta = {
+            "matched": True,
+            "playbook_id": family_result.get("legacy_playbook_type") or family_result.get("family", ""),
+            "playbook_file": "",
+            "mode": "capability_registry",
         }
     else:
         execution_candidates = normalize_execution_candidates(command_plan, suggested_commands)
@@ -286,6 +293,7 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
         "family_result": family_result,
         "capability_plan": capability_plan,
         "playbook": playbook_meta,
+        "playbook_runtime": policy_playbook or {},
         "execution_source": execution_source,
         "auto_confirm_recommended": False,
         "policy_result": {

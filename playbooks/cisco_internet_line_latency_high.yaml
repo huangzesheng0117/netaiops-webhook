@@ -1,7 +1,7 @@
 playbook_id: cisco_internet_line_latency_high
 match:
   vendor: cisco
-  alertname_regex: '^(互联网线路延迟|互联网线路时延|互联网链路延迟|互联网链路时延|.*互联网线路.*延迟.*|.*互联网链路.*延迟.*)$'
+  alertname_regex: '^(互联网线路延迟|互联网线路时延|互联网链路延迟|互联网链路时延|.*互联网线路.*延迟.*|.*互联网链路.*延迟.*|DCI专线延迟|DCI专线时延|DCI线路延迟|DCI线路时延|DCI链路延迟|DCI链路时延|.*DCI.*延迟.*|.*DCI.*时延.*)$'
 execution:
   readonly_only: true
   auto_execute_allowed: true

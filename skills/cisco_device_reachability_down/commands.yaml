@@ -1,0 +1,126 @@
+skill_name: cisco_device_reachability_down
+version: v6.3.0
+family: cisco_device_reachability_down
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - local_ping_management_ip
+  - ssh_login_check
+  - show_device_version
+  - show_device_clock
+  - show_cpu
+  - show_memory
+  - show_mgmt_interface
+  - show_ip_interface_brief
+  - show_recent_logs
+  - show_routing_protocol
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  cisco_nxos:
+    show_device_version:
+      template: "show version"
+      readonly: true
+    show_device_clock:
+      template: "show clock"
+      readonly: true
+    show_cpu:
+      template: "show processes cpu"
+      readonly: true
+    show_memory:
+      template: "show processes memory"
+      readonly: true
+    show_mgmt_interface:
+      template: "show interface mgmt0"
+      readonly: true
+    show_ip_interface_brief:
+      template: "show ip interface brief"
+      readonly: true
+    show_recent_logs:
+      template: "show logging | include mgmt|MGMT|SSH|LOGIN|CPU|MEMORY|UPDOWN|DOWN|reload|RELOAD"
+      readonly: true
+    show_routing_protocol:
+      template: "show bgp summary"
+      readonly: true
+  cisco_iosxe:
+    show_device_version:
+      template: "show version"
+      readonly: true
+    show_device_clock:
+      template: "show clock"
+      readonly: true
+    show_cpu:
+      template: "show processes cpu"
+      readonly: true
+    show_memory:
+      template: "show processes memory"
+      readonly: true
+    show_mgmt_interface:
+      template: "show interface mgmt0"
+      readonly: true
+    show_ip_interface_brief:
+      template: "show ip interface brief"
+      readonly: true
+    show_recent_logs:
+      template: "show logging | include mgmt|MGMT|SSH|LOGIN|CPU|MEMORY|UPDOWN|DOWN|reload|RELOAD"
+      readonly: true
+    show_routing_protocol:
+      template: "show bgp summary"
+      readonly: true
+  cisco_ios:
+    show_device_version:
+      template: "show version"
+      readonly: true
+    show_device_clock:
+      template: "show clock"
+      readonly: true
+    show_cpu:
+      template: "show processes cpu"
+      readonly: true
+    show_memory:
+      template: "show processes memory"
+      readonly: true
+    show_mgmt_interface:
+      template: "show interface mgmt0"
+      readonly: true
+    show_ip_interface_brief:
+      template: "show ip interface brief"
+      readonly: true
+    show_recent_logs:
+      template: "show logging | include mgmt|MGMT|SSH|LOGIN|CPU|MEMORY|UPDOWN|DOWN|reload|RELOAD"
+      readonly: true
+    show_routing_protocol:
+      template: "show bgp summary"
+      readonly: true
+
+precheck_order:
+  - local_ping_management_ip
+  - ssh_login_check
+  - readonly_health_inspection
+stop_if_ping_failed: true
+stop_if_ssh_failed: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "configure"
+  - "conf t"
+  - "config"
+  - "edit"
+  - "set "
+  - "unset"
+  - "delete"
+  - "clear"
+  - "reload"
+  - "reboot"
+  - "shutdown"
+  - "debug"
+  - "save"
+  - "commit"
+  - "write"
+  - "copy"
+  - "erase"

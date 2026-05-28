@@ -1,0 +1,34 @@
+{
+  "facts": {
+    "cpu_current_percent": "number",
+    "device_ip": "string",
+    "family": "string",
+    "hostname": "string",
+    "local_ping_status": "string",
+    "mcp_commands": "array",
+    "memory_current_percent": "number",
+    "mgmt_interface_status": "string",
+    "prometheus_window_state": "string",
+    "recent_log_keywords": "array",
+    "routing_protocol_state": "string",
+    "ssh_login_status": "string"
+  },
+  "family": "hillstone_device_reachability_down",
+  "judgement": {
+    "confidence": "string",
+    "current_state": "string",
+    "manual_review_required": "boolean"
+  },
+  "notification": {
+    "required_lines": [
+      "管理 IP ping 结果",
+      "SSH 登录检查结果",
+      "若 ping 或 SSH 失败，明确提前停止后续 CLI 取证的原因",
+      "设备 CPU / 内存 / 管理接口 / 路由协议 / 日志巡检结果",
+      "是否仍处于不可达状态",
+      "建议下一步动作"
+    ]
+  },
+  "skill_name": "hillstone_device_reachability_down",
+  "version": "v6.3.0"
+}

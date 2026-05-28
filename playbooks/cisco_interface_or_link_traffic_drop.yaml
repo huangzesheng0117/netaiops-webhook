@@ -39,3 +39,25 @@ commands:
   readonly: true
 readonly_only: true
 auto_execute_allowed: true
+
+# V7_12_PROMETHEUS_FIRST_TRAFFIC_DROP BEGIN
+prometheus_evidence_first:
+  enabled: true
+  purpose: "Confirm traffic drop from Prometheus time series before device-side CLI evidence collection."
+  lookback_minutes: 15
+  step_seconds: 30
+  required_series:
+    - input_rate_bps
+    - output_rate_bps
+    - interface_speed_or_bandwidth_bps
+  judgement:
+    confirmed_drop: "Current window traffic is significantly lower than previous baseline."
+    not_confirmed: "Prometheus trend does not confirm the drop; treat as transient, recovered or monitoring artifact."
+device_evidence_after_prometheus:
+  enabled: true
+  commands:
+    - "show interface {interface_each}"
+    - "show interface {interface_each} counters errors"
+    - "show port-channel summary"
+    - "show lacp neighbor"
+# V7_12_PROMETHEUS_FIRST_TRAFFIC_DROP END

@@ -80,3 +80,22 @@ The final review should clearly show:
 - v7.9 delta recheck status and counter delta when available
 - whether the issue is still active, historical, transient, or inconclusive
 - next recommended action
+
+<!-- V7_12_TWO_SAMPLE_ERROR_DELTA BEGIN -->
+## v7.12 two-sample error-counter rule
+
+For `5m错包数-入向`, `5m错包数-出向`, `错包率-入向`, `错包率-出向`, `丢包率-入向`, and `丢包率-出向` alerts, one CLI snapshot is not enough.
+
+Required workflow:
+
+1. First sample: collect current interface counters and error counters immediately.
+2. Wait for a short interval, normally 2 to 5 minutes.
+3. Second sample: collect the same counters again.
+4. Compare sample-1 and sample-2 for CRC, input errors, output errors, input discards, and output discards.
+5. The final review must explicitly state whether the counter is still increasing.
+
+Judgement rule:
+
+- If counters are still increasing, treat the issue as active and prioritize physical-layer, optic, cable, peer-port, port-channel and line-card checks.
+- If counters are not increasing, treat it as historical, transient or recovered, and correlate with Prometheus time-window evidence.
+<!-- V7_12_TWO_SAMPLE_ERROR_DELTA END -->

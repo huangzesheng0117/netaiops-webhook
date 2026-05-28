@@ -41,3 +41,13 @@ The final review should clearly show:
 - 是否伴随 link flap / timeout / SLA 异常日志
 - 是否仍处于延迟异常、已恢复、短时抖动或证据不足
 - 建议下一步动作
+
+<!-- V7_12_PROMETHEUS_FIRST_LATENCY BEGIN -->
+## v7.12 Prometheus-first latency rule
+
+For DCI or internet line latency alerts, query Prometheus latency/IP-SLA time series first.
+
+If Prometheus does not confirm a sustained latency issue, mark the event as transient/recovered/monitoring artifact before doing deeper device-side analysis.
+
+If Prometheus confirms sustained latency, then collect device-side evidence such as IP SLA status, interface status, error counters and recent link/IP-SLA logs.
+<!-- V7_12_PROMETHEUS_FIRST_LATENCY END -->

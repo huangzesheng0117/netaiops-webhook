@@ -41,3 +41,30 @@ The final review should clearly show:
 - 是否伴随 link flap / 聚合成员变化
 - 是否仍处于异常变化状态
 - 建议下一步动作
+
+<!-- V7_12_PROMETHEUS_FIRST_TRAFFIC_ANOMALY BEGIN -->
+## v7.12 Prometheus-first traffic anomaly rule
+
+For internet/DCI line traffic spike or drop alerts, do not start from device CLI.
+
+Required workflow:
+
+1. Query Prometheus first for the affected interface and direction.
+2. Fetch each point in the recent time window, normally 5 to 15 minutes around the alert.
+3. Compare current traffic with the previous baseline.
+4. Confirm whether the spike/drop really exists.
+5. Only after Prometheus confirms the trend, collect device-side evidence:
+   - interface current rate
+   - interface bandwidth or operational speed
+   - errors/discards
+   - port-channel state
+   - link flap or traffic-related logs
+
+The final review must explicitly include:
+
+- current traffic series
+- previous baseline
+- spike/drop direction
+- whether Prometheus confirms the anomaly
+- whether device-side evidence supports a link, port-channel, provider, failover or traffic-source issue
+<!-- V7_12_PROMETHEUS_FIRST_TRAFFIC_ANOMALY END -->

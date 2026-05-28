@@ -1,12 +1,28 @@
 playbook_id: fortigate_device_reachability_down
+family: fortigate_device_reachability_down
 match:
   vendor: fortigate
   alertname_regex: '^(up)$'
+reachability_precheck:
+  required: true
+  order:
+    - local_ping_management_ip
+    - ssh_login_check
+    - readonly_health_inspection
+  stop_if_ping_failed: true
+  stop_if_ssh_failed: true
+  conclusion_if_ping_failed: "管理 IP ping 不通，优先判断 FortiGate 下电、死机、管理链路中断、HA 切换或采集路径中断。"
+  conclusion_if_ssh_failed: "管理 IP 可 ping 通但 SSH 登录失败，优先判断管理面、管理员访问策略、CPU/内存高负载、conserve mode 或 SSH 服务异常。"
 execution:
   readonly_only: true
   auto_execute_allowed: true
-  max_commands: 5
+  max_commands: 8
   commands:
     - "get system status"
     - "get system performance status"
+    - "get hardware status"
     - "get sys ha status"
+    - "get system interface physical"
+    - "get router info routing-table all"
+    - "get router info bgp summary"
+    - "get router info ospf neighbor"

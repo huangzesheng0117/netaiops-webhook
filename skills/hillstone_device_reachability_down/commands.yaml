@@ -1,0 +1,94 @@
+skill_name: hillstone_device_reachability_down
+version: v6.3.0
+family: hillstone_device_reachability_down
+risk_level: readonly
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+allowed_capabilities:
+  - local_ping_management_ip
+  - ssh_login_check
+  - show_version
+  - show_resource
+  - show_resource_history
+  - show_interface
+  - show_route
+  - show_ha
+  - show_log
+  - prometheus_range_query
+  - parse_cli_output
+platform_commands:
+  hillstone:
+    show_version:
+      template: "show version"
+      readonly: true
+    show_resource:
+      template: "show system resource"
+      readonly: true
+    show_resource_history:
+      template: "show system resource history"
+      readonly: true
+    show_interface:
+      template: "show interface"
+      readonly: true
+    show_route:
+      template: "show route"
+      readonly: true
+    show_ha:
+      template: "show ha cluster"
+      readonly: true
+    show_log:
+      template: "show log"
+      readonly: true
+  stoneos:
+    show_version:
+      template: "show version"
+      readonly: true
+    show_resource:
+      template: "show system resource"
+      readonly: true
+    show_resource_history:
+      template: "show system resource history"
+      readonly: true
+    show_interface:
+      template: "show interface"
+      readonly: true
+    show_route:
+      template: "show route"
+      readonly: true
+    show_ha:
+      template: "show ha cluster"
+      readonly: true
+    show_log:
+      template: "show log"
+      readonly: true
+
+precheck_order:
+  - local_ping_management_ip
+  - ssh_login_check
+  - readonly_health_inspection
+stop_if_ping_failed: true
+stop_if_ssh_failed: true
+command_limits:
+  max_commands_per_request: 8
+  max_extra_rounds: 0
+readonly_only: true
+forbidden_patterns:
+  - "configure"
+  - "conf t"
+  - "config"
+  - "edit"
+  - "set "
+  - "unset"
+  - "delete"
+  - "clear"
+  - "reload"
+  - "reboot"
+  - "shutdown"
+  - "debug"
+  - "save"
+  - "commit"
+  - "write"
+  - "copy"
+  - "erase"

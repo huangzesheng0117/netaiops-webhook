@@ -12,3 +12,24 @@ execution:
     - "show interface {interface_each} transceiver details"
     - "show port-channel summary"
     - "show logging | include {interface_each}|CRC|FCS|error|Error|drop|Drop|discard|Discard|LINK|flap"
+
+# V7_12_INTERFACE_ERROR_DELTA BEGIN
+delayed_second_sample:
+  enabled: true
+  purpose: "Confirm whether interface error counters are still increasing after the initial evidence collection."
+  delay_seconds: 180
+  min_delay_seconds: 120
+  max_delay_seconds: 300
+  compare_fields:
+    - CRC
+    - input_error
+    - output_error
+    - input_discard
+    - output_discard
+  commands:
+    - "show interface {interface_each}"
+    - "show interface {interface_each} counters errors"
+  judgement:
+    still_increasing: "Counters increased between sample-1 and sample-2; treat as active or ongoing physical/link-layer issue."
+    not_increasing: "Counters did not increase between sample-1 and sample-2; treat as historical, transient or recovered unless Prometheus still rises."
+# V7_12_INTERFACE_ERROR_DELTA END
