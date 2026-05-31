@@ -45,3 +45,11 @@ mcp_wrapper_stub.py
 .DS_Store
 .idea/
 .vscode/
+*.pyc
+data/raw/
+data/normalized/
+data/analysis/
+data/plans/
+data/reviews/
+data/prometheus_evidence/
+data/v8_prometheus_mcp_poc/

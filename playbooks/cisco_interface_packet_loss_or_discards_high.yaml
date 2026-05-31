@@ -1,35 +1,55 @@
 playbook_id: cisco_interface_packet_loss_or_discards_high
 match:
   vendor: cisco
-  alertname_regex: '^(丢包率-入向|丢包率-出向|错包率-入向|错包率-出向|5m错包数-入向|5m错包数-出向|端口CRC错包|接口错包|端口错包|接口错误包|接口丢包|端口丢包)$'
+  alertname_regex: ^(丢包率-入向|丢包率-出向|错包率-入向|错包率-出向|5m错包数-入向|5m错包数-出向|端口CRC错包|接口错包|端口错包|接口错误包|接口丢包|端口丢包)$
 execution:
   readonly_only: true
   auto_execute_allowed: true
   max_commands: 6
   commands:
-    - "show interface {interface_each}"
-    - "show interface {interface_each} counters errors"
-    - "show interface {interface_each} transceiver details"
-    - "show port-channel summary"
-    - "show logging | include {interface_each}|CRC|FCS|error|Error|drop|Drop|discard|Discard|LINK|flap"
-
-# V7_12_INTERFACE_ERROR_DELTA BEGIN
+  - show interface {interface_each}
+  - show interface {interface_each} counters errors
+  - show interface {interface_each} transceiver details
+  - show port-channel summary
+  - show logging | include {interface_each}|CRC|FCS|error|Error|drop|Drop|discard|Discard|LINK|flap
 delayed_second_sample:
   enabled: true
-  purpose: "Confirm whether interface error counters are still increasing after the initial evidence collection."
+  purpose: Confirm whether interface error counters are still increasing after the initial evidence collection.
   delay_seconds: 180
   min_delay_seconds: 120
   max_delay_seconds: 300
   compare_fields:
-    - CRC
-    - input_error
-    - output_error
-    - input_discard
-    - output_discard
+  - CRC
+  - input_error
+  - output_error
+  - input_discard
+  - output_discard
   commands:
-    - "show interface {interface_each}"
-    - "show interface {interface_each} counters errors"
+  - show interface {interface_each}
+  - show interface {interface_each} counters errors
   judgement:
-    still_increasing: "Counters increased between sample-1 and sample-2; treat as active or ongoing physical/link-layer issue."
-    not_increasing: "Counters did not increase between sample-1 and sample-2; treat as historical, transient or recovered unless Prometheus still rises."
-# V7_12_INTERFACE_ERROR_DELTA END
+    still_increasing: Counters increased between sample-1 and sample-2; treat as active or ongoing physical/link-layer issue.
+    not_increasing: Counters did not increase between sample-1 and sample-2; treat as historical, transient or recovered unless
+      Prometheus still rises.
+prometheus_evidence_first:
+  enabled: true
+  backend_preference: prometheus_mcp
+  fallback: http_api
+  evidence_profile: interface_errors
+  query_names:
+  - in_errors_delta
+  - out_errors_delta
+  - in_discards_delta
+  - out_discards_delta
+  lookback_minutes: 15
+  compare_offset_minutes: 5
+  step_seconds: 60
+  max_candidates_per_query: 1
+  sidecar_overall_timeout_seconds: 30
+  required_labels:
+  - device_ip
+  - if_name
+  stop_device_cli_if_not_confirmed: false
+  unavailable_policy: continue_cli_evidence
+  note: 'v8 runtime metadata: Prometheus MCP sidecar enabled; failure must not block CLI evidence.'
+  sidecar_parallel_workers: 3

@@ -831,3 +831,35 @@ if _v11n_original_build_notification_text is not None:
         text = _v11n_original_build_notification_text(payload)
         return _v11n_clean_final_text(payload, text)
 # ===== v5 notification non-traffic interface recommendation final filter end =====
+
+
+# ===== v8 prometheus notification wrapper begin =====
+# 将 plan_data.prometheus_evidence_runtime 注入通知 payload，并在最终通知文本中追加“Prometheus窗口证据”。
+# 仅当 runtime sidecar 已执行且 summary_text 可见时展示；runtime_disabled 不展示。
+try:
+    _v8_prom_original_build_notification_payload = build_notification_payload
+    _v8_prom_original_build_notification_text = build_notification_text
+
+    def build_notification_payload(request_id: str) -> Dict[str, Any]:
+        from netaiops.prometheus_notification_hooks import attach_prometheus_runtime_to_payload
+
+        payload = _v8_prom_original_build_notification_payload(request_id)
+
+        try:
+            ctx = get_full_request_context(request_id)
+            plan_data = ctx.get("plan_data") or {}
+        except Exception:
+            plan_data = {}
+
+        return attach_prometheus_runtime_to_payload(payload, plan_data)
+
+    def build_notification_text(payload: dict) -> str:
+        from netaiops.prometheus_notification_hooks import append_prometheus_runtime_to_text
+
+        text = _v8_prom_original_build_notification_text(payload)
+        return append_prometheus_runtime_to_text(text, payload)
+
+except NameError:
+    pass
+# ===== v8 prometheus notification wrapper end =====
+

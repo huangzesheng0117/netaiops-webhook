@@ -381,3 +381,43 @@ def get_latest_review() -> Dict[str, Any]:
         "review_file": str(path),
         "review_data": read_json_file(path),
     }
+
+
+# ===== v8 prometheus review wrapper begin =====
+# 将 plan_data.prometheus_evidence_runtime 附加到 review dict。
+# runtime_disabled 不展示；失败不影响原有 review 构建。
+try:
+    _v8_prom_original_generate_review_for_request_id = generate_review_for_request_id
+
+    def generate_review_for_request_id(*args, **kwargs):
+        from pathlib import Path as _Path
+        from netaiops.prometheus_review_hooks import attach_prometheus_runtime_to_review
+
+        review = _v8_prom_original_generate_review_for_request_id(*args, **kwargs)
+
+        try:
+            request_id = kwargs.get("request_id")
+            if not request_id and args:
+                request_id = args[0]
+
+            plan_data = {}
+            if request_id:
+                # 优先复用 notification_payload 的上下文加载能力。
+                try:
+                    from netaiops.notification_payload import get_full_request_context
+                    ctx = get_full_request_context(str(request_id))
+                    plan_data = ctx.get("plan_data") or {}
+                except Exception:
+                    plan_data = {}
+
+            if isinstance(review, dict):
+                review = attach_prometheus_runtime_to_review(review, plan_data)
+        except Exception:
+            return review
+
+        return review
+
+except NameError:
+    pass
+# ===== v8 prometheus review wrapper end =====
+

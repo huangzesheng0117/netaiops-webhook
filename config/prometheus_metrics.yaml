@@ -1,0 +1,101 @@
+defaults:
+  lookback_minutes: 15
+  compare_offset_minutes: 5
+  step_seconds: 60
+  timeout_seconds: 15
+  max_candidates_per_query: 1
+  sidecar_overall_timeout_seconds: 45
+  sidecar_parallel_workers: 3
+  rate_window: 1m
+profiles:
+  poc_count_up:
+    description: POC：验证 Prometheus MCP query/query_range 与窗口统计
+    queries:
+      current:
+        promql: count(up)
+        unit: count
+        direction: all
+  device_up:
+    description: 设备采集 up 状态
+    labels:
+      required_any:
+      - ip
+      - instance
+    queries:
+      current:
+        promql_candidates:
+        - up{ip="{{ device_ip }}"}
+        - up{instance="{{ device_ip }}"}
+        unit: state
+        direction: all
+  interface_traffic:
+    description: 接口入/出方向流量 bps
+    labels:
+      required:
+      - device_ip
+      - if_name
+    queries:
+      in_bps:
+        promql_candidates:
+        - rate(ifHCInOctets{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        - rate(ifInOctets{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        - rate(ifHCInOctets{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        - rate(ifInOctets{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        unit: bps
+        direction: in
+      out_bps:
+        promql_candidates:
+        - rate(ifHCOutOctets{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        - rate(ifOutOctets{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        - rate(ifHCOutOctets{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        - rate(ifOutOctets{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        unit: bps
+        direction: out
+      oper_status:
+        promql_candidates:
+        - ifOperStatus{ip="{{ device_ip }}", ifName="{{ if_name }}"}
+        - ifOperStatus{instance="{{ device_ip }}", ifName="{{ if_name }}"}
+        unit: status
+        direction: all
+  interface_errors:
+    description: 接口错误/丢弃计数 5 分钟增量
+    labels:
+      required:
+      - device_ip
+      - if_name
+    queries:
+      in_errors_delta:
+        promql_candidates:
+        - increase(ifInErrors{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+        - increase(ifInErrors{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+        unit: count
+        direction: in
+      out_errors_delta:
+        promql_candidates:
+        - increase(ifOutErrors{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+        - increase(ifOutErrors{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+        unit: count
+        direction: out
+      in_discards_delta:
+        promql_candidates:
+        - increase(ifInDiscards{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+        - increase(ifInDiscards{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+        unit: count
+        direction: in
+      out_discards_delta:
+        promql_candidates:
+        - increase(ifOutDiscards{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+        - increase(ifOutDiscards{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+        unit: count
+        direction: out
+  f5_connections:
+    description: F5 活跃连接数
+    queries:
+      current_connections:
+        promql_candidates:
+        - sysStatClientCurConns1m{ip="{{ device_ip }}"}
+        - sysStatClientCurConns1m{instance="{{ device_ip }}"}
+        - sysStatClientCurConns1m{job=~".*F5.*", ip="{{ device_ip }}"}
+        - sysStatClientCurConns1m{job=~".*F5.*", instance="{{ device_ip }}"}
+        unit: connections
+        direction: all

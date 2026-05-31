@@ -105,6 +105,32 @@ def run_pipeline_for_request_id(
     auto_dispatch: bool = True,
 ) -> Dict[str, Any]:
     plan_result = generate_plan_for_request_id(request_id)
+
+    # ===== v8 prometheus evidence sidecar begin =====
+    # 在 plan 生成后、confirm/dispatch 前执行 Prometheus Evidence 旁路取证。
+    # 失败不得阻断原有 CLI 取证链路。
+    prometheus_sidecar_result = None
+    try:
+        from netaiops.prometheus_runtime_sidecar import run_prometheus_evidence_sidecar_for_plan_result
+
+        prometheus_sidecar_result = run_prometheus_evidence_sidecar_for_plan_result(
+            request_id=request_id,
+            plan_result=plan_result,
+            write_record=True,
+            update_plan=True,
+            force=False,
+        )
+        if isinstance(prometheus_sidecar_result, dict) and isinstance(prometheus_sidecar_result.get("plan_result"), dict):
+            plan_result = prometheus_sidecar_result.get("plan_result") or plan_result
+    except Exception as _prom_exc:
+        prometheus_sidecar_result = {
+            "ok": False,
+            "skipped": False,
+            "request_id": request_id,
+            "error": f"{type(_prom_exc).__name__}: {_prom_exc}",
+        }
+    # ===== v8 prometheus evidence sidecar end =====
+
     plan_data = plan_result["plan_data"]
 
     policy_result = plan_data.get("policy_result", {}) or {}
@@ -132,6 +158,7 @@ def run_pipeline_for_request_id(
     return {
         "request_id": request_id,
         "plan_result": plan_result,
+        "prometheus_sidecar_result": prometheus_sidecar_result,
         "confirm_result": confirm_result,
         "dispatch_result": dispatch_result,
         "local_execution_result": local_execution_result,

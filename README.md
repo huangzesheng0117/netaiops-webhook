@@ -423,3 +423,24 @@ V7：Incident Memory、Relation Engine、Skill Proposal、Learning Report、Rele
 ```
 
 README 只描述当前最终能力，不保留历史建设过程中的中间实现说明。更细的版本文档和运行手册见 `docs/` 目录。
+
+## Webhook v8 Prometheus MCP
+
+v8 新增 Prometheus 历史指标证据能力，用于补齐设备 show 命令无法回答的时间窗口趋势问题。当前已支持通过 Prometheus MCP 查询接口流量类告警的历史窗口数据，并将 Prometheus窗口证据合并到 review 与咚咚通知中。
+
+当前已验证能力：
+
+- Prometheus MCP SSE 查询。
+- Prometheus HTTP API fallback。
+- Prometheus query_range 窗口取证。
+- 接口入/出方向流量趋势分析。
+- 1min PromQL 精度，匹配现网 SNMP 采集频率。
+- 流量类告警默认只查询 in_bps / out_bps，不再查询 oper_status。
+- Prometheus evidence 落盘与咚咚通知展示。
+- Alertmanager 仿真告警端到端验证。
+
+接口流量类 PromQL 示例：
+
+rate(ifHCInOctets{ip="<device_ip>", ifName="<if_name>"}[1m]) * 8
+rate(ifHCOutOctets{ip="<device_ip>", ifName="<if_name>"}[1m]) * 8
+

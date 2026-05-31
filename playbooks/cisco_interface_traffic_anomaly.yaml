@@ -1,38 +1,43 @@
 playbook_id: cisco_interface_traffic_anomaly
 match:
   vendor: cisco
-  alertname_regex: '^(互联网线路流量突增|互联网线路流量突降|互联网链路流量突增|互联网链路流量突降|.*流量突增|.*流量突降)$'
+  alertname_regex: ^(互联网线路流量突增|互联网线路流量突降|互联网链路流量突增|互联网链路流量突降|.*流量突增|.*流量突降)$
 execution:
   readonly_only: true
   auto_execute_allowed: true
   max_commands: 6
   commands:
-    - "show interface {interface_each}"
-    - "show interface {interface_each} status"
-    - "show interface {interface_each} counters errors"
-    - "show port-channel summary"
-    - "show logging | include {interface_each}|LINK|UPDOWN|flap|rate|traffic"
-
-# V7_12_PROMETHEUS_FIRST_TRAFFIC_ANOMALY BEGIN
+  - show interface {interface_each}
+  - show interface {interface_each} status
+  - show interface {interface_each} counters errors
+  - show port-channel summary
+  - show logging | include {interface_each}|LINK|UPDOWN|flap|rate|traffic
 prometheus_evidence_first:
   enabled: true
-  purpose: "Confirm traffic spike/drop from Prometheus time series before device-side CLI evidence collection."
+  backend_preference: prometheus_mcp
+  fallback: http_api
+  evidence_profile: interface_traffic
+  query_names:
+  - in_bps
+  - out_bps
   lookback_minutes: 15
-  step_seconds: 30
-  required_series:
-    - input_rate_bps
-    - output_rate_bps
-    - interface_speed_or_bandwidth_bps
-  judgement:
-    confirmed_spike: "Current window traffic is significantly higher than previous baseline."
-    confirmed_drop: "Current window traffic is significantly lower than previous baseline."
-    not_confirmed: "Prometheus trend does not confirm the spike/drop; treat as transient, recovered or monitoring artifact."
+  compare_offset_minutes: 5
+  step_seconds: 60
+  max_candidates_per_query: 1
+  sidecar_overall_timeout_seconds: 30
+  required_labels:
+  - device_ip
+  - if_name
+  stop_device_cli_if_not_confirmed: false
+  unavailable_policy: continue_cli_evidence
+  note: 'v8 runtime metadata: traffic evidence uses 1m PromQL rate window; oper_status is not queried for traffic-only alerts.'
+  sidecar_parallel_workers: 3
+  rate_window: 1m
 device_evidence_after_prometheus:
   enabled: true
   commands:
-    - "show interface {interface_each}"
-    - "show interface {interface_each} status"
-    - "show interface {interface_each} counters errors"
-    - "show port-channel summary"
-    - "show logging | include {interface_each}|LINK|UPDOWN|flap|rate|traffic"
-# V7_12_PROMETHEUS_FIRST_TRAFFIC_ANOMALY END
+  - show interface {interface_each}
+  - show interface {interface_each} status
+  - show interface {interface_each} counters errors
+  - show port-channel summary
+  - show logging | include {interface_each}|LINK|UPDOWN|flap|rate|traffic

@@ -167,18 +167,58 @@ def _build_target_scope(event: Dict[str, Any], family_result: Dict[str, Any]) ->
     device_ip = event.get("device_ip", "") or event.get("ip", "") or event.get("host_ip", "")
     alarm_type = event.get("alarm_type", "") or event.get("event_type", "")
 
+    interface = (
+        event.get("interface", "")
+        or event.get("ifName", "")
+        or event.get("if_name", "")
+        or event.get("interface_name", "")
+        or event.get("object_name", "")
+    )
+    if_alias = event.get("ifAlias", "") or event.get("if_alias", "")
+    job = event.get("job", "")
+    instance = event.get("instance", "")
+
     scope = {
         "vendor": vendor,
         "platform": platform,
         "hostname": hostname,
         "device_ip": device_ip,
         "alarm_type": alarm_type,
+        "interface": interface,
+        "if_name": interface,
+        "ifName": interface,
+        "interface_name": interface,
+        "object_name": event.get("object_name", "") or interface,
+        "ifAlias": if_alias,
+        "if_alias": if_alias,
+        "job": job,
+        "instance": instance,
+        "ip": event.get("ip", "") or device_ip,
     }
 
     family_scope = dict((family_result or {}).get("target_scope", {}) or {})
     for key, value in family_scope.items():
         if value not in (None, "", [], {}):
             scope[key] = value
+
+    # 兼容 family_scope 覆盖后仍要补齐规范别名。
+    normalized_interface = (
+        scope.get("if_name")
+        or scope.get("ifName")
+        or scope.get("interface")
+        or scope.get("interface_name")
+        or scope.get("object_name")
+        or ""
+    )
+    if normalized_interface:
+        scope["interface"] = normalized_interface
+        scope["if_name"] = normalized_interface
+        scope["ifName"] = normalized_interface
+        scope["interface_name"] = normalized_interface
+
+    if scope.get("device_ip"):
+        scope.setdefault("ip", scope.get("device_ip"))
+        scope.setdefault("instance", scope.get("device_ip"))
 
     return scope
 
@@ -438,4 +478,38 @@ try:
 except NameError:
     pass
 # ===== v5 safety policy wrapper end =====
+
+
+# ===== v8 prometheus evidence plan metadata wrapper begin =====
+# 仅将 playbook.prometheus_evidence_first 规范化写入 plan metadata。
+# 不在 plan_builder 阶段执行 Prometheus 查询，不改变原有 CLI 取证和通知流程。
+try:
+    _v8_prometheus_metadata_original_generate_plan_for_request_id = generate_plan_for_request_id
+
+    def generate_plan_for_request_id(request_id: str):
+        from pathlib import Path as _Path
+        from netaiops.prometheus_plan_hooks import apply_prometheus_evidence_metadata_to_plan as _apply_prometheus_evidence_metadata_to_plan
+
+        result = _v8_prometheus_metadata_original_generate_plan_for_request_id(request_id)
+
+        if not isinstance(result, dict):
+            return result
+
+        plan_data = result.get("plan_data")
+        plan_file = result.get("plan_file")
+
+        if not isinstance(plan_data, dict):
+            return result
+
+        plan_data = _apply_prometheus_evidence_metadata_to_plan(plan_data)
+        result["plan_data"] = plan_data
+
+        if plan_file:
+            safe_write_json(_Path(plan_file), plan_data)
+
+        return result
+
+except NameError:
+    pass
+# ===== v8 prometheus evidence plan metadata wrapper end =====
 

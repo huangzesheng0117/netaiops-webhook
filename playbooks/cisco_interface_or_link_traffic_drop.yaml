@@ -39,25 +39,31 @@ commands:
   readonly: true
 readonly_only: true
 auto_execute_allowed: true
-
-# V7_12_PROMETHEUS_FIRST_TRAFFIC_DROP BEGIN
 prometheus_evidence_first:
   enabled: true
-  purpose: "Confirm traffic drop from Prometheus time series before device-side CLI evidence collection."
+  backend_preference: prometheus_mcp
+  fallback: http_api
+  evidence_profile: interface_traffic
+  query_names:
+  - in_bps
+  - out_bps
   lookback_minutes: 15
-  step_seconds: 30
-  required_series:
-    - input_rate_bps
-    - output_rate_bps
-    - interface_speed_or_bandwidth_bps
-  judgement:
-    confirmed_drop: "Current window traffic is significantly lower than previous baseline."
-    not_confirmed: "Prometheus trend does not confirm the drop; treat as transient, recovered or monitoring artifact."
+  compare_offset_minutes: 5
+  step_seconds: 60
+  max_candidates_per_query: 1
+  sidecar_overall_timeout_seconds: 30
+  required_labels:
+  - device_ip
+  - if_name
+  stop_device_cli_if_not_confirmed: false
+  unavailable_policy: continue_cli_evidence
+  note: 'v8 runtime metadata: traffic evidence uses 1m PromQL rate window; oper_status is not queried for traffic-only alerts.'
+  sidecar_parallel_workers: 3
+  rate_window: 1m
 device_evidence_after_prometheus:
   enabled: true
   commands:
-    - "show interface {interface_each}"
-    - "show interface {interface_each} counters errors"
-    - "show port-channel summary"
-    - "show lacp neighbor"
-# V7_12_PROMETHEUS_FIRST_TRAFFIC_DROP END
+  - show interface {interface_each}
+  - show interface {interface_each} counters errors
+  - show port-channel summary
+  - show lacp neighbor
