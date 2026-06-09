@@ -1,0 +1,315 @@
+skill_name: device_disk_flash_usage_high
+version: v8.4.0-cisco-disk-flash-prometheus
+family: device_disk_flash_usage_high
+risk_level: readonly
+readonly_only: true
+default_auto_execute_command_limit: 15
+allowed_tools:
+- mcp_netmiko_run_show
+- prometheus_range_query
+- parser_parse_cli_output
+allowed_capabilities:
+- show_clock
+- show_version
+- show_boot
+- show_boot_variables
+- show_file_systems
+- dir_flash
+- dir_bootflash
+- dir_crashinfo
+- dir_stby_bootflash
+- show_install_summary
+- more_packages_conf
+- dir_image_files
+- dir_package_files
+- dir_archive_files
+- dir_showtech_files
+- dir_core_files
+- dir_capture_files
+- dir_log_files
+- show_system_cores
+- show_filesystem_logs
+- show_monitor_capture
+- show_debugging
+- show_processes_log
+- show_module
+- show_system_resources
+- prometheus_filesystem_usage_history
+profiles:
+  cisco_nxos_disk_flash_high:
+    description: Cisco NX-OS disk/bootflash high utilization first-wave profile. Readonly
+      only.
+    max_commands_per_request: 15
+    prometheus_evidence_preferred: true
+    default_commands:
+    - show clock
+    - show version
+    - show boot
+    - show boot variables
+    - 'dir bootflash:'
+    - dir bootflash:*.bin
+    - dir bootflash:*.tar
+    - dir bootflash:*.tgz
+    - dir bootflash:*.gz
+    - dir bootflash:*show*
+    - dir bootflash:*tech*
+    - dir bootflash:*core*
+    - show system cores
+    - 'dir log:'
+    - show logging last 500 | include BOOTFLASH|bootflash|DISK|disk|space|No space|filesystem|core|crash|copy|write
+    forbidden_cleanup_actions:
+    - delete bootflash:<file>
+    - delete bootflash:<directory>
+  cisco_iosxe_disk_flash_high:
+    description: Cisco IOS/IOS-XE flash high utilization first-wave profile. Readonly
+      only.
+    max_commands_per_request: 15
+    prometheus_evidence_preferred: true
+    default_commands:
+    - show clock
+    - show version
+    - show boot
+    - show running-config | include ^boot system
+    - show file systems
+    - 'dir flash:'
+    - 'dir bootflash:'
+    - 'dir crashinfo:'
+    - 'dir stby-bootflash:'
+    - show install summary
+    - more flash:packages.conf
+    - dir flash:*.bin
+    - dir flash:*.pkg
+    - show logging | include FLASH|flash|BOOTFLASH|bootflash|DISK|disk|space|No space|filesystem|crash|core|install|package
+    forbidden_cleanup_actions:
+    - delete
+    - install remove inactive
+    - request platform software package clean
+    - request platform software package clean switch all
+platform_commands:
+  cisco_nxos:
+    show_clock:
+      template: show clock
+      readonly: true
+    show_version:
+      template: show version
+      readonly: true
+    show_boot:
+      template: show boot
+      readonly: true
+    show_boot_variables:
+      template: show boot variables
+      readonly: true
+    dir_bootflash:
+      template: 'dir bootflash:'
+      readonly: true
+    dir_bootflash_bin:
+      template: dir bootflash:*.bin
+      readonly: true
+    dir_bootflash_tar:
+      template: dir bootflash:*.tar
+      readonly: true
+    dir_bootflash_tgz:
+      template: dir bootflash:*.tgz
+      readonly: true
+    dir_bootflash_gz:
+      template: dir bootflash:*.gz
+      readonly: true
+    dir_bootflash_show:
+      template: dir bootflash:*show*
+      readonly: true
+    dir_bootflash_tech:
+      template: dir bootflash:*tech*
+      readonly: true
+    dir_bootflash_core:
+      template: dir bootflash:*core*
+      readonly: true
+    show_system_cores:
+      template: show system cores
+      readonly: true
+    dir_log:
+      template: 'dir log:'
+      readonly: true
+    show_filesystem_logs:
+      template: show logging last 500 | include BOOTFLASH|bootflash|DISK|disk|space|No
+        space|filesystem|core|crash|copy|write
+      readonly: true
+    show_debugging:
+      template: show debugging
+      readonly: true
+      optional: true
+    show_processes_log:
+      template: show processes log
+      readonly: true
+      optional: true
+    show_module:
+      template: show module
+      readonly: true
+      optional: true
+    show_system_resources:
+      template: show system resources
+      readonly: true
+      optional: true
+  cisco_iosxe:
+    show_clock:
+      template: show clock
+      readonly: true
+    show_version:
+      template: show version
+      readonly: true
+    show_boot:
+      template: show boot
+      readonly: true
+    show_boot_system:
+      template: show boot system
+      readonly: true
+      optional: true
+    show_running_boot:
+      template: show running-config | include ^boot system
+      readonly: true
+    show_file_systems:
+      template: show file systems
+      readonly: true
+    dir_flash:
+      template: 'dir flash:'
+      readonly: true
+    dir_bootflash:
+      template: 'dir bootflash:'
+      readonly: true
+    dir_crashinfo:
+      template: 'dir crashinfo:'
+      readonly: true
+    dir_stby_bootflash:
+      template: 'dir stby-bootflash:'
+      readonly: true
+    dir_stby_flash:
+      template: 'dir stby-flash:'
+      readonly: true
+      optional: true
+    show_install_summary:
+      template: show install summary
+      readonly: true
+    more_packages_conf:
+      template: more flash:packages.conf
+      readonly: true
+    dir_flash_bin:
+      template: dir flash:*.bin
+      readonly: true
+    dir_flash_pkg:
+      template: dir flash:*.pkg
+      readonly: true
+    show_filesystem_logs:
+      template: show logging | include FLASH|flash|BOOTFLASH|bootflash|DISK|disk|space|No
+        space|filesystem|crash|core|install|package
+      readonly: true
+    show_monitor_capture:
+      template: show monitor capture
+      readonly: true
+      optional: true
+    show_debugging:
+      template: show debugging
+      readonly: true
+      optional: true
+  cisco_ios:
+    show_clock:
+      template: show clock
+      readonly: true
+    show_version:
+      template: show version
+      readonly: true
+    show_boot:
+      template: show boot
+      readonly: true
+    show_running_boot:
+      template: show running-config | include ^boot system
+      readonly: true
+    show_file_systems:
+      template: show file systems
+      readonly: true
+    dir_flash:
+      template: 'dir flash:'
+      readonly: true
+    dir_bootflash:
+      template: 'dir bootflash:'
+      readonly: true
+    dir_crashinfo:
+      template: 'dir crashinfo:'
+      readonly: true
+    dir_flash_bin:
+      template: dir flash:*.bin
+      readonly: true
+    show_filesystem_logs:
+      template: show logging | include FLASH|flash|BOOTFLASH|bootflash|DISK|disk|space|No
+        space|filesystem|crash|core|install|package
+      readonly: true
+    show_debugging:
+      template: show debugging
+      readonly: true
+      optional: true
+command_limits:
+  max_commands_per_request: 15
+  max_extra_rounds: 0
+  timeout_seconds_per_command: 30
+  continue_on_command_failure: true
+forbidden_patterns:
+- configure terminal
+- conf t
+- shutdown
+- no shutdown
+- clear
+- reload
+- delete
+- erase
+- debug
+- copy
+- write memory
+- install remove inactive
+- request platform software package clean
+notification_policy:
+  template: 初步判断 / 告警含义分析 / 命令执行概况 / 命令分析 / 综合执行结果判断 / 建议
+  hide_internal_orchestration: true
+  forbidden_words_in_notification:
+  - 第一批
+  - 第二批
+  - 第一波
+  - 第二波
+  - stage-1
+  - stage-2
+  command_overview: 列出成功执行命令清单和失败命令；失败命令必须单独列出。
+  analysis: 聚合 Prometheus 历史趋势、文件系统空间、启动依赖、大文件类型、core/crash、日志和文件系统异常，不逐条解释命令用途。
+commands:
+- command: show clock
+  purpose: 记录设备时间，用于和告警时间、日志时间、Prometheus 窗口对齐
+  readonly: true
+- command: show version
+  purpose: 查看平台、版本、运行镜像和 uptime，确认当前启动依赖背景
+  readonly: true
+- command: show boot
+  purpose: 查看当前 boot 变量，清理前必须确认当前启动镜像不可误删
+  readonly: true
+- command: show boot variables
+  purpose: 补充查看 boot 变量细节和双引擎/备用引擎启动上下文
+  readonly: true
+- command: 'dir bootflash:'
+  purpose: 一次性查看 bootflash 容量、剩余空间和根目录文件，后续由本地解析识别旧镜像、show-tech、core、压缩包等文件
+  readonly: true
+- command: 'dir log:'
+  purpose: 查看日志文件系统目录和空间占用
+  readonly: true
+- command: show system cores
+  purpose: 查看系统 core/crash 记录，判断是否存在可清理前需保留的故障证据
+  readonly: true
+- command: show logging last 300
+  purpose: 查看近期日志，后续由 webhook 本地解析 filesystem、space、core、copy、write 等关键字
+  readonly: true
+- command: show file systems
+  purpose: 查看设备文件系统列表和容量信息，确认 bootflash/log/crashinfo 等 filesystem 状态
+  readonly: true
+- command: show system internal flash
+  purpose: 补充查看 NX-OS flash 内部状态；如设备不支持，失败不影响主结论
+  readonly: true
+max_auto_execute_commands: 10
+notes:
+- 不要使用 dir bootflash:*.bin / *.tar / *.tgz / *show* / *core* 等通配命令，因为无匹配文件时可能被设备或
+  runner 判定为失败。
+- '通过 dir bootflash: 的完整输出在本地解析旧镜像、show-tech、core、压缩包等文件类型。'
+- 不要自动执行 delete、copy、erase、install remove inactive、package clean、clear、reload 等修改类命令。

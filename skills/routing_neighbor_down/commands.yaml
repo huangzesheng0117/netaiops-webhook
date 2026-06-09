@@ -1,136 +1,367 @@
 skill_name: routing_neighbor_down
-version: v6.3.0
+version: v8.1.0-bgp-enhanced
 family: routing_neighbor_down
 risk_level: readonly
 allowed_tools:
-  - mcp_netmiko_run_show
-  - prometheus_range_query
-  - parser_parse_cli_output
+- mcp_netmiko_run_show
+- parser_parse_cli_output
+- prometheus_range_query
 allowed_capabilities:
-  - show_bgp_summary
-  - show_bgp_sessions
-  - show_ospf_neighbor
-  - show_ospf_interface_brief
-  - show_ospf_routes
-  - show_bfd_neighbors
-  - show_bfd_neighbors_detail
-  - show_recent_routing_logs
-  - prometheus_range_query
-  - parse_cli_output
+- parse_cli_output
+- ping_peer_with_source
+- show_arp_for_peer
+- show_as_path_filter
+- show_bfd_clients
+- show_bfd_config
+- show_bfd_control_plane_redirect
+- show_bfd_neighbors
+- show_bfd_neighbors_detail
+- show_bfd_peer_detail
+- show_bgp_advertised_routes
+- show_bgp_config
+- show_bgp_feature
+- show_bgp_peer_detail
+- show_bgp_received_routes
+- show_bgp_recent_logs
+- show_bgp_summary
+- show_clock
+- show_control_plane_policy
+- show_copp_status
+- show_cpu
+- show_forwarding_route_to_peer
+- show_interface_config
+- show_interface_errors
+- show_interface_status
+- show_ip_interface_brief
+- show_isis_adjacency
+- show_isis_config
+- show_isis_interface
+- show_l3_interface
+- show_memory
+- show_optics
+- show_ospf_config
+- show_ospf_interface
+- show_ospf_neighbor
+- show_port_channel_database
+- show_port_channel_summary
+- show_prefix_list
+- show_recent_routing_logs
+- show_route_map
+- show_route_to_peer
+- show_version
+- show_vpc_brief
+- telnet_bgp_179
 platform_commands:
   cisco_nxos:
-    show_bgp_summary:
-      template: "show bgp ipv4 unicast summary"
+    show_clock:
+      template: show clock
       readonly: true
-    show_bgp_sessions:
-      template: "show bgp sessions"
+    show_features:
+      template: show feature | include bfd|bgp|ospf|isis|eigrp
       readonly: true
-    show_ospf_neighbor:
-      template: "show ip ospf neighbor"
-      readonly: true
-    show_ospf_interface_brief:
-      template: "show ip ospf interface brief"
-      readonly: true
-    show_ospf_routes:
-      template: "show ip route ospf"
+    show_bfd_clients:
+      template: show bfd clients
       readonly: true
     show_bfd_neighbors:
-      template: "show bfd neighbors"
+      template: show bfd neighbors vrf all
       readonly: true
     show_bfd_neighbors_detail:
-      template: "show bfd neighbors details"
+      template: show bfd neighbors details
+      readonly: true
+    show_bfd_peer_detail:
+      template: show bfd neighbors dest-ip {peer_ip} details
       readonly: true
     show_recent_routing_logs:
-      template: "show logging | include BGP|OSPF|BFD|neighbor|Neighbor|Established|FULL|Down"
+      template: show logging logfile | include BFD|bfd|BGP|OSPF|EIGRP|ISIS|ETHPORT|IF_DOWN|LINK|neighbor|adjacency
       readonly: true
+    show_route_to_peer:
+      template: show ip route {peer_ip} vrf {vrf}
+      readonly: true
+    show_arp_for_peer:
+      template: show ip arp vrf {vrf} {peer_ip}
+      readonly: true
+    show_l3_interface:
+      template: show ip interface {interface}
+      readonly: true
+    show_interface_status:
+      template: show interface {interface}
+      readonly: true
+      optional_followup: true
+    show_interface_errors:
+      template: show interface {interface} counters errors
+      readonly: true
+      optional_followup: true
+    show_interface_config:
+      template: show running-config interface {interface}
+      readonly: true
+      optional_followup: true
+    show_bfd_config:
+      template: show running-config | section bfd
+      readonly: true
+    show_bgp_summary:
+      template: show bgp ipv4 unicast summary vrf all
+      readonly: true
+    show_bgp_peer_detail:
+      template: show bgp ipv4 unicast neighbors {peer_ip} vrf {vrf}
+      readonly: true
+    show_bgp_config:
+      template: show running-config bgp
+      readonly: true
+    show_ospf_neighbor:
+      template: show ip ospf neighbors vrf all
+      readonly: true
+    show_ospf_interface:
+      template: show ip ospf interface {interface} vrf {vrf}
+      readonly: true
+    show_ospf_config:
+      template: show running-config ospf
+      readonly: true
+    show_isis_adjacency:
+      template: show isis adjacency
+      readonly: true
+    show_isis_interface:
+      template: show isis interface {interface}
+      readonly: true
+    show_isis_config:
+      template: show running-config isis
+      readonly: true
+    show_bfd_control_plane_redirect:
+      template: show system internal access-list sup-redirect-stats | include BFD|bfd|BFDC
+      readonly: true
+    show_control_plane_policy:
+      template: show policy-map interface control-plane
+      readonly: true
+    show_copp_status:
+      template: show copp status
+      readonly: true
+    show_optics:
+      template: show interface {interface} transceiver details
+      readonly: true
+    show_port_channel_summary:
+      template: show port-channel summary
+      readonly: true
+      optional_followup: true
+    show_port_channel_database:
+      template: show port-channel database interface {interface}
+      readonly: true
+    show_vpc_brief:
+      template: show vpc brief
+      readonly: true
+    show_version:
+      template: show version
+      readonly: true
+    show_bgp_feature:
+      template: show feature | include bgp|bfd
+      readonly: true
+    show_bgp_recent_logs:
+      template: show logging logfile | include BGP|BFD
+      readonly: true
+    show_forwarding_route_to_peer:
+      template: show forwarding route {peer_ip} vrf {vrf}
+      readonly: true
+    show_ip_interface_brief:
+      template: show ip interface brief vrf all
+      readonly: true
+    show_bgp_advertised_routes:
+      template: show bgp ipv4 unicast neighbors {peer_ip} advertised-routes vrf {vrf}
+      readonly: true
+    show_bgp_received_routes:
+      template: show bgp ipv4 unicast neighbors {peer_ip} routes vrf {vrf}
+      readonly: true
+    show_route_map:
+      template: show route-map
+      readonly: true
+    show_prefix_list:
+      template: show ip prefix-list
+      readonly: true
+    show_as_path_filter:
+      template: show ip as-path-access-list
+      readonly: true
+    show_cpu:
+      template: show processes cpu sort
+      readonly: true
+    show_memory:
+      template: show system resources
+      readonly: true
+    ping_peer_with_source:
+      template: ping {peer_ip} vrf {vrf} source {local_source_ip} count 5
+      readonly: true
+      default_auto_execute: false
+    telnet_bgp_179:
+      template: telnet {peer_ip} 179 vrf {vrf}
+      readonly: true
+      default_auto_execute: false
   cisco_iosxe:
-    show_bgp_summary:
-      template: "show bgp ipv4 unicast summary"
+    show_bfd_clients: &id001
+      template: show bfd clients
       readonly: true
-    show_bgp_sessions:
-      template: "show bgp summary"
+    show_bfd_neighbors: &id002
+      template: show bfd neighbors
       readonly: true
-    show_ospf_neighbor:
-      template: "show ip ospf neighbor"
+    show_bfd_neighbors_detail: &id003
+      template: show bfd neighbors details
       readonly: true
-    show_ospf_interface_brief:
-      template: "show ip ospf interface brief"
+    show_bfd_peer_detail: &id011
+      template: show bfd neighbors {peer_ip} details
       readonly: true
-    show_ospf_routes:
-      template: "show ip route ospf"
+    show_recent_routing_logs: &id004
+      template: show logging | include BFD|bfd|BGP|OSPF|EIGRP|ISIS|LINK|neighbor|Down
       readonly: true
-    show_bfd_neighbors:
-      template: "show bfd neighbors"
+    show_route_to_peer: &id005
+      template: show ip route {peer_ip}
       readonly: true
-    show_bfd_neighbors_detail:
-      template: "show bfd neighbors details"
+    show_l3_interface: &id012
+      template: show ip interface {interface}
       readonly: true
-    show_recent_routing_logs:
-      template: "show logging | include BGP|OSPF|BFD|neighbor|Neighbor|Established|FULL|Down"
+    show_interface_status: &id006
+      template: show interfaces {interface}
       readonly: true
+    show_interface_errors: &id007
+      template: show interfaces {interface} counters errors
+      readonly: true
+    show_interface_config: &id013
+      template: show running-config interface {interface}
+      readonly: true
+    show_bfd_config: &id008
+      template: show running-config | section bfd
+      readonly: true
+    show_bgp_summary: &id009
+      template: show ip bgp summary
+      readonly: true
+    show_bgp_config: &id014
+      template: show running-config | section router bgp
+      readonly: true
+    show_ospf_neighbor: &id010
+      template: show ip ospf neighbor
+      readonly: true
+    show_ospf_config: &id015
+      template: show running-config | section router ospf
+      readonly: true
+    show_clock: &id016
+      template: show clock
+      readonly: true
+    show_version: &id017
+      template: show version | include IOS|Version|uptime
+      readonly: true
+    show_bgp_peer_detail: &id018
+      template: show ip bgp neighbors {peer_ip}
+      readonly: true
+    show_bgp_recent_logs: &id019
+      template: show logging | include BGP|BGP-3|BGP-5|BFD|LINEPROTO|{peer_ip}
+      readonly: true
+    show_forwarding_route_to_peer: &id020
+      template: show ip cef {peer_ip}
+      readonly: true
+    show_ip_interface_brief: &id021
+      template: show ip interface brief
+      readonly: true
+    show_bgp_advertised_routes: &id022
+      template: show ip bgp neighbors {peer_ip} advertised-routes
+      readonly: true
+    show_bgp_received_routes: &id023
+      template: show ip bgp neighbors {peer_ip} routes
+      readonly: true
+    show_route_map: &id024
+      template: show route-map
+      readonly: true
+    show_prefix_list: &id025
+      template: show ip prefix-list
+      readonly: true
+    show_as_path_filter: &id026
+      template: show ip as-path-access-list
+      readonly: true
+    show_cpu: &id027
+      template: show processes cpu sorted
+      readonly: true
+    show_memory: &id028
+      template: show processes memory sorted
+      readonly: true
+    ping_peer_with_source: &id029
+      template: ping {peer_ip} source {local_source_ip} repeat 5
+      readonly: true
+      default_auto_execute: false
+    telnet_bgp_179: &id030
+      template: telnet {peer_ip} 179
+      readonly: true
+      default_auto_execute: false
   cisco_ios:
-    show_bgp_summary:
-      template: "show bgp ipv4 unicast summary"
-      readonly: true
-    show_bgp_sessions:
-      template: "show ip bgp summary"
-      readonly: true
-    show_ospf_neighbor:
-      template: "show ip ospf neighbor"
-      readonly: true
-    show_ospf_interface_brief:
-      template: "show ip ospf interface brief"
-      readonly: true
-    show_ospf_routes:
-      template: "show ip route ospf"
-      readonly: true
-    show_bfd_neighbors:
-      template: "show bfd neighbors"
-      readonly: true
-    show_bfd_neighbors_detail:
-      template: "show bfd neighbors details"
-      readonly: true
-    show_recent_routing_logs:
-      template: "show logging | include BGP|OSPF|BFD|neighbor|Neighbor|Established|FULL|Down"
-      readonly: true
-  aci:
-    show_bgp_summary:
-      template: "show bgp ipv4 unicast summary"
-      readonly: true
-    show_bgp_sessions:
-      template: "show bgp sessions"
-      readonly: true
-    show_ospf_neighbor:
-      template: "show ip ospf neighbor"
-      readonly: true
-    show_ospf_interface_brief:
-      template: "show ip ospf interface brief"
-      readonly: true
-    show_ospf_routes:
-      template: "show ip route ospf"
-      readonly: true
-    show_bfd_neighbors:
-      template: "show bfd neighbors"
-      readonly: true
-    show_bfd_neighbors_detail:
-      template: "show bfd neighbors details"
-      readonly: true
-    show_recent_routing_logs:
-      template: "show logging | include BGP|OSPF|BFD|neighbor|Neighbor|Established|FULL|Down"
-      readonly: true
+    show_bfd_clients: *id001
+    show_bfd_neighbors: *id002
+    show_bfd_neighbors_detail: *id003
+    show_recent_routing_logs: *id004
+    show_route_to_peer: *id005
+    show_interface_status: *id006
+    show_interface_errors: *id007
+    show_bfd_config: *id008
+    show_bgp_summary: *id009
+    show_ospf_neighbor: *id010
+    show_bfd_peer_detail: *id011
+    show_l3_interface: *id012
+    show_interface_config: *id013
+    show_bgp_config: *id014
+    show_ospf_config: *id015
+    show_clock: *id016
+    show_version: *id017
+    show_bgp_peer_detail: *id018
+    show_bgp_recent_logs: *id019
+    show_forwarding_route_to_peer: *id020
+    show_ip_interface_brief: *id021
+    show_bgp_advertised_routes: *id022
+    show_bgp_received_routes: *id023
+    show_route_map: *id024
+    show_prefix_list: *id025
+    show_as_path_filter: *id026
+    show_cpu: *id027
+    show_memory: *id028
+    ping_peer_with_source: *id029
+    telnet_bgp_179: *id030
 command_limits:
-  max_commands_per_request: 8
+  max_commands_per_request: 15
   max_extra_rounds: 0
+  timeout_seconds_per_command: 20
+  continue_on_command_failure: true
 readonly_only: true
 forbidden_patterns:
-  - "configure terminal"
-  - "conf t"
-  - "shutdown"
-  - "no shutdown"
-  - "clear"
-  - "reload"
-  - "write memory"
-  - "copy running-config startup-config"
-  - "delete"
-  - "erase"
-  - "debug"
+- clear
+- conf t
+- configure terminal
+- copy running-config startup-config
+- debug
+- delete
+- erase
+- no shutdown
+- reload
+- shutdown
+- write memory
+default_auto_execute_command_limit: 15
+note: Default auto-executed playbook command count must not exceed 15.
+notification_policy:
+  template: 初步判断 / 告警含义分析 / 命令执行概况 / 命令分析 / 综合执行结果判断 / 建议
+  hide_internal_orchestration: true
+  forbidden_words_in_notification:
+  - 第一批
+  - 第二批
+  - 第一波
+  - 第二波
+  - stage-1
+  - stage-2
+  command_overview: 列出成功执行命令清单和失败命令；失败命令必须单独列出。
+  analysis: 少解释命令用途，多聚合命令结果，重点输出判断依据和当前不能判断的边界。
+profiles:
+  bgp_neighbor_down:
+    description: BGP neighbor abnormal profile. Physical interface checks are excluded.
+    max_commands_per_request: 15
+    physical_interface_checks: false
+    default_commands:
+    - show clock
+    - show version
+    - show feature | include bgp|bfd
+    - show bgp ipv4 unicast summary vrf all
+    - show bgp ipv4 unicast neighbors {peer_ip} vrf {vrf}
+    - show logging logfile | include BGP|BFD
+    - show running-config bgp
+    - show ip route {peer_ip} vrf {vrf}
+    - show forwarding route {peer_ip} vrf {vrf}
+    - show bfd neighbors details
+    - show bgp ipv4 unicast neighbors {peer_ip} advertised-routes vrf {vrf}
+    - show bgp ipv4 unicast neighbors {peer_ip} routes vrf {vrf}

@@ -1,0 +1,203 @@
+playbook_id: cisco_device_memory_utilization_high
+match:
+  vendor: cisco
+  alertname_regex: ^(Cisco设备内存利用率异常|Cisco设备内存高|Cisco Memory High|Cisco Memory Utilization High|Device Memory High|device_memory_utilization_high|cisco_device_memory_utilization_high|memory_high)$
+family: device_memory_utilization_high
+skill_name: device_memory_utilization_high
+description: Cisco device memory high utilization readonly investigation playbook with Prometheus memory history evidence.
+readonly_only: true
+auto_execute_allowed: true
+default_command_scope: cisco_nxos_memory_first_wave_15_commands
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 15
+  commands: &id001
+  - show clock
+  - show version
+  - show system resources
+  - show processes memory
+  - show system internal processes memory
+  - show system internal kernel meminfo
+  - show system internal kernel memory global
+  - show system internal memory-alerts-log
+  - show logging last 500
+  - show system cores
+  - show processes log
+  - show ip route summary vrf all
+  - show ip arp summary vrf all
+  - show mac address-table count
+  - show snmp
+commands:
+- order: 1
+  command: show clock
+  reason: record device time for alert, log and Prometheus correlation
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 2
+  command: show version
+  reason: check model, NX-OS version, uptime and image context
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 3
+  command: show system resources
+  reason: check overall CPU, process count, memory usage and memory status
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 4
+  command: show processes memory
+  reason: check NX-OS process memory allocation and memory limit pressure
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 5
+  command: show system internal processes memory
+  reason: check process RSS to identify real resident memory consumers
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 6
+  command: show system internal kernel meminfo
+  reason: distinguish MemFree, Cached, Available, Slab and Mapped memory
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 7
+  command: show system internal kernel memory global
+  reason: distinguish Kernel/App memory and RAM FS memory
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 8
+  command: show system internal memory-alerts-log
+  reason: check platform memory alert history
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 9
+  command: show logging last 500
+  reason: collect recent logs for OOM, low memory, core, crash, restart and sysmgr events; parse locally
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 10
+  command: show system cores
+  reason: check recent core files and process crash evidence
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 11
+  command: show processes log
+  reason: check process restart or abnormal exit evidence
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 12
+  command: show ip route summary vrf all
+  reason: check route scale across VRFs without assuming BGP is enabled
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 13
+  command: show ip arp summary vrf all
+  reason: check ARP scale across VRFs
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 14
+  command: show mac address-table count
+  reason: check MAC table scale
+  risk: low
+  readonly: true
+  timeout_sec: 35
+- order: 15
+  command: show snmp
+  reason: check SNMP management-plane pressure and authentication failures
+  risk: low
+  readonly: true
+  timeout_sec: 35
+platform_profiles:
+  cisco_nxos: *id001
+  cisco_iosxe:
+  - show clock
+  - show version
+  - show memory
+  - show memory statistics
+  - show processes memory sorted
+  - show processes memory detailed sorted
+  - show platform software status control-processor brief
+  - show processes memory platform sorted
+  - show processes memory platform accounting
+  - show memory statistics history table
+  - show memory failures alloc
+  - show logging | include MEMORY|Memory|MALLOC|malloc|MALLOCFAIL|LOWMEM|Low memory|No memory|SYS-2-MALLOCFAIL|crash|core|restart|OOM|watchdog
+  - show ip route summary
+  - show ip arp summary
+  - show snmp
+  cisco_ios:
+  - show clock
+  - show version
+  - show memory
+  - show memory statistics
+  - show processes memory sorted
+  - show processes memory detailed sorted
+  - show memory statistics history table
+  - show memory failures alloc
+  - show memory processor fragment
+  - show logging | include MEMORY|Memory|MALLOC|malloc|MALLOCFAIL|LOWMEM|Low memory|No memory|SYS-2-MALLOCFAIL|crash|core|restart|OOM|watchdog
+  - show ip route summary
+  - show ip arp summary
+  - show mac address-table count
+  - show users
+  - show snmp
+prometheus_evidence_first:
+  enabled: true
+  backend_preference: prometheus_mcp
+  fallback: http_api
+  evidence_profile: device_memory_usage
+  query_names:
+  - memory_usage_percent
+  lookback_minutes: 60
+  compare_offset_minutes: 15
+  step_seconds: 60
+  sidecar_overall_timeout_seconds: 30
+  max_candidates_per_query: 8
+  required_labels:
+  - device_ip
+  unavailable_policy: continue_cli_evidence
+  stop_device_cli_if_not_confirmed: false
+  sidecar_parallel_workers: 2
+  note: Memory high alerts should use Prometheus history when available. Prometheus unavailable must not block CLI evidence. Nexus memory high must distinguish used memory from available/cache.
+analysis_policy:
+  max_auto_execute_commands: 15
+  notification_template: 统一咚咚模板：初步判断、告警含义分析、命令执行概况、命令分析、综合执行结果判断、建议。
+  command_overview_policy: 命令执行概况列出成功执行命令清单和失败命令；失败命令必须单独列出。
+  analysis_language_policy: 不要逐条解释命令用途；命令分析应聚合 Prometheus 历史趋势、总体内存、进程 RSS、cache/available、kernel/RAM FS、内存告警、core/crash/restart、表项规模、SNMP/管理面等证据。
+  primary_judgement_flow:
+  - 先用 Prometheus 历史窗口判断内存是瞬时峰值、周期性峰值、持续增长、持续高位还是当前已恢复。
+  - NX-OS 必须区分 used 高和 available/cache 是否仍充足，避免把 page cache 误判为真实故障。
+  - 再用 CLI 判断当前 memory status、free/available、cache、kernel/slab/RAM FS、进程 RSS 是否异常。
+  - 再判断是否存在低内存故障证据：MALLOCFAIL、Low memory、No memory、OOM、core、crash、sysmgr restart、watchdog。
+  - 再判断是否为进程型问题：snmpd/SNMP、ARP/netstack、syslogd、vPC/lacp/ethpm、urib/ipfib/l2rib、iosd 等。
+  - 再判断是否为表项规模问题：路由表、ARP 表、MAC 表异常增长。
+  - 第一批不默认展开 BGP/OSPF/ISIS 细节；只有进程或表项证据指向对应协议后，第二阶段再补协议专项命令。
+  - 最终结论必须说明当前证据边界：Prometheus 是否有历史数据、CLI 是否有失败命令、是否能区分 cache 和真实内存紧张。
+  second_stage_policy:
+    bgp: 仅当 bgp/BGP Router/urib/ipfib 等进程或路由规模异常时，再进入 BGP 专项取证。
+    ospf_isis: 仅当 ospf/isis 进程、邻接或数据库规模异常时，再进入 IGP 专项取证。
+    snmp: 当 snmpd/SNMP ENGINE 高或 show snmp 显示请求/认证失败异常时，进入 SNMP 专项分析。
+    arp_mac: 当 ARP/MAC 表项异常增长或快速变化时，进入二层/网关规模专项分析。
+    ha_stack: 当 active/standby 或堆叠成员状态不一致时，再补 HA/Stack 成员级资源取证。
+  failure_policy: 任何单条只读命令失败时不得阻断后续命令；最终结论中只列失败命令及影响。
+  forbidden_actions:
+  - clear
+  - reload
+  - debug
+  - configure
+  - process restart
+  - write memory
+  - delete
+  - copy

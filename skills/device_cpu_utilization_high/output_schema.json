@@ -1,0 +1,41 @@
+{
+  "skill_name": "device_cpu_utilization_high",
+  "version": "v8.3.0-cisco-cpu-prometheus",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "prometheus_cpu_evidence": {
+      "type": "object"
+    },
+    "cpu_current": {
+      "type": "object"
+    },
+    "cpu_history": {
+      "type": "object"
+    },
+    "top_processes": {
+      "type": "array"
+    },
+    "top_memory_processes": {
+      "type": "array"
+    },
+    "logs": {
+      "type": "array"
+    },
+    "control_plane": {
+      "type": "object"
+    },
+    "snmp": {
+      "type": "object"
+    },
+    "protocols": {
+      "type": "object"
+    },
+    "judgement": {
+      "type": "string"
+    },
+    "recommendations": {
+      "type": "array"
+    }
+  }
+}

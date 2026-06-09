@@ -161,39 +161,56 @@ def normalize_execution_candidates(command_plan: list, suggested_commands: list)
 
 
 def _build_target_scope(event: Dict[str, Any], family_result: Dict[str, Any]) -> Dict[str, Any]:
-    vendor = event.get("vendor", "")
-    platform = event.get("platform", "")
-    hostname = event.get("hostname", "")
-    device_ip = event.get("device_ip", "") or event.get("ip", "") or event.get("host_ip", "")
-    alarm_type = event.get("alarm_type", "") or event.get("event_type", "")
+    labels = event.get("labels") or {}
+    if not isinstance(labels, dict):
+        labels = {}
 
-    interface = (
-        event.get("interface", "")
-        or event.get("ifName", "")
-        or event.get("if_name", "")
-        or event.get("interface_name", "")
-        or event.get("object_name", "")
-    )
-    if_alias = event.get("ifAlias", "") or event.get("if_alias", "")
-    job = event.get("job", "")
-    instance = event.get("instance", "")
+    def pick(*keys: str) -> str:
+        for key in keys:
+            value = event.get(key)
+            if value not in (None, "", [], {}):
+                return str(value).strip()
+            value = labels.get(key)
+            if value not in (None, "", [], {}):
+                return str(value).strip()
+        return ""
+
+    vendor = pick("vendor")
+    platform = pick("platform")
+    hostname = pick("hostname", "sysName", "device_name", "host")
+    device_ip = pick("device_ip", "ip", "host_ip", "instance")
+    alarm_type = pick("alarm_type", "event_type", "alertname")
+
+    interface = pick("interface", "ifName", "if_name", "interface_name")
+    object_name = pick("object_name")
+    if object_name and not interface and (object_name.lower().startswith(("eth", "gi", "te", "po", "vlan", "loop", "ethernet"))):
+        interface = object_name
+
+    peer_ip = pick("peer_ip", "neighbor_ip", "neighbor_id", "remote_ip", "remote_peer")
+    vrf = pick("vrf", "vrf_name")
+    protocol = pick("protocol")
 
     scope = {
         "vendor": vendor,
         "platform": platform,
-        "hostname": hostname,
+        "hostname": hostname or device_ip,
         "device_ip": device_ip,
         "alarm_type": alarm_type,
         "interface": interface,
         "if_name": interface,
         "ifName": interface,
         "interface_name": interface,
-        "object_name": event.get("object_name", "") or interface,
-        "ifAlias": if_alias,
-        "if_alias": if_alias,
-        "job": job,
-        "instance": instance,
-        "ip": event.get("ip", "") or device_ip,
+        "object_name": object_name or interface or peer_ip,
+        "ifAlias": pick("ifAlias", "if_alias"),
+        "if_alias": pick("ifAlias", "if_alias"),
+        "job": pick("job"),
+        "instance": pick("instance") or device_ip,
+        "ip": pick("ip") or device_ip,
+        "peer_ip": peer_ip,
+        "neighbor_ip": peer_ip,
+        "neighbor_id": peer_ip,
+        "vrf": vrf or "default",
+        "protocol": protocol,
     }
 
     family_scope = dict((family_result or {}).get("target_scope", {}) or {})
@@ -201,13 +218,11 @@ def _build_target_scope(event: Dict[str, Any], family_result: Dict[str, Any]) ->
         if value not in (None, "", [], {}):
             scope[key] = value
 
-    # 兼容 family_scope 覆盖后仍要补齐规范别名。
     normalized_interface = (
         scope.get("if_name")
         or scope.get("ifName")
         or scope.get("interface")
         or scope.get("interface_name")
-        or scope.get("object_name")
         or ""
     )
     if normalized_interface:
@@ -215,6 +230,20 @@ def _build_target_scope(event: Dict[str, Any], family_result: Dict[str, Any]) ->
         scope["if_name"] = normalized_interface
         scope["ifName"] = normalized_interface
         scope["interface_name"] = normalized_interface
+
+    normalized_peer = (
+        scope.get("peer_ip")
+        or scope.get("neighbor_ip")
+        or scope.get("neighbor_id")
+        or ""
+    )
+    if normalized_peer:
+        scope["peer_ip"] = normalized_peer
+        scope["neighbor_ip"] = normalized_peer
+        scope["neighbor_id"] = normalized_peer
+
+    if not scope.get("vrf"):
+        scope["vrf"] = "default"
 
     if scope.get("device_ip"):
         scope.setdefault("ip", scope.get("device_ip"))
@@ -513,3 +542,75 @@ except NameError:
     pass
 # ===== v8 prometheus evidence plan metadata wrapper end =====
 
+
+# ===== BGP placeholder render override begin =====
+# 兜底处理 playbook 命令中的 {peer_ip}/{vrf}/{interface} 等变量，避免进入执行面时仍保留占位符。
+def _v8_render_command_placeholders(text, scope):
+    if not isinstance(text, str):
+        return text
+    scope = scope or {}
+
+    def get_any(*keys):
+        for k in keys:
+            v = scope.get(k)
+            if v not in (None, "", [], {}):
+                return str(v)
+        return ""
+
+    mapping = {
+        "peer_ip": get_any("peer_ip", "neighbor_ip", "neighbor_id", "remote_ip"),
+        "neighbor_ip": get_any("neighbor_ip", "peer_ip", "neighbor_id", "remote_ip"),
+        "neighbor_id": get_any("neighbor_id", "peer_ip", "neighbor_ip", "remote_ip"),
+        "vrf": get_any("vrf", "vrf_name") or "default",
+        "interface": get_any("interface", "ifName", "if_name", "interface_name"),
+        "ifName": get_any("ifName", "interface", "if_name", "interface_name"),
+        "if_name": get_any("if_name", "interface", "ifName", "interface_name"),
+        "device_ip": get_any("device_ip", "ip", "instance"),
+        "hostname": get_any("hostname", "sysName", "device_name"),
+        "ip": get_any("ip", "device_ip", "instance"),
+        "instance": get_any("instance", "device_ip", "ip"),
+        "object_name": get_any("object_name", "interface", "ifName", "peer_ip"),
+        "local_source_ip": get_any("local_source_ip", "source_ip", "ip", "device_ip"),
+    }
+
+    out = text
+    for k, v in mapping.items():
+        out = out.replace("{" + k + "}", v)
+    return out
+
+
+def _v8_postprocess_plan_placeholders(plan_result):
+    try:
+        plan = plan_result.get("plan_data") if isinstance(plan_result, dict) else None
+        if not isinstance(plan, dict):
+            plan = plan_result if isinstance(plan_result, dict) else None
+        if not isinstance(plan, dict):
+            return plan_result
+
+        scope = plan.get("target_scope") or {}
+
+        for item in plan.get("execution_candidates") or []:
+            if isinstance(item, dict) and "command" in item:
+                item["command"] = _v8_render_command_placeholders(item.get("command"), scope)
+
+        runtime = plan.get("playbook_runtime") or {}
+        exe = runtime.get("execution") or {}
+        cmds = exe.get("commands")
+        if isinstance(cmds, list):
+            exe["commands"] = [_v8_render_command_placeholders(x, scope) for x in cmds]
+
+        if isinstance(plan_result, dict) and isinstance(plan_result.get("plan_data"), dict):
+            plan_result["plan_data"] = plan
+        return plan_result
+    except Exception:
+        return plan_result
+
+
+try:
+    _v8_original_generate_plan_for_request_id = generate_plan_for_request_id
+
+    def generate_plan_for_request_id(*args, **kwargs):
+        return _v8_postprocess_plan_placeholders(_v8_original_generate_plan_for_request_id(*args, **kwargs))
+except Exception:
+    pass
+# ===== BGP placeholder render override end =====

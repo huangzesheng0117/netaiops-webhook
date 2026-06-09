@@ -142,3 +142,22 @@ def handle_execution_result_callback(request_id: str, payload: Dict[str, Any]) -
         "execution_file": execution_file,
         "execution_data": execution_data,
     }
+
+# ===== log command false hard-error callback guard begin =====
+# 兜底保护：无论哪个 API 调用 save_callback_payload，都先修正 show logging/display log
+# 日志正文中的历史错误关键字误判，避免 failed 状态进入 execution.json / review.json。
+try:
+    from netaiops.log_command_hard_error_normalizer import normalize_log_command_false_hard_errors as _normalize_log_cmd_false_hard_errors
+
+    _original_save_callback_payload = save_callback_payload
+
+    def save_callback_payload(request_id: str, payload: dict) -> str:
+        try:
+            payload = _normalize_log_cmd_false_hard_errors(payload)
+        except Exception:
+            pass
+        return _original_save_callback_payload(request_id, payload)
+
+except Exception:
+    pass
+# ===== log command false hard-error callback guard end =====

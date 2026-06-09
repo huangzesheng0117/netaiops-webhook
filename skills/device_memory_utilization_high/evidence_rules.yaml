@@ -1,0 +1,89 @@
+skill_name: device_memory_utilization_high
+version: v8.4.0-cisco-memory-prometheus
+family: device_memory_utilization_high
+required_facts:
+- hostname
+- device_ip
+- mcp_commands
+preferred_facts:
+- prometheus_memory_window
+- memory_usage_current
+- memory_usage_avg
+- memory_usage_max
+- memory_usage_trend
+- nxos_memory_status
+- nxos_available_memory
+- nxos_cached_memory
+- nxos_slab_memory
+- nxos_ramfs_memory
+- top_memory_processes
+- process_rss_high
+- memory_alerts_log
+- core_files
+- process_restart_logs
+- mallocfail_logs
+- oom_logs
+- route_table_scale
+- arp_table_scale
+- mac_table_scale
+- snmp_pressure
+- snmp_auth_failures
+- management_session_pressure
+- ha_or_standby_signal
+status_rules:
+  prometheus_sustained_high:
+    condition: Prometheus memory usage remains high through the window
+    severity: warning
+    message: Memory high appears sustained in the historical monitoring window.
+  prometheus_growing:
+    condition: Prometheus memory usage keeps increasing in the window
+    severity: warning
+    message: Memory usage is increasing; check leak, table growth, SNMP walk, logs and process RSS.
+  prometheus_unavailable:
+    condition: Prometheus memory metric unavailable or no data
+    severity: info
+    message: Prometheus memory history unavailable; CLI evidence is authoritative.
+  nxos_cache_not_fault:
+    condition: NX-OS used memory high but available/cache remains sufficient and memory status OK
+    severity: info
+    message: High used memory may be Linux page cache rather than real memory pressure.
+  nxos_available_low:
+    condition: NX-OS available memory is low or memory status is warning/critical
+    severity: warning
+    message: Available memory is low; memory pressure may be real.
+  process_memory_high:
+    condition: One or more processes show high memory or RSS
+    severity: warning
+    message: Process-level memory pressure found; correlate with process type and related feature.
+  memory_leak_suspected:
+    condition: Same process RSS/diff bytes/diff calls keeps increasing
+    severity: warning
+    message: Sustained process growth suggests possible leak or unbounded object growth.
+  table_scale_high:
+    condition: route/ARP/MAC scale is abnormal or increasing
+    severity: warning
+    message: Memory high may be scale-related rather than leak.
+  low_memory_fault:
+    condition: MALLOCFAIL, Low memory, No memory, OOM, watchdog, core or process restart is observed
+    severity: critical
+    message: Memory issue has fault symptoms and may affect device stability.
+  snmp_management_pressure:
+    condition: SNMP process high or SNMP input/auth failure abnormal
+    severity: warning
+    message: SNMP polling or authentication failures may contribute to memory/control-plane pressure.
+manual_review_conditions:
+- Prometheus memory query returned no data
+- NX-OS memory used high but available/cache cannot be parsed
+- show logging command returns many historical error logs
+- platform internal commands unsupported
+- memory alert or OOM/core/restart exists
+- single process RSS or diff bytes grows across samples
+- active/standby or stack member memory status inconsistent
+- route/ARP/MAC table scale abnormal
+human_readable_analysis_flow:
+- 先看 Prometheus 内存历史窗口，判断内存高是瞬时、周期性、持续高位、持续增长还是已恢复。
+- 再看设备当前总体内存：IOS/IOS-XE 关注 memory pool、free、lowest、largest；NX-OS 关注 memory status、available、cache、slab、RAM FS。
+- 再看进程内存：IOS 进程、IOS-XE platform 进程、NX-OS RSS，识别 snmpd/SNMP、ARP/netstack、syslogd、vPC/lacp/ethpm、urib/ipfib/l2rib、iosd 等方向。
+- 再看故障症状：MALLOCFAIL、Low memory、No memory、OOM、core、crash、restart、watchdog、memory alert。
+- 再看规模因素：路由表、ARP、MAC 表是否异常增长。
+- 最后给出结论边界：是否有历史趋势、是否像 cache/误判、是否像泄露、是否已有稳定性影响、是否需要第二阶段协议或功能专项取证。

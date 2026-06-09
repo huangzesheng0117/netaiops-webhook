@@ -130,6 +130,20 @@ def run_pipeline_for_request_id(
             "error": f"{type(_prom_exc).__name__}: {_prom_exc}",
         }
     # ===== v8 prometheus evidence sidecar end =====
+    # ===== Disk/Flash safe dir readonly override begin =====
+    # Disk/Flash playbook 需要使用 dir bootflash:/log:/crashinfo: 等只读目录查看命令。
+    # 这些命令在部分旧安全前缀规则中会被误判为 command_prefix_not_allowed，
+    # 导致 plan_not_readonly_only / guard_not_all_readonly / unsafe_candidate，
+    # 从而阻断 confirm/dispatch/review/notify。这里只针对 Disk/Flash playbook
+    # 且只针对安全 dir 目录查看命令做只读覆盖，不放开 delete/copy/clear/reload 等危险命令。
+    try:
+        from netaiops.disk_flash_dir_safety_patch import apply_disk_flash_dir_safety_override_to_plan_result
+        plan_result = apply_disk_flash_dir_safety_override_to_plan_result(plan_result)
+    except Exception:
+        pass
+    plan_data = (plan_result or {}).get("plan_data") or {}
+    # ===== Disk/Flash safe dir readonly override end =====
+
 
     plan_data = plan_result["plan_data"]
 

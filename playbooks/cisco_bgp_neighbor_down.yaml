@@ -1,13 +1,128 @@
 playbook_id: cisco_bgp_neighbor_down
 match:
   vendor: cisco
-  alertname_regex: "^(BGP邻居状态|BGP邻居异常|BGP Peer Down)$"
+  alertname_regex: ^(BGP邻居状态|BGP邻居异常|BGP Neighbor Down|BGP Peer Down|bgp_neighbor_down|cisco_bgp_neighbor_down)$
+family: routing_neighbor_down
+skill_name: routing_neighbor_down
+description: Cisco BGP neighbor abnormal readonly investigation playbook. Physical interface checks are intentionally excluded.
+readonly_only: true
+auto_execute_allowed: true
+default_command_scope: bgp_neighbor_protocol_first
 execution:
   readonly_only: true
   auto_execute_allowed: true
-  max_commands: 6
+  max_commands: 12
   commands:
-    - "show bgp ipv4 unicast summary"
-    - "show bgp summary"
-    - "show bgp sessions"
-    - "show logging | include BGP|bgp|neighbor|Neighbor|Established|Idle|Active"
+  - show clock
+  - show version
+  - show feature | include bgp|bfd
+  - show bgp ipv4 unicast summary vrf all
+  - show bgp ipv4 unicast neighbors {peer_ip} vrf {vrf}
+  - show logging logfile | include BGP|BFD
+  - show running-config bgp
+  - show ip route {peer_ip} vrf {vrf}
+  - show forwarding route {peer_ip} vrf {vrf}
+  - show bfd neighbors details
+  - show bgp ipv4 unicast neighbors {peer_ip} advertised-routes vrf {vrf}
+  - show bgp ipv4 unicast neighbors {peer_ip} routes vrf {vrf}
+commands:
+- order: 1
+  command: show clock
+  reason: record device time for log and alert correlation
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 2
+  command: show version
+  reason: check platform, software version and uptime
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 3
+  command: show feature | include bgp|bfd
+  reason: confirm BGP and BFD feature state
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 4
+  command: show bgp ipv4 unicast summary vrf all
+  reason: check BGP neighbor state and received prefix count
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 5
+  command: show bgp ipv4 unicast neighbors {peer_ip} vrf {vrf}
+  reason: check specific BGP peer state, last reset reason, timers and counters
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 6
+  command: show logging logfile | include BGP|BFD
+  reason: correlate BGP and BFD logs around the alert time
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 7
+  command: show running-config bgp
+  reason: check BGP configuration
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 8
+  command: show ip route {peer_ip} vrf {vrf}
+  reason: check RIB path to BGP peer
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 9
+  command: show forwarding route {peer_ip} vrf {vrf}
+  reason: check FIB path to BGP peer
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 10
+  command: show bfd neighbors details
+  reason: check whether BFD triggered BGP down
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 11
+  command: show bgp ipv4 unicast neighbors {peer_ip} advertised-routes vrf {vrf}
+  reason: check routes advertised to the peer
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 12
+  command: show bgp ipv4 unicast neighbors {peer_ip} routes vrf {vrf}
+  reason: check routes accepted from the peer
+  risk: low
+  readonly: true
+  timeout_sec: 30
+analysis_policy:
+  max_auto_execute_commands: 15
+  notification_template: 初步判断、告警含义分析、命令执行概况、命令分析、综合执行结果判断、建议。
+  command_overview_policy: 命令执行概况列出成功执行命令清单和失败命令；失败命令必须单独列出。
+  analysis_language_policy: 不要逐条解释命令用途；命令分析应聚合命令结果，重点输出 BGP 状态、reset 原因、配置、RIB/FIB、BFD 和收发路由等判断依据。
+  physical_interface_policy: BGP playbook 不做物理接口取证；物理接口问题由物理接口故障类告警处理。
+  internal_orchestration_visibility: 咚咚通知中不要出现第一批、第二批、第一波、第二波等内部编排词。
+  primary判断顺序:
+  - 先判断 BGP summary 和 peer detail 中的邻居状态、Up/Down、Prefix、Last reset、Notification。
+  - 再结合 BGP/BFD 日志判断是否存在 hold timer expired、BFD adjacency down、wrong AS、maximum-prefix exceeded 或对端 reset。
+  - 再核对 running-config bgp 中的 remote-as、update-source、ebgp-multihop、password、address-family、route-map、maximum-prefix、BFD 和 shutdown。
+  - 再确认到 peer_ip 的 RIB/FIB 是否存在、是否递归、是否 unresolved/drop/glean。
+  - 再结合 BFD detail 判断 BGP down 是否由 BFD 触发。
+  - 再结合 advertised-routes / routes 判断是否存在收发路由异常或策略过滤。
+  - 如需判断物理链路、接口错误包、端口聚合或光模块状态，应交由物理接口故障类告警或单独接口 playbook 处理。
+  failure_policy: 任何单条只读命令失败时不得阻断后续命令，最终结论中只列失败命令及影响。
+  must_not_use_unrelated_family_text:
+  - 光功率
+  - 光模块
+  - transceiver
+  - 端口物理接口故障
+extended_command_note: Ping with source, telnet TCP/179, route-map/prefix-list/as-path, CPU/memory and per-prefix RIB/FIB checks are second-wave or manual checks. They are documented
+  in skills/routing_neighbor_down/commands.yaml but are not included in the default auto-executed first wave.
+internal_orchestration_note: The playbook may internally use peer/vrf discovery and optional interface follow-up, but DingTalk notification must present a unified analysis and must not
+  expose batch/stage wording.
+physical_interface_policy:
+  enabled: false
+  reason: Physical interface failures are handled by dedicated physical-interface alert categories.

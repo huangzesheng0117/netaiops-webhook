@@ -99,3 +99,48 @@ profiles:
         - sysStatClientCurConns1m{job=~".*F5.*", instance="{{ device_ip }}"}
         unit: connections
         direction: all
+  device_cpu_utilization:
+    description: Cisco device CPU utilization historical evidence. Current VictoriaMetrics only has cpmCPUTotal1minRev for device CPU utilization.
+    queries:
+      cpu_1min:
+        description: Cisco CPU 1 minute utilization from CISCO-PROCESS-MIB cpmCPUTotal1minRev.
+        unit: percent
+        promql_candidates:
+        - avg(cpmCPUTotal1minRev{ip="{{device_ip}}"})
+        - avg(cpmCPUTotal1minRev{instance="{{device_ip}}"})
+        - avg(cpmCPUTotal1minRev{instance=~"{{device_ip}}(:[0-9]+)?"})
+  device_filesystem_usage:
+    description: Cisco device filesystem / Flash / bootflash historical usage evidence.
+    queries:
+      filesystem_usage_percent:
+        description: Filesystem usage percent from HOST-RESOURCES-MIB hrStorage or CISCO-FLASH-MIB partition metrics.
+        unit: percent
+        promql_candidates:
+        - 100 * avg by (ip, hrStorageDescr) (hrStorageUsed{ip="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"}) / avg by (ip, hrStorageDescr) (hrStorageSize{ip="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"})
+        - 100 * avg by (instance, hrStorageDescr) (hrStorageUsed{instance="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"}) / avg by (instance, hrStorageDescr) (hrStorageSize{instance="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"})
+        - 100 * (1 - (ciscoFlashPartitionFreeSpace{ip="{{device_ip}}"} / ciscoFlashPartitionSize{ip="{{device_ip}}"}))
+        - 100 * (1 - (ciscoFlashPartitionFreeSpace{instance="{{device_ip}}"} / ciscoFlashPartitionSize{instance="{{device_ip}}"}))
+  device_memory_usage:
+    description: Cisco device memory historical usage evidence.
+    queries:
+      memory_usage_percent:
+        description: Device memory usage percent from Cisco cseSysMemoryUtilization, cpmCPUMemoryUsed/Free, Cisco memory pool, HOST-RESOURCES-MIB, or generic memory metrics.
+        unit: percent
+        promql_candidates:
+        - avg by (ip) (cseSysMemoryUtilization{ip="{{device_ip}}"})
+        - avg by (instance) (cseSysMemoryUtilization{instance="{{device_ip}}"})
+        - avg by (instance) (cseSysMemoryUtilization{instance=~"{{device_ip}}(:.*)?"})
+        - 100 * avg by (ip) (cpmCPUMemoryUsed{ip="{{device_ip}}"}) / (avg by (ip) (cpmCPUMemoryUsed{ip="{{device_ip}}"}) + avg by (ip) (cpmCPUMemoryFree{ip="{{device_ip}}"}) )
+        - 100 * avg by (instance) (cpmCPUMemoryUsed{instance="{{device_ip}}"}) / (avg by (instance) (cpmCPUMemoryUsed{instance="{{device_ip}}"}) + avg by (instance) (cpmCPUMemoryFree{instance="{{device_ip}}"}) )
+        - 100 * avg by (instance) (cpmCPUMemoryUsed{instance=~"{{device_ip}}(:.*)?"}) / (avg by (instance) (cpmCPUMemoryUsed{instance=~"{{device_ip}}(:.*)?"}) + avg by (instance) (cpmCPUMemoryFree{instance=~"{{device_ip}}(:.*)?"})
+          )
+        - 100 * avg by (ip, ciscoMemoryPoolName) (ciscoMemoryPoolUsed{ip="{{device_ip}}"}) / (avg by (ip, ciscoMemoryPoolName) (ciscoMemoryPoolUsed{ip="{{device_ip}}"}) + avg by (ip, ciscoMemoryPoolName) (ciscoMemoryPoolFree{ip="{{device_ip}}"})
+          )
+        - 100 * avg by (instance, ciscoMemoryPoolName) (ciscoMemoryPoolUsed{instance="{{device_ip}}"}) / (avg by (instance, ciscoMemoryPoolName) (ciscoMemoryPoolUsed{instance="{{device_ip}}"}) + avg by (instance, ciscoMemoryPoolName)
+          (ciscoMemoryPoolFree{instance="{{device_ip}}"}) )
+        - 100 * avg by (ip, hrStorageDescr) (hrStorageUsed{ip="{{device_ip}}",hrStorageDescr=~".*(Memory|memory|RAM|Processor|DRAM).*"}) / avg by (ip, hrStorageDescr) (hrStorageSize{ip="{{device_ip}}",hrStorageDescr=~".*(Memory|memory|RAM|Processor|DRAM).*"})
+        - 100 * avg by (instance, hrStorageDescr) (hrStorageUsed{instance="{{device_ip}}",hrStorageDescr=~".*(Memory|memory|RAM|Processor|DRAM).*"}) / avg by (instance, hrStorageDescr) (hrStorageSize{instance="{{device_ip}}",hrStorageDescr=~".*(Memory|memory|RAM|Processor|DRAM).*"})
+        - avg by (ip) (memory_usage_percent{ip="{{device_ip}}"})
+        - avg by (instance) (memory_usage_percent{instance="{{device_ip}}"})
+        - avg by (ip) (device_memory_usage_percent{ip="{{device_ip}}"})
+        - avg by (instance) (device_memory_usage_percent{instance="{{device_ip}}"})

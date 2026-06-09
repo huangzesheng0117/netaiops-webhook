@@ -863,3 +863,201 @@ except NameError:
     pass
 # ===== v8 prometheus notification wrapper end =====
 
+
+# ===== BFD notification human-readable format override begin =====
+try:
+    from netaiops.bfd_notification_formatter import apply_bfd_format_to_payload as _bfd_apply_payload_format
+
+    def _bfd_wrap_notification_func(_fn):
+        def _wrapped(*args, **kwargs):
+            return _bfd_apply_payload_format(_fn(*args, **kwargs))
+        _wrapped.__name__ = getattr(_fn, "__name__", "wrapped_bfd_notification_func")
+        _wrapped.__doc__ = getattr(_fn, "__doc__", None)
+        return _wrapped
+
+    for _name, _obj in list(globals().items()):
+        if not callable(_obj):
+            continue
+        if getattr(_obj, "__module__", None) != __name__:
+            continue
+        if _name.startswith("_"):
+            continue
+        _lname = _name.lower()
+        if any(x in _lname for x in ["payload", "notification", "message", "ding", "dong", "text"]):
+            globals()["_bfd_original_" + _name] = _obj
+            globals()[_name] = _bfd_wrap_notification_func(_obj)
+
+except Exception:
+    pass
+# ===== BFD notification human-readable format override end =====
+
+# ===== BGP notification human-readable format override begin =====
+try:
+    from netaiops.bgp_notification_formatter import apply_bgp_format_to_payload as _bgp_apply_payload_format
+
+    def _bgp_wrap_notification_func(_fn):
+        def _wrapped(*args, **kwargs):
+            return _bgp_apply_payload_format(_fn(*args, **kwargs))
+        _wrapped.__name__ = getattr(_fn, "__name__", "wrapped_bgp_notification_func")
+        _wrapped.__doc__ = getattr(_fn, "__doc__", None)
+        return _wrapped
+
+    for _name, _obj in list(globals().items()):
+        if not callable(_obj):
+            continue
+        if getattr(_obj, "__module__", None) != __name__:
+            continue
+        if _name.startswith("_"):
+            continue
+        _lname = _name.lower()
+        if any(x in _lname for x in ["payload", "notification", "message", "ding", "dong", "text"]):
+            globals()["_bgp_original_" + _name] = _obj
+            globals()[_name] = _bgp_wrap_notification_func(_obj)
+except Exception:
+    pass
+# ===== BGP notification human-readable format override end =====
+
+# ===== BGP final notification text guard begin =====
+# 必须放在文件末尾：对最终咚咚文本做最后一层 BGP 格式兜底，避免旧 review 或其他族 formatter 覆盖 BGP 输出。
+try:
+    from netaiops.bgp_notification_formatter import rewrite_bgp_notification_text as _bgp_final_rewrite_text
+    from netaiops.bgp_notification_formatter import apply_bgp_format_to_payload as _bgp_final_apply_payload
+
+    _bgp_final_original_build_notification_text = build_notification_text
+
+    def build_notification_text(payload: dict) -> str:
+        text = _bgp_final_original_build_notification_text(payload)
+        return _bgp_final_rewrite_text(text)
+
+    try:
+        _bgp_final_original_build_notification_payload = build_notification_payload
+
+        def build_notification_payload(request_id: str) -> dict:
+            payload = _bgp_final_original_build_notification_payload(request_id)
+            return _bgp_final_apply_payload(payload)
+    except Exception:
+        pass
+
+except Exception:
+    pass
+# ===== BGP final notification text guard end =====
+
+# ===== BFD final notification text guard begin =====
+# 必须放在文件末尾：对最终咚咚文本做最后一层 BFD 格式兜底，确保 BFD 使用统一新模板。
+try:
+    from netaiops.bfd_notification_formatter import rewrite_bfd_notification_text as _bfd_final_rewrite_text
+    from netaiops.bfd_notification_formatter import apply_bfd_format_to_payload as _bfd_final_apply_payload
+
+    _bfd_final_original_build_notification_text = build_notification_text
+
+    def build_notification_text(payload: dict) -> str:
+        text = _bfd_final_original_build_notification_text(payload)
+        return _bfd_final_rewrite_text(text)
+
+    try:
+        _bfd_final_original_build_notification_payload = build_notification_payload
+
+        def build_notification_payload(request_id: str) -> dict:
+            payload = _bfd_final_original_build_notification_payload(request_id)
+            return _bfd_final_apply_payload(payload)
+    except Exception:
+        pass
+
+except Exception:
+    pass
+# ===== BFD final notification text guard end =====
+
+# ===== CPU final notification text guard begin =====
+try:
+    from netaiops.cpu_notification_formatter import rewrite_cpu_notification_text as _cpu_final_rewrite_text
+    from netaiops.cpu_notification_formatter import apply_cpu_format_to_payload as _cpu_final_apply_payload
+
+    _cpu_final_original_build_notification_text = build_notification_text
+
+    def build_notification_text(payload: dict) -> str:
+        text = _cpu_final_original_build_notification_text(payload)
+        return _cpu_final_rewrite_text(text)
+
+    try:
+        _cpu_final_original_build_notification_payload = build_notification_payload
+
+        def build_notification_payload(request_id: str) -> dict:
+            payload = _cpu_final_original_build_notification_payload(request_id)
+            return _cpu_final_apply_payload(payload)
+    except Exception:
+        pass
+
+except Exception:
+    pass
+# ===== CPU final notification text guard end =====
+
+# ===== Disk/Flash final notification text guard begin =====
+try:
+    from netaiops.disk_flash_notification_formatter import rewrite_disk_flash_notification_text as _disk_flash_final_rewrite_text
+    from netaiops.disk_flash_notification_formatter import apply_disk_flash_format_to_payload as _disk_flash_final_apply_payload
+
+    _disk_flash_final_original_build_notification_text = build_notification_text
+
+    def build_notification_text(payload: dict) -> str:
+        text = _disk_flash_final_original_build_notification_text(payload)
+        return _disk_flash_final_rewrite_text(text)
+
+    try:
+        _disk_flash_final_original_build_notification_payload = build_notification_payload
+
+        def build_notification_payload(request_id: str) -> dict:
+            payload = _disk_flash_final_original_build_notification_payload(request_id)
+            return _disk_flash_final_apply_payload(payload)
+    except Exception:
+        pass
+
+except Exception:
+    pass
+# ===== Disk/Flash final notification text guard end =====
+
+# ===== Memory High final notification payload guard begin =====
+try:
+    from netaiops.memory_notification_formatter import rewrite_memory_notification_text as _memory_rewrite_text
+    from netaiops.memory_notification_formatter import apply_memory_format_to_payload as _memory_apply_payload
+
+    try:
+        _memory_original_build_notification_text = build_notification_text
+
+        def build_notification_text(*args, **kwargs):
+            text = _memory_original_build_notification_text(*args, **kwargs)
+            request_id = kwargs.get("request_id")
+            if not request_id and args:
+                for arg in args:
+                    if isinstance(arg, str) and arg.startswith("20"):
+                        request_id = arg
+                        break
+                    if isinstance(arg, dict) and arg.get("request_id"):
+                        request_id = arg.get("request_id")
+                        break
+            return _memory_rewrite_text(text, request_id=request_id)
+
+    except Exception:
+        pass
+
+    try:
+        _memory_original_build_notification_payload = build_notification_payload
+
+        def build_notification_payload(*args, **kwargs):
+            payload = _memory_original_build_notification_payload(*args, **kwargs)
+            request_id = kwargs.get("request_id")
+            if not request_id and args:
+                for arg in args:
+                    if isinstance(arg, str) and arg.startswith("20"):
+                        request_id = arg
+                        break
+                    if isinstance(arg, dict) and arg.get("request_id"):
+                        request_id = arg.get("request_id")
+                        break
+            return _memory_apply_payload(payload, request_id=request_id)
+
+    except Exception:
+        pass
+
+except Exception:
+    pass
+# ===== Memory High final notification payload guard end =====

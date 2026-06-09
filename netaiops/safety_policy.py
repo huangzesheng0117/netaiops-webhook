@@ -130,7 +130,7 @@ def safety_config() -> Dict[str, Any]:
     return {
         "enabled": bool(safety.get("enabled", True)),
         "readonly_only": bool(safety.get("readonly_only", True)),
-        "max_commands_per_request": int(safety.get("max_commands_per_request", 5)),
+        "max_commands_per_request": int(safety.get("max_commands_per_request", 15)),
         "command_timeout_sec": int(safety.get("command_timeout_sec", 30)),
         "allowed_command_prefixes": [safe_lower(x) for x in allowed_prefixes],
         "deny_command_patterns": [safe_text(x) for x in deny_patterns],
@@ -238,7 +238,7 @@ def evaluate_plan_safety(plan_data: Dict[str, Any]) -> Dict[str, Any]:
     reasons: List[str] = []
     candidate_results: List[Dict[str, Any]] = []
 
-    max_commands = int(cfg.get("max_commands_per_request", 5))
+    max_commands = int(cfg.get("max_commands_per_request", 15))
     if len(candidates) > max_commands:
         reasons.append("too_many_commands")
 

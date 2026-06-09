@@ -1,12 +1,189 @@
 playbook_id: cisco_bfd_neighbor_down
 match:
   vendor: cisco
-  alertname_regex: "^(BFD邻居状态|BFD邻居异常|BFD Neighbor Down)$"
+  alertname_regex: ^(BFD邻居状态|BFD邻居异常|BFD Neighbor Down)$
+family: routing_neighbor_down
+skill_name: routing_neighbor_down
+description: Enhanced Cisco NX-OS BFD neighbor down readonly investigation playbook.
 execution:
   readonly_only: true
   auto_execute_allowed: true
-  max_commands: 6
+  max_commands: 14
   commands:
-    - "show bfd neighbors"
-    - "show bfd neighbors details"
-    - "show logging | include BFD|bfd|neighbor|Neighbor|Down|Session"
+  - show clock
+  - show feature | include bfd|bgp|ospf|isis|eigrp
+  - show bfd clients
+  - show bfd neighbors vrf all
+  - show bfd neighbors details
+  - show logging logfile | include BFD|bfd|BGP|OSPF|EIGRP|ISIS|ETHPORT|IF_DOWN|LINK|neighbor|adjacency
+  - show ip interface {interface}
+  - show interface {interface}
+  - show interface {interface} counters errors
+  - show running-config interface {interface}
+  - show running-config | section bfd
+  - show bgp ipv4 unicast summary vrf all
+  - show ip ospf neighbors vrf all
+  - show port-channel summary
+commands:
+- order: 1
+  command: show clock
+  reason: record device time for log correlation
+  risk: low
+  readonly: true
+- order: 2
+  command: show feature | include bfd|bgp|ospf|isis|eigrp
+  reason: confirm BFD and routing protocol features
+  risk: low
+  readonly: true
+- order: 3
+  command: show bfd clients
+  reason: check which upper-layer protocols registered BFD sessions
+  risk: low
+  readonly: true
+- order: 4
+  command: show bfd neighbors vrf all
+  reason: check BFD neighbor list, VRF, session type and state
+  risk: low
+  readonly: true
+- order: 5
+  command: show bfd neighbors details
+  reason: check BFD timers, rx/tx counters, registered protocols and down reason
+  risk: low
+  readonly: true
+- order: 6
+  command: show bfd neighbors dest-ip {peer_ip} details
+  reason: check the affected BFD peer precisely
+  risk: low
+  readonly: true
+- order: 7
+  command: show logging logfile | include BFD|bfd|BGP|OSPF|EIGRP|ISIS|ETHPORT|IF_DOWN|LINK|neighbor|adjacency
+  reason: correlate BFD, routing protocol and interface logs
+  risk: low
+  readonly: true
+- order: 8
+  command: show ip route {peer_ip} vrf {vrf}
+  reason: check route to BFD peer
+  risk: low
+  readonly: true
+- order: 9
+  command: show ip arp vrf {vrf} {peer_ip}
+  reason: check direct L3 adjacency or ARP state
+  risk: low
+  readonly: true
+- order: 10
+  command: show ip interface {interface}
+  reason: check L3 interface address, VRF and protocol state
+  risk: low
+  readonly: true
+- order: 11
+  command: show interface {interface}
+  reason: check carrier state, rate, resets and drops
+  risk: low
+  readonly: true
+- order: 12
+  command: show interface {interface} counters errors
+  reason: check CRC, errors, discards and drops
+  risk: low
+  readonly: true
+- order: 13
+  command: show running-config interface {interface}
+  reason: check BFD, echo, interface and protocol binding config
+  risk: low
+  readonly: true
+- order: 14
+  command: show running-config | section bfd
+  reason: check global BFD timer and echo configuration
+  risk: low
+  readonly: true
+- order: 15
+  command: show bgp ipv4 unicast summary vrf all
+  reason: check whether BGP neighbors are also impacted
+  risk: low
+  readonly: true
+- order: 16
+  command: show bgp ipv4 unicast neighbors {peer_ip} vrf {vrf}
+  reason: check BGP peer state, reset reason and BFD binding
+  risk: low
+  readonly: true
+- order: 17
+  command: show running-config bgp
+  reason: check BGP neighbor bfd or bfd multihop configuration
+  risk: low
+  readonly: true
+- order: 18
+  command: show ip ospf neighbors vrf all
+  reason: check whether OSPF neighbors are also impacted
+  risk: low
+  readonly: true
+- order: 19
+  command: show ip ospf interface {interface} vrf {vrf}
+  reason: check OSPF interface and BFD binding hints
+  risk: low
+  readonly: true
+- order: 20
+  command: show running-config ospf
+  reason: check OSPF BFD configuration
+  risk: low
+  readonly: true
+- order: 21
+  command: show isis adjacency
+  reason: check whether ISIS adjacency is also impacted
+  risk: low
+  readonly: true
+- order: 22
+  command: show isis interface {interface}
+  reason: check ISIS interface status
+  risk: low
+  readonly: true
+- order: 23
+  command: show running-config isis
+  reason: check ISIS BFD configuration
+  risk: low
+  readonly: true
+- order: 24
+  command: show system internal access-list sup-redirect-stats | include BFD|bfd|BFDC
+  reason: check whether BFD packets reach control plane
+  risk: low
+  readonly: true
+- order: 25
+  command: show policy-map interface control-plane
+  reason: check CoPP control-plane drops
+  risk: low
+  readonly: true
+- order: 26
+  command: show copp status
+  reason: check CoPP status and possible policing issue
+  risk: low
+  readonly: true
+- order: 27
+  command: show interface {interface} transceiver details
+  reason: check optics and physical-layer health
+  risk: low
+  readonly: true
+- order: 28
+  command: show port-channel summary
+  reason: check port-channel member state
+  risk: low
+  readonly: true
+- order: 29
+  command: show port-channel database interface {interface}
+  reason: check port-channel database for the affected interface
+  risk: low
+  readonly: true
+- order: 30
+  command: show vpc brief
+  reason: check vPC peer-link / member state when BFD runs over SVI or vPC path
+  risk: low
+  readonly: true
+readonly_only: true
+auto_execute_allowed: true
+analysis_policy:
+  primary判断顺序:
+  - 先确认 BFD 当前是否仍 Down，以及是否存在 down reason。
+  - 再确认承载接口、物理层、错误包和日志是否异常。
+  - 再确认到 peer_ip 的路由与 ARP 是否正常。
+  - 再确认 BGP/OSPF/ISIS 等上层协议是否也受影响。
+  - 最后检查 CoPP/ACL、BFD echo、vPC/SVI、timer 过激进等平台和设计问题。
+  failure_policy: 任何单条只读命令失败时不得阻断后续命令，最终结论中必须说明失败命令及影响。
+default_command_scope: bfd_core_first_wave_14_commands
+extended_command_note: Default BFD first-wave command count is 14, within global readonly auto-execution safety limit 15.

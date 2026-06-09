@@ -1,0 +1,50 @@
+{
+  "skill_name": "device_memory_utilization_high",
+  "version": "v8.4.0-cisco-memory-prometheus",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "prometheus_memory_evidence": {
+      "type": "object"
+    },
+    "memory_summary": {
+      "type": "object"
+    },
+    "nxos_cache_available_evidence": {
+      "type": "object"
+    },
+    "ios_memory_pool_evidence": {
+      "type": "object"
+    },
+    "iosxe_platform_memory_evidence": {
+      "type": "object"
+    },
+    "top_process_memory": {
+      "type": "array"
+    },
+    "memory_alerts": {
+      "type": "array"
+    },
+    "core_crash_restart_evidence": {
+      "type": "object"
+    },
+    "route_table_scale": {
+      "type": "object"
+    },
+    "arp_table_scale": {
+      "type": "object"
+    },
+    "mac_table_scale": {
+      "type": "object"
+    },
+    "snmp_pressure_evidence": {
+      "type": "object"
+    },
+    "judgement": {
+      "type": "string"
+    },
+    "recommendations": {
+      "type": "array"
+    }
+  }
+}

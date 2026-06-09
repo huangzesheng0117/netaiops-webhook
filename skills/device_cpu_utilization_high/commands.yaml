@@ -1,0 +1,269 @@
+skill_name: device_cpu_utilization_high
+version: v8.3.0-cisco-cpu-prometheus
+family: device_cpu_utilization_high
+risk_level: readonly
+readonly_only: true
+default_auto_execute_command_limit: 15
+note: Default auto-executed playbook command count must not exceed 15.
+allowed_tools:
+- mcp_netmiko_run_show
+- prometheus_range_query
+- parser_parse_cli_output
+allowed_capabilities:
+- show_clock
+- show_version
+- show_cpu_current
+- show_cpu_history
+- show_system_resources
+- show_process_cpu
+- show_process_memory
+- show_recent_cpu_logs
+- show_control_plane_policy
+- show_interface_errors
+- show_bgp_summary
+- show_ospf_neighbors
+- show_isis_adjacency
+- show_snmp
+- show_users
+- show_feature
+- show_punt_cause
+- show_punt_rate_interfaces
+- show_cpu_policer
+- show_ip_traffic
+- show_stp_detail
+- show_mac_count
+- show_qfp_utilization
+- prometheus_cpu_history
+- parse_cli_output
+profiles:
+  cisco_nxos_cpu_high:
+    description: Cisco NX-OS CPU high utilization first-wave profile.
+    max_commands_per_request: 15
+    prometheus_evidence_required: false
+    prometheus_evidence_preferred: true
+    default_commands:
+    - show clock
+    - show system resources
+    - show processes cpu sort
+    - show processes cpu history
+    - show version
+    - show logging last 300 | include CPU|HIGH|BGP|OSPF|ISIS|STP|VPC|LACP|ETHPORT|BFD|SNMP|AAA|LOGIN
+    - show processes memory sort
+    - show interface counters errors
+    - show policy-map interface control-plane
+    - show ip bgp summary vrf all
+    - show ip ospf neighbors vrf all
+    - show isis adjacency
+    - show snmp
+    - show users
+    - show feature
+  cisco_iosxe_cpu_high:
+    description: Cisco IOS-XE CPU high utilization first-wave profile.
+    max_commands_per_request: 15
+    prometheus_evidence_required: false
+    prometheus_evidence_preferred: true
+    default_commands:
+    - show clock
+    - show processes cpu sorted
+    - show processes cpu history
+    - show version
+    - show logging | include CPU|HIGH|BGP|OSPF|EIGRP|STP|SPANTREE|LINEPROTO|LINK|BFD|SNMP|AAA|LOGIN
+    - show processes memory sorted
+    - show platform software status control-processor brief
+    - show platform software process list switch active R0 sort
+    - show platform software fed switch active punt cause summary
+    - show platform software fed switch active punt rates interfaces
+    - show platform hardware fed switch active qos queue stats internal cpu policer
+    - show interfaces counters errors
+    - show ip traffic
+    - show snmp
+    - show users
+  cisco_ios_cpu_high:
+    description: Cisco IOS CPU high utilization first-wave profile.
+    max_commands_per_request: 15
+    prometheus_evidence_required: false
+    prometheus_evidence_preferred: true
+    default_commands:
+    - show clock
+    - show processes cpu sorted
+    - show processes cpu history
+    - show version
+    - show logging | include CPU|HIGH|BGP|OSPF|EIGRP|STP|SPANTREE|LINEPROTO|LINK|BFD|SNMP|AAA|LOGIN
+    - show processes memory sorted
+    - show interfaces counters errors
+    - show ip interface brief
+    - show spanning-tree detail | include ieee|occurr|from|executing
+    - show mac address-table count
+    - show ip traffic
+    - show snmp
+    - show policy-map control-plane
+    - show ip bgp summary
+    - show users
+platform_commands:
+  cisco_nxos:
+    show_clock:
+      template: show clock
+      readonly: true
+    show_version:
+      template: show version
+      readonly: true
+    show_system_resources:
+      template: show system resources
+      readonly: true
+    show_process_cpu:
+      template: show processes cpu sort
+      readonly: true
+    show_cpu_history:
+      template: show processes cpu history
+      readonly: true
+    show_recent_cpu_logs:
+      template: show logging last 300 | include CPU|HIGH|BGP|OSPF|ISIS|STP|VPC|LACP|ETHPORT|BFD|SNMP|AAA|LOGIN
+      readonly: true
+    show_process_memory:
+      template: show processes memory sort
+      readonly: true
+    show_interface_errors:
+      template: show interface counters errors
+      readonly: true
+    show_control_plane_policy:
+      template: show policy-map interface control-plane
+      readonly: true
+    show_bgp_summary:
+      template: show ip bgp summary vrf all
+      readonly: true
+    show_ospf_neighbors:
+      template: show ip ospf neighbors vrf all
+      readonly: true
+    show_isis_adjacency:
+      template: show isis adjacency
+      readonly: true
+    show_snmp:
+      template: show snmp
+      readonly: true
+    show_users:
+      template: show users
+      readonly: true
+    show_feature:
+      template: show feature
+      readonly: true
+  cisco_iosxe:
+    show_clock:
+      template: show clock
+      readonly: true
+    show_version:
+      template: show version
+      readonly: true
+    show_cpu_current:
+      template: show processes cpu sorted
+      readonly: true
+    show_cpu_history:
+      template: show processes cpu history
+      readonly: true
+    show_recent_cpu_logs:
+      template: show logging | include CPU|HIGH|BGP|OSPF|EIGRP|STP|SPANTREE|LINEPROTO|LINK|BFD|SNMP|AAA|LOGIN
+      readonly: true
+    show_process_memory:
+      template: show processes memory sorted
+      readonly: true
+    show_control_processor:
+      template: show platform software status control-processor brief
+      readonly: true
+    show_process_cpu_platform:
+      template: show platform software process list switch active R0 sort
+      readonly: true
+    show_punt_cause:
+      template: show platform software fed switch active punt cause summary
+      readonly: true
+    show_punt_rate_interfaces:
+      template: show platform software fed switch active punt rates interfaces
+      readonly: true
+    show_cpu_policer:
+      template: show platform hardware fed switch active qos queue stats internal cpu policer
+      readonly: true
+    show_interface_errors:
+      template: show interfaces counters errors
+      readonly: true
+    show_ip_traffic:
+      template: show ip traffic
+      readonly: true
+    show_snmp:
+      template: show snmp
+      readonly: true
+    show_users:
+      template: show users
+      readonly: true
+  cisco_ios:
+    show_clock:
+      template: show clock
+      readonly: true
+    show_version:
+      template: show version
+      readonly: true
+    show_cpu_current:
+      template: show processes cpu sorted
+      readonly: true
+    show_cpu_history:
+      template: show processes cpu history
+      readonly: true
+    show_recent_cpu_logs:
+      template: show logging | include CPU|HIGH|BGP|OSPF|EIGRP|STP|SPANTREE|LINEPROTO|LINK|BFD|SNMP|AAA|LOGIN
+      readonly: true
+    show_process_memory:
+      template: show processes memory sorted
+      readonly: true
+    show_interface_errors:
+      template: show interfaces counters errors
+      readonly: true
+    show_ip_interface_brief:
+      template: show ip interface brief
+      readonly: true
+    show_stp_detail:
+      template: show spanning-tree detail | include ieee|occurr|from|executing
+      readonly: true
+    show_mac_count:
+      template: show mac address-table count
+      readonly: true
+    show_ip_traffic:
+      template: show ip traffic
+      readonly: true
+    show_snmp:
+      template: show snmp
+      readonly: true
+    show_control_plane_policy:
+      template: show policy-map control-plane
+      readonly: true
+    show_bgp_summary:
+      template: show ip bgp summary
+      readonly: true
+    show_users:
+      template: show users
+      readonly: true
+command_limits:
+  max_commands_per_request: 15
+  max_extra_rounds: 0
+  timeout_seconds_per_command: 30
+  continue_on_command_failure: true
+forbidden_patterns:
+- configure terminal
+- conf t
+- shutdown
+- no shutdown
+- clear
+- reload
+- write memory
+- copy running-config startup-config
+- delete
+- erase
+- debug
+notification_policy:
+  template: 初步判断 / 告警含义分析 / 命令执行概况 / 命令分析 / 综合执行结果判断 / 建议
+  hide_internal_orchestration: true
+  forbidden_words_in_notification:
+  - 第一批
+  - 第二批
+  - 第一波
+  - 第二波
+  - stage-1
+  - stage-2
+  command_overview: 列出成功执行命令清单和失败命令；失败命令必须单独列出。
+  analysis: 聚合 Prometheus 历史趋势、当前 CPU、进程排行、日志、CoPP、SNMP、协议状态等证据，不逐条解释命令用途。

@@ -1,0 +1,152 @@
+playbook_id: cisco_cpu_utilization_high
+match:
+  vendor: cisco
+  alertname_regex: ^(Cisco设备CPU利用率异常|Cisco CPU High|CPU利用率异常|CPU高利用率|cpu_utilization_high|cisco_cpu_utilization_high)$
+family: device_cpu_utilization_high
+skill_name: device_cpu_utilization_high
+description: Cisco device CPU high utilization readonly investigation playbook with Prometheus historical CPU evidence.
+readonly_only: true
+auto_execute_allowed: true
+default_command_scope: cisco_cpu_nxos_first_wave_15_commands
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 15
+  commands:
+  - show clock
+  - show system resources
+  - show processes cpu sort
+  - show processes cpu history
+  - show version
+  - show logging last 300 | include CPU|HIGH|BGP|OSPF|ISIS|STP|VPC|LACP|ETHPORT|BFD|SNMP|AAA|LOGIN
+  - show processes memory sort
+  - show interface counters errors
+  - show policy-map interface control-plane
+  - show ip bgp summary vrf all
+  - show ip ospf neighbors vrf all
+  - show isis adjacency
+  - show snmp
+  - show users
+  - show feature
+commands:
+- order: 1
+  command: show clock
+  reason: record device time for alert, CLI and Prometheus correlation
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 2
+  command: show system resources
+  reason: check NX-OS CPU user/kernel/idle, memory and load average
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 3
+  command: show processes cpu sort
+  reason: identify high CPU processes and classify process-driven CPU
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 4
+  command: show processes cpu history
+  reason: check whether CPU is instant spike, periodic spike or sustained high
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 5
+  command: show version
+  reason: check platform, NX-OS version and uptime
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 6
+  command: show logging last 300 | include CPU|HIGH|BGP|OSPF|ISIS|STP|VPC|LACP|ETHPORT|BFD|SNMP|AAA|LOGIN
+  reason: correlate CPU alert with protocol, interface, vPC, SNMP, AAA or login events
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 7
+  command: show processes memory sort
+  reason: check memory pressure and process memory growth
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 8
+  command: show interface counters errors
+  reason: check whether physical errors/drop/flap may contribute to CPU pressure
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 9
+  command: show policy-map interface control-plane
+  reason: check CoPP/control-plane class hit and drop counters
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 10
+  command: show ip bgp summary vrf all
+  reason: check BGP neighbor flap or route update pressure
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 11
+  command: show ip ospf neighbors vrf all
+  reason: check OSPF neighbor instability
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 12
+  command: show isis adjacency
+  reason: check ISIS adjacency instability
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 13
+  command: show snmp
+  reason: check SNMP polling volume, authentication failures and management-plane pressure
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 14
+  command: show users
+  reason: check active CLI/SSH management sessions
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 15
+  command: show feature
+  reason: check enabled features that may correlate with high CPU, such as BGP/OSPF/PIM/VXLAN/vPC/Telemetry
+  risk: low
+  readonly: true
+  timeout_sec: 30
+prometheus_evidence_first:
+  enabled: true
+  backend_preference: prometheus_mcp
+  fallback: http_api
+  evidence_profile: device_cpu_utilization
+  query_names:
+  - cpu_1min
+  lookback_minutes: 30
+  compare_offset_minutes: 5
+  step_seconds: 60
+  sidecar_overall_timeout_seconds: 30
+  max_candidates_per_query: 3
+  required_labels:
+  - device_ip
+  unavailable_policy: continue_cli_evidence
+  stop_device_cli_if_not_confirmed: false
+  sidecar_parallel_workers: 3
+  note: Current VictoriaMetrics has cpmCPUTotal1minRev for Cisco CPU. Use cpu_1min range query as historical CPU evidence; do not query absent cpu_5sec/cpu_5min metrics.
+analysis_policy:
+  max_auto_execute_commands: 15
+  notification_template: 统一咚咚模板：初步判断、告警含义分析、命令执行概况、命令分析、综合执行结果判断、建议。
+  command_overview_policy: 命令执行概况列出成功执行命令清单和失败命令；失败命令必须单独列出。
+  analysis_language_policy: 不要逐条解释命令用途；命令分析应聚合 Prometheus 历史 CPU、当前 CPU、进程排行、日志、CoPP、SNMP、协议状态等证据。
+  primary判断顺序:
+  - 先用 Prometheus 历史窗口判断 CPU 是瞬时尖峰、周期性尖峰还是持续高位。
+  - 再用设备当前 CPU 命令判断 user/kernel/idle、5秒/1分钟/5分钟 CPU，以及是否存在明显高 CPU 进程。
+  - 再结合 CPU history 判断是否和 Prometheus 趋势一致。
+  - 再结合日志判断 CPU 高是否伴随 BGP/OSPF/ISIS/STP/vPC/LACP/BFD/SNMP/AAA/LOGIN 事件。
+  - 再结合 CoPP/control-plane、SNMP、用户会话、接口错误、协议邻居状态，判断是进程高、管理面压力、路由协议震荡、报文上送/控制面压力，还是平台/版本问题。
+  failure_policy: 任何单条只读命令失败时不得阻断后续命令；最终结论中只列失败命令及影响。
+  prometheus_policy: Prometheus CPU 历史证据用于判断窗口趋势；Prometheus 不可用时不得阻断 CLI 取证。

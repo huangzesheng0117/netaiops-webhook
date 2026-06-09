@@ -1,0 +1,178 @@
+playbook_id: cisco_device_disk_flash_usage_high
+match:
+  vendor: cisco
+  alertname_regex: ^(Cisco设备磁盘使用率异常|Cisco设备Flash使用率异常|Cisco Disk High|Cisco Flash
+    High|设备磁盘高|设备Flash高|disk_flash_usage_high|device_disk_flash_usage_high|cisco_device_disk_flash_usage_high)$
+family: device_disk_flash_usage_high
+skill_name: device_disk_flash_usage_high
+description: Cisco device disk/Flash high utilization readonly investigation playbook
+  with Prometheus filesystem history evidence.
+readonly_only: true
+auto_execute_allowed: true
+default_command_scope: cisco_nxos_disk_flash_first_wave_15_commands
+execution:
+  readonly_only: true
+  auto_execute_allowed: true
+  max_commands: 10
+  commands:
+  - show clock
+  - show version
+  - show boot
+  - show boot variables
+  - 'dir bootflash:'
+  - 'dir log:'
+  - show system cores
+  - show logging last 300
+  - show file systems
+  - show system internal flash
+commands:
+- order: 1
+  command: show clock
+  reason: record device time for alert, log and Prometheus correlation
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 2
+  command: show version
+  reason: check platform, NX-OS version, uptime and current image context
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 3
+  command: show boot
+  reason: check active boot variable and protect currently referenced image
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 4
+  command: show boot variables
+  reason: check boot variable details and standby/supervisor boot context when supported
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 5
+  command: 'dir bootflash:'
+  reason: check bootflash capacity, free space and root file list
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 6
+  command: dir bootflash:*.bin
+  reason: identify NX-OS image files and possible old image residue
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 7
+  command: dir bootflash:*.tar
+  reason: identify tar archives such as show-tech or TAC bundles
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 8
+  command: dir bootflash:*.tgz
+  reason: identify compressed technical support or archive files
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 9
+  command: dir bootflash:*.gz
+  reason: identify compressed logs, core files or support bundles
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 10
+  command: dir bootflash:*show*
+  reason: identify show-tech related files
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 11
+  command: dir bootflash:*tech*
+  reason: identify tech-support related files
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 12
+  command: dir bootflash:*core*
+  reason: identify core or crash related files under bootflash
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 13
+  command: show system cores
+  reason: check system core records and recent process crashes
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 14
+  command: 'dir log:'
+  reason: check NX-OS log filesystem usage and large log files
+  risk: low
+  readonly: true
+  timeout_sec: 30
+- order: 15
+  command: show logging last 500 | include BOOTFLASH|bootflash|DISK|disk|space|No
+    space|filesystem|core|crash|copy|write
+  reason: correlate filesystem full, write failure, copy failure, core/crash and filesystem
+    errors
+  risk: low
+  readonly: true
+  timeout_sec: 30
+prometheus_evidence_first:
+  enabled: true
+  backend_preference: prometheus_mcp
+  fallback: http_api
+  evidence_profile: device_filesystem_usage
+  query_names:
+  - filesystem_usage_percent
+  lookback_minutes: 60
+  compare_offset_minutes: 15
+  step_seconds: 60
+  sidecar_overall_timeout_seconds: 30
+  max_candidates_per_query: 6
+  required_labels:
+  - device_ip
+  unavailable_policy: continue_cli_evidence
+  stop_device_cli_if_not_confirmed: false
+  sidecar_parallel_workers: 2
+  note: Disk/Flash high alerts should use Prometheus filesystem history when available.
+    Metric names and labels depend on the exporter, so multiple candidates are used.
+    If Prometheus has no filesystem series, CLI evidence remains authoritative.
+analysis_policy:
+  max_auto_execute_commands: 15
+  notification_template: 统一咚咚模板：初步判断、告警含义分析、命令执行概况、命令分析、综合执行结果判断、建议。
+  command_overview_policy: 命令执行概况列出成功执行命令清单和失败命令；失败命令必须单独列出。
+  analysis_language_policy: 不要逐条解释命令用途；命令分析应聚合 Prometheus 历史趋势、文件系统空间、当前版本、boot 变量、大文件类型、core/crash、show-tech、日志和文件系统异常等证据。
+  primary判断顺序:
+  - 先用 Prometheus 历史窗口判断文件系统使用率是持续增长、周期性增长、瞬时异常还是当前已恢复。
+  - 再用 CLI 确认具体是哪一个 filesystem 高，例如 bootflash、flash、crashinfo、log、stby-bootflash。
+  - 再核对 show version、show boot、show boot variables，明确当前运行镜像和 boot 变量引用文件，避免误删当前依赖文件。
+  - 再识别空间占用类型：旧镜像、旧 package、show-tech/tech-support、core/crash、pcap/cap、log、备份配置或人工拷贝文件。
+  - 再结合日志判断是否存在 No space、copy/write 失败、filesystem error、core/crash 持续生成、debug/log
+    风暴。
+  - 如果涉及 standby、堆叠、双 supervisor，需要单独说明 active 与 standby / member 文件系统可能不一致。
+  - 本 playbook 只做只读定位；清理动作必须人工确认后单独执行，不允许自动 delete/install remove inactive/package
+    clean。
+  protected_files:
+  - packages.conf
+  - current boot variable .bin
+  - current install mode .pkg
+  - startup-config
+  - private-config
+  - vlan.dat
+  - license files
+  - trustpoint / crypto / pki files
+  - current SMU / patch files
+  - recent TAC core / show-tech files
+  forbidden_cleanup_actions:
+  - delete
+  - install remove inactive
+  - request platform software package clean
+  - request platform software package clean switch all
+  failure_policy: 任何单条只读命令失败时不得阻断后续命令；最终结论中只列失败命令及影响。
+  prometheus_policy: Prometheus filesystem history is used for trend; Prometheus unavailable
+    must not block CLI evidence.
+command_change_note: 'Removed wildcard dir bootflash:* commands because NX-OS may
+  return failure when no file matches. Use dir bootflash: and local parser to identify
+  .bin/.tar/.tgz/.gz/show-tech/core files. Replaced complex include log command with
+  raw show logging last 300 to avoid CLI regex compatibility issues.'

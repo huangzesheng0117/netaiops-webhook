@@ -1,0 +1,50 @@
+{
+  "skill_name": "device_disk_flash_usage_high",
+  "version": "v8.4.0-cisco-disk-flash-prometheus",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "prometheus_filesystem_evidence": {
+      "type": "object"
+    },
+    "filesystem_summary": {
+      "type": "object"
+    },
+    "version_and_boot": {
+      "type": "object"
+    },
+    "large_file_candidates": {
+      "type": "array"
+    },
+    "protected_file_candidates": {
+      "type": "array"
+    },
+    "cleanup_candidate_categories": {
+      "type": "array"
+    },
+    "crash_core_evidence": {
+      "type": "object"
+    },
+    "showtech_archive_evidence": {
+      "type": "object"
+    },
+    "pcap_capture_evidence": {
+      "type": "object"
+    },
+    "log_growth_evidence": {
+      "type": "object"
+    },
+    "standby_or_stack_evidence": {
+      "type": "object"
+    },
+    "filesystem_error_logs": {
+      "type": "array"
+    },
+    "judgement": {
+      "type": "string"
+    },
+    "recommendations": {
+      "type": "array"
+    }
+  }
+}

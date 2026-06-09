@@ -1,0 +1,89 @@
+skill_name: device_cpu_utilization_high
+version: v8.3.0-cisco-cpu-prometheus
+family: device_cpu_utilization_high
+required_facts:
+- hostname
+- device_ip
+- mcp_commands
+preferred_facts:
+- prometheus_cpu_window
+- prometheus_cpu_current
+- prometheus_cpu_avg
+- prometheus_cpu_max
+- prometheus_cpu_min
+- prometheus_cpu_trend
+- cpu_5sec
+- cpu_1min
+- cpu_5min
+- cpu_interrupt_percent
+- cpu_user_percent
+- cpu_kernel_percent
+- cpu_idle_percent
+- load_average
+- top_cpu_processes
+- top_memory_processes
+- recent_cpu_logs
+- snmp_pressure_signal
+- control_plane_drop_signal
+- punt_signal
+- routing_protocol_flap_signal
+- interface_error_signal
+- management_session_signal
+- feature_signal
+- hardware_environment_signal
+status_rules:
+  cpu_sustained_high_prometheus:
+    condition: Prometheus CPU window indicates sustained high CPU
+    severity: warning
+    message: CPU high appears sustained in historical monitoring window.
+  cpu_instant_spike_prometheus:
+    condition: Prometheus current CPU is high but window average is normal
+    severity: info
+    message: CPU high may be an instant spike; correlate with CLI history and business impact.
+  cpu_periodic_spike_prometheus:
+    condition: Prometheus window has repeated peaks at regular intervals
+    severity: warning
+    message: CPU high looks periodic; check SNMP/NMS/automation/logging/backup tasks.
+  cpu_process_driven:
+    condition: A single process or small set of processes dominates CPU
+    severity: warning
+    message: CPU high is likely process-driven; classify by process name such as SNMP, BGP, OSPF, ARP, IP Input, syslogd, ethpm, lacp, vpc, ipfib or urib.
+  cpu_interrupt_or_punt_driven:
+    condition: Interrupt/punt/control-plane traffic or CoPP counters are high
+    severity: warning
+    message: CPU high may be caused by packets punted to CPU or control-plane pressure.
+  cpu_snmp_management_pressure:
+    condition: SNMP counters/logs/users indicate excessive management polling or login activity
+    severity: warning
+    message: CPU high may be management-plane driven.
+  cpu_routing_protocol_pressure:
+    condition: BGP/OSPF/ISIS/EIGRP logs or neighbor state indicate flap or route churn
+    severity: warning
+    message: CPU high may be caused by routing protocol churn.
+  cpu_l2_or_interface_event_pressure:
+    condition: STP/vPC/LACP/ETHPORT/interface errors or logs are abnormal
+    severity: warning
+    message: CPU high may be associated with L2/interface events; correlate with dedicated interface playbooks if needed.
+  cpu_platform_or_version_risk:
+    condition: CPU high persists with no obvious traffic/protocol/management trigger and platform/version is known risk
+    severity: warning
+    message: Potential platform process issue or software defect; confirm version and process details.
+  cpu_inconclusive:
+    condition: Prometheus unavailable or CLI evidence is incomplete/contradictory
+    severity: warning
+    message: Evidence is incomplete; manual review is required.
+manual_review_conditions:
+- Prometheus CPU query returned no data
+- CPU is high but CLI current CPU is normal
+- CLI CPU high but Prometheus history does not confirm
+- Single process high but process name cannot be classified
+- Interrupt/punt suspected but platform punt commands unavailable
+- Multiple unrelated protocol/interface/management events overlap
+- Command failures hide key CPU evidence
+human_readable_analysis_flow:
+- 先看 Prometheus CPU 历史窗口，判断 CPU 高是瞬时、周期性还是持续。
+- 再看当前设备 CPU 总览和历史趋势，确认是否与 Prometheus 一致。
+- 再判断 CPU 属于进程高、interrupt/punt 高、kernel/user 高、还是无明显进程。
+- 再结合日志确认是否伴随路由协议、STP/vPC/LACP/BFD/SNMP/AAA/LOGIN 事件。
+- 再结合 SNMP、CoPP/control-plane、punt、接口错误、路由协议邻居状态判断可能触发源。
+- 最终按标准咚咚模板输出：命令执行概况、命令分析、综合执行结果判断和建议。

@@ -1,0 +1,42 @@
+skill_name: device_disk_flash_usage_high
+version: v8.4.0-cisco-disk-flash-prometheus
+profile: device_filesystem_usage
+description: Cisco disk/flash filesystem usage Prometheus query mapping. Actual metric names depend on SNMP exporter and Cisco MIB coverage. Runtime should try candidates in order and
+  use the first valid time series.
+lookback_minutes: 60
+step_seconds: 60
+compare_offset_minutes: 15
+required_labels:
+- device_ip
+label_aliases:
+  device_ip:
+  - ip
+  - device_ip
+  - instance
+  filesystem:
+  - hrStorageDescr
+  - ciscoFlashPartitionName
+  - filesystem
+  - mountpoint
+queries:
+  filesystem_usage_percent:
+    description: Disk/Flash usage percentage for Cisco flash/bootflash/crash/log related filesystem.
+    unit: percent
+    candidate_promql:
+    - 100 * avg by (ip, hrStorageDescr) (hrStorageUsed{ip="{device_ip}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"}) / avg by (ip, hrStorageDescr) (hrStorageSize{ip="{device_ip}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"})
+    - 100 * avg by (instance, hrStorageDescr) (hrStorageUsed{instance="{device_ip}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"}) / avg by (instance, hrStorageDescr)
+      (hrStorageSize{instance="{device_ip}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"})
+    - 100 * (1 - (ciscoFlashPartitionFreeSpace{ip="{device_ip}"} / ciscoFlashPartitionSize{ip="{device_ip}"}))
+    - 100 * (1 - (ciscoFlashPartitionFreeSpace{instance="{device_ip}"} / ciscoFlashPartitionSize{instance="{device_ip}"}))
+    promql_candidates:
+    - 100 * avg by (ip, hrStorageDescr) (hrStorageUsed{ip="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"}) / avg by (ip, hrStorageDescr) (hrStorageSize{ip="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"})
+    - 100 * avg by (instance, hrStorageDescr) (hrStorageUsed{instance="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"}) / avg by (instance, hrStorageDescr)
+      (hrStorageSize{instance="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"})
+    - 100 * (1 - (ciscoFlashPartitionFreeSpace{ip="{{device_ip}}"} / ciscoFlashPartitionSize{ip="{{device_ip}}"}))
+    - 100 * (1 - (ciscoFlashPartitionFreeSpace{instance="{{device_ip}}"} / ciscoFlashPartitionSize{instance="{{device_ip}}"}))
+judgement:
+  sustained_high: filesystem usage stays high in the historical window.
+  growing: filesystem usage keeps increasing, suggesting logs/core/capture files may still be growing.
+  stable_high: filesystem usage is high but stable, likely historical files or old images.
+  recovered: filesystem usage has recovered or dropped, likely cleanup occurred before investigation.
+  prometheus_unavailable: Prometheus filesystem series unavailable; continue CLI evidence and state evidence boundary.

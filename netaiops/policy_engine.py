@@ -57,7 +57,7 @@ def evaluate_auto_confirm_policy(plan: Dict[str, Any], classification: Dict[str,
     if not device_ip:
         reasons.append("device_ip_missing")
 
-    max_commands = int(execution_cfg.get("max_commands", 5) or 5)
+    max_commands = int(execution_cfg.get("max_commands", 15) or 15)
     if len(execution_candidates) > max_commands:
         reasons.append("command_count_exceeded")
 

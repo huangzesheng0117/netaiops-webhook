@@ -421,3 +421,79 @@ except NameError:
     pass
 # ===== v8 prometheus review wrapper end =====
 
+
+# ===== BFD review human-readable format override begin =====
+try:
+    from netaiops.bfd_notification_formatter import apply_bfd_format_to_payload as _bfd_apply_review_format
+
+    def _bfd_wrap_review_func(_fn):
+        def _wrapped(*args, **kwargs):
+            return _bfd_apply_review_format(_fn(*args, **kwargs))
+        _wrapped.__name__ = getattr(_fn, "__name__", "wrapped_bfd_review_func")
+        _wrapped.__doc__ = getattr(_fn, "__doc__", None)
+        return _wrapped
+
+    for _name, _obj in list(globals().items()):
+        if not callable(_obj):
+            continue
+        if getattr(_obj, "__module__", None) != __name__:
+            continue
+        if _name.startswith("_"):
+            continue
+        _lname = _name.lower()
+        if any(x in _lname for x in ["review", "summary", "text", "payload", "message"]):
+            globals()["_bfd_original_" + _name] = _obj
+            globals()[_name] = _bfd_wrap_review_func(_obj)
+
+except Exception:
+    pass
+# ===== BFD review human-readable format override end =====
+
+# ===== BGP review human-readable format override begin =====
+try:
+    from netaiops.bgp_notification_formatter import apply_bgp_format_to_payload as _bgp_apply_review_format
+
+    def _bgp_wrap_review_func(_fn):
+        def _wrapped(*args, **kwargs):
+            return _bgp_apply_review_format(_fn(*args, **kwargs))
+        _wrapped.__name__ = getattr(_fn, "__name__", "wrapped_bgp_review_func")
+        _wrapped.__doc__ = getattr(_fn, "__doc__", None)
+        return _wrapped
+
+    for _name, _obj in list(globals().items()):
+        if not callable(_obj):
+            continue
+        if getattr(_obj, "__module__", None) != __name__:
+            continue
+        if _name.startswith("_"):
+            continue
+        _lname = _name.lower()
+        if any(x in _lname for x in ["review", "summary", "text", "payload", "message"]):
+            globals()["_bgp_original_" + _name] = _obj
+            globals()[_name] = _bgp_wrap_review_func(_obj)
+except Exception:
+    pass
+# ===== BGP review human-readable format override end =====
+
+# ===== Memory High review formatter guard begin =====
+try:
+    from netaiops.memory_notification_formatter import apply_memory_format_to_review_file as _apply_memory_review_file
+    from netaiops.memory_notification_formatter import apply_memory_format_to_review as _apply_memory_review_obj
+
+    _memory_original_generate_review_for_request_id = generate_review_for_request_id
+
+    def generate_review_for_request_id(request_id: str):
+        result = _memory_original_generate_review_for_request_id(request_id)
+        try:
+            review_obj = _apply_memory_review_file(request_id)
+            if isinstance(result, dict):
+                _apply_memory_review_obj(result)
+                if review_obj:
+                    result.update(review_obj)
+        except Exception:
+            pass
+        return result
+
+except Exception:
+    pass
+# ===== Memory High review formatter guard end =====

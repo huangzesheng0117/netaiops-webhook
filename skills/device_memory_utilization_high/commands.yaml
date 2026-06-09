@@ -1,0 +1,304 @@
+skill_name: device_memory_utilization_high
+version: v8.4.0-cisco-memory-prometheus
+family: device_memory_utilization_high
+risk_level: readonly
+readonly_only: true
+default_auto_execute_command_limit: 15
+allowed_tools:
+- mcp_netmiko_run_show
+- prometheus_range_query
+- parser_parse_cli_output
+profiles:
+  cisco_nxos_memory_high:
+    description: Cisco NX-OS memory high first-wave profile. Generic, readonly, no BGP assumption.
+    max_commands_per_request: 15
+    prometheus_evidence_preferred: true
+    default_commands:
+    - show clock
+    - show version
+    - show system resources
+    - show processes memory
+    - show system internal processes memory
+    - show system internal kernel meminfo
+    - show system internal kernel memory global
+    - show system internal memory-alerts-log
+    - show logging last 500
+    - show system cores
+    - show processes log
+    - show ip route summary vrf all
+    - show ip arp summary vrf all
+    - show mac address-table count
+    - show snmp
+  cisco_iosxe_memory_high:
+    description: Cisco IOS-XE memory high first-wave profile. Generic, readonly, no BGP assumption.
+    max_commands_per_request: 15
+    prometheus_evidence_preferred: true
+    default_commands:
+    - show clock
+    - show version
+    - show memory
+    - show memory statistics
+    - show processes memory sorted
+    - show processes memory detailed sorted
+    - show platform software status control-processor brief
+    - show processes memory platform sorted
+    - show processes memory platform accounting
+    - show memory statistics history table
+    - show memory failures alloc
+    - show logging | include MEMORY|Memory|MALLOC|malloc|MALLOCFAIL|LOWMEM|Low memory|No memory|SYS-2-MALLOCFAIL|crash|core|restart|OOM|watchdog
+    - show ip route summary
+    - show ip arp summary
+    - show snmp
+  cisco_ios_memory_high:
+    description: Cisco IOS memory high first-wave profile. Generic, readonly, no BGP assumption.
+    max_commands_per_request: 15
+    prometheus_evidence_preferred: true
+    default_commands:
+    - show clock
+    - show version
+    - show memory
+    - show memory statistics
+    - show processes memory sorted
+    - show processes memory detailed sorted
+    - show memory statistics history table
+    - show memory failures alloc
+    - show memory processor fragment
+    - show logging | include MEMORY|Memory|MALLOC|malloc|MALLOCFAIL|LOWMEM|Low memory|No memory|SYS-2-MALLOCFAIL|crash|core|restart|OOM|watchdog
+    - show ip route summary
+    - show ip arp summary
+    - show mac address-table count
+    - show users
+    - show snmp
+platform_commands:
+  cisco_nxos:
+    show_clock:
+      template: show clock
+      readonly: true
+    show_version:
+      template: show version
+      readonly: true
+    show_system_resources:
+      template: show system resources
+      readonly: true
+    show_processes_memory:
+      template: show processes memory
+      readonly: true
+    show_system_internal_processes_memory:
+      template: show system internal processes memory
+      readonly: true
+    show_system_internal_kernel_meminfo:
+      template: show system internal kernel meminfo
+      readonly: true
+    show_system_internal_kernel_memory_global:
+      template: show system internal kernel memory global
+      readonly: true
+    show_system_internal_memory_alerts_log:
+      template: show system internal memory-alerts-log
+      readonly: true
+    show_logging_last_500:
+      template: show logging last 500
+      readonly: true
+    show_system_cores:
+      template: show system cores
+      readonly: true
+    show_processes_log:
+      template: show processes log
+      readonly: true
+    show_ip_route_summary_vrf_all:
+      template: show ip route summary vrf all
+      readonly: true
+    show_ip_arp_summary_vrf_all:
+      template: show ip arp summary vrf all
+      readonly: true
+    show_mac_address_table_count:
+      template: show mac address-table count
+      readonly: true
+    show_snmp:
+      template: show snmp
+      readonly: true
+    show_users:
+      template: show users
+      readonly: true
+      optional_second_stage: true
+    show_module:
+      template: show module
+      readonly: true
+      optional_second_stage: true
+    show_environment:
+      template: show environment
+      readonly: true
+      optional_second_stage: true
+    show_vpc_brief:
+      template: show vpc brief
+      readonly: true
+      optional_second_stage: true
+  cisco_iosxe:
+    show_clock:
+      template: show clock
+      readonly: true
+    show_version:
+      template: show version
+      readonly: true
+    show_memory:
+      template: show memory
+      readonly: true
+    show_memory_statistics:
+      template: show memory statistics
+      readonly: true
+    show_processes_memory_sorted:
+      template: show processes memory sorted
+      readonly: true
+    show_processes_memory_detailed_sorted:
+      template: show processes memory detailed sorted
+      readonly: true
+    show_platform_software_status_control_processor_brief:
+      template: show platform software status control-processor brief
+      readonly: true
+    show_processes_memory_platform_sorted:
+      template: show processes memory platform sorted
+      readonly: true
+    show_processes_memory_platform_accounting:
+      template: show processes memory platform accounting
+      readonly: true
+    show_memory_statistics_history_table:
+      template: show memory statistics history table
+      readonly: true
+    show_memory_failures_alloc:
+      template: show memory failures alloc
+      readonly: true
+    show_logging_memory:
+      template: show logging | include MEMORY|Memory|MALLOC|malloc|MALLOCFAIL|LOWMEM|Low memory|No memory|SYS-2-MALLOCFAIL|crash|core|restart|OOM|watchdog
+      readonly: true
+    show_ip_route_summary:
+      template: show ip route summary
+      readonly: true
+    show_ip_arp_summary:
+      template: show ip arp summary
+      readonly: true
+    show_snmp:
+      template: show snmp
+      readonly: true
+    show_users:
+      template: show users
+      readonly: true
+      optional_second_stage: true
+    show_mac_address_table_count:
+      template: show mac address-table count
+      readonly: true
+      optional_second_stage: true
+    show_redundancy:
+      template: show redundancy
+      readonly: true
+      optional_second_stage: true
+  cisco_ios:
+    show_clock:
+      template: show clock
+      readonly: true
+    show_version:
+      template: show version
+      readonly: true
+    show_memory:
+      template: show memory
+      readonly: true
+    show_memory_statistics:
+      template: show memory statistics
+      readonly: true
+    show_processes_memory_sorted:
+      template: show processes memory sorted
+      readonly: true
+    show_processes_memory_detailed_sorted:
+      template: show processes memory detailed sorted
+      readonly: true
+    show_memory_statistics_history_table:
+      template: show memory statistics history table
+      readonly: true
+    show_memory_failures_alloc:
+      template: show memory failures alloc
+      readonly: true
+    show_memory_processor_fragment:
+      template: show memory processor fragment
+      readonly: true
+    show_logging_memory:
+      template: show logging | include MEMORY|Memory|MALLOC|malloc|MALLOCFAIL|LOWMEM|Low memory|No memory|SYS-2-MALLOCFAIL|crash|core|restart|OOM|watchdog
+      readonly: true
+    show_ip_route_summary:
+      template: show ip route summary
+      readonly: true
+    show_ip_arp_summary:
+      template: show ip arp summary
+      readonly: true
+    show_mac_address_table_count:
+      template: show mac address-table count
+      readonly: true
+    show_users:
+      template: show users
+      readonly: true
+    show_snmp:
+      template: show snmp
+      readonly: true
+second_stage_triggers:
+  bgp:
+  - BGP Router
+  - bgp
+  - urib
+  - ipfib
+  - route count abnormal
+  ospf:
+  - OSPF Router
+  - ospf
+  - LSA
+  - database
+  isis:
+  - isis
+  - adjacency
+  - database
+  snmp:
+  - SNMP ENGINE
+  - snmpd
+  - authentication failures
+  - SNMP input fast increasing
+  arp_mac:
+  - ARP Input
+  - netstack
+  - mac address table abnormal
+  - ARP table abnormal
+  syslog:
+  - syslogd
+  - logging storm
+  - message repeat
+  ha_stack:
+  - standby
+  - SSO
+  - stack member
+  - supervisor
+command_limits:
+  max_commands_per_request: 15
+  max_extra_rounds: 0
+  timeout_seconds_per_command: 35
+  continue_on_command_failure: true
+forbidden_patterns:
+- configure terminal
+- conf t
+- shutdown
+- no shutdown
+- clear
+- reload
+- delete
+- erase
+- debug
+- copy
+- write memory
+- install
+- request
+notification_policy:
+  template: 初步判断 / 告警含义分析 / 命令执行概况 / 命令分析 / 综合执行结果判断 / 建议
+  hide_internal_orchestration: true
+  forbidden_words_in_notification:
+  - 第一批
+  - 第二批
+  - 第一波
+  - 第二波
+  - stage-1
+  - stage-2
+  command_overview: 列出成功执行命令清单和失败命令；失败命令必须单独列出。
+  analysis: 聚合 Prometheus 历史趋势、总体内存、进程 RSS、cache/available、kernel/RAM FS、内存告警、core/crash/restart、表项规模、SNMP/管理面，不逐条解释命令用途。

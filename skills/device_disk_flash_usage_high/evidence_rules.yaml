@@ -1,0 +1,92 @@
+skill_name: device_disk_flash_usage_high
+version: v8.4.0-cisco-disk-flash-prometheus
+family: device_disk_flash_usage_high
+required_facts:
+- hostname
+- device_ip
+- mcp_commands
+preferred_facts:
+- prometheus_filesystem_window
+- filesystem_usage_current
+- filesystem_usage_avg
+- filesystem_usage_max
+- filesystem_usage_trend
+- filesystem_name
+- filesystem_free_space
+- filesystem_total_space
+- filesystem_rw_state
+- current_version
+- current_boot_variable
+- system_image
+- boot_mode
+- bin_files
+- pkg_files
+- packages_conf_references
+- showtech_files
+- tech_support_files
+- core_files
+- crashinfo_files
+- pcap_files
+- log_files
+- standby_flash_signal
+- filesystem_error_logs
+- no_space_logs
+- copy_or_write_failure_logs
+- debug_enabled_signal
+status_rules:
+  filesystem_sustained_high_prometheus:
+    condition: Prometheus filesystem usage remains high through the window
+    severity: warning
+    message: Disk/Flash high appears sustained in historical monitoring window.
+  filesystem_growing_prometheus:
+    condition: Prometheus filesystem usage keeps increasing in the window
+    severity: warning
+    message: Disk/Flash usage is increasing; check growing logs, core, capture or debug files.
+  filesystem_no_prometheus:
+    condition: Prometheus filesystem metric unavailable or no data
+    severity: info
+    message: Prometheus filesystem history unavailable; CLI file system evidence is authoritative.
+  current_boot_file_protected:
+    condition: Candidate large file is referenced by current boot variable or packages.conf
+    severity: critical
+    message: Do not delete current boot image, packages.conf or active package files.
+  old_image_or_package_residue:
+    condition: Multiple old .bin or .pkg files exist and are not referenced by current boot/packages.conf
+    severity: warning
+    message: Old software images or inactive packages may be consuming Flash space.
+  showtech_or_archive_residue:
+    condition: Large show-tech, tech-support, tar, tgz, gz or zip files exist
+    severity: warning
+    message: Technical support archives may be consuming Flash space; confirm retention before cleanup.
+  core_or_crash_files:
+    condition: Recent core/crashinfo files exist
+    severity: warning
+    message: Core/crash files indicate possible process or system abnormality; preserve before cleanup.
+  capture_or_debug_files:
+    condition: pcap/cap/debug files exist or debug is enabled
+    severity: warning
+    message: Capture/debug files may consume disk and can continue growing.
+  standby_or_stack_member_mismatch:
+    condition: standby or stack member filesystem usage differs from active
+    severity: warning
+    message: Standby/stack member Flash may be full even if active looks normal.
+  filesystem_error:
+    condition: logs contain filesystem error, readonly state, write failure or No space
+    severity: critical
+    message: Filesystem full or abnormal state may already affect write/copy/core/install operations.
+manual_review_conditions:
+- Prometheus filesystem query returned no data
+- CLI indicates boot variable points to missing file
+- packages.conf missing but boot points to packages.conf
+- recent core/crash files exist
+- filesystem readonly or I/O error detected
+- standby/member filesystem inaccessible
+- large files may still be needed by TAC or recent troubleshooting
+- cleanup requires install remove inactive or delete actions
+human_readable_analysis_flow:
+- 先看 Prometheus 文件系统历史窗口，判断空间高是持续高位、仍在增长、周期性增长还是已恢复。
+- 再看设备文件系统总览或 bootflash/flash 目录，确认具体哪个 filesystem 高。
+- 再核对当前版本、system image、boot 变量和 packages.conf，明确不可删除文件。
+- 再按文件类型归因：旧镜像/package、show-tech、core/crash、pcap/cap、log、备份文件、standby/stack 成员不一致。
+- 再结合日志确认是否出现 No space、copy/write/install 失败、filesystem error、core/crash、debug/log 风暴。
+- 最终只给只读分析和清理前注意事项；不自动执行任何 delete/install remove inactive/package clean。

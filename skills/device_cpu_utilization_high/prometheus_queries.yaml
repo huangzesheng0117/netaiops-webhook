@@ -1,0 +1,33 @@
+skill_name: device_cpu_utilization_high
+version: v8.3.1-cisco-cpu-prometheus-mapping-fix
+profile: device_cpu_utilization
+description: >
+  Cisco CPU utilization Prometheus query mapping. Current VictoriaMetrics confirms
+  cpmCPUTotal1minRev is the available CPU utilization metric for the tested Cisco device.
+lookback_minutes: 30
+step_seconds: 60
+compare_offset_minutes: 5
+required_labels:
+  - device_ip
+label_aliases:
+  device_ip:
+    - ip
+    - device_ip
+    - instance
+queries:
+  cpu_1min:
+    description: Cisco CPU 1 minute utilization from CISCO-PROCESS-MIB.
+    unit: percent
+    candidate_promql:
+      - avg(cpmCPUTotal1minRev{ip="{device_ip}"})
+      - avg(cpmCPUTotal1minRev{instance="{device_ip}"})
+      - avg(cpmCPUTotal1minRev{instance=~"{device_ip}(:[0-9]+)?"})
+    promql_candidates:
+      - avg(cpmCPUTotal1minRev{ip="{{device_ip}}"})
+      - avg(cpmCPUTotal1minRev{instance="{{device_ip}}"})
+      - avg(cpmCPUTotal1minRev{instance=~"{{device_ip}}(:[0-9]+)?"})
+judgement:
+  instant_spike: CPU is high only at current point while 30m average is normal.
+  periodic_spike: CPU has repeated peaks in the 30m window.
+  sustained_high: CPU stays high for most samples in the window.
+  prometheus_unavailable: Prometheus CPU series unavailable; continue CLI evidence and state evidence boundary.

@@ -1,40 +1,173 @@
 skill_name: routing_neighbor_down
-version: v6.3.0
+version: v8.2.0-bgp-no-physical-interface
 family: routing_neighbor_down
 required_facts:
-  - hostname
-  - device_ip
-  - protocol
-  - neighbor_state
-  - mcp_commands
+- device_ip
+- hostname
+- mcp_commands
+- neighbor_state
+- peer_ip
+- protocol
 preferred_facts:
-  - peer_ip
-  - neighbor_id
-  - interface
-  - vrf
-  - area
-  - route_count
-  - hold_timer
-  - bfd_session_state
-  - prometheus_window_state
-  - recent_log_keywords
+- accepted_route_count
+- advertised_route_count
+- arp_state
+- bfd_down_reason
+- bfd_echo_risk
+- bfd_registered_protocols
+- bfd_rx_count
+- bfd_session_state
+- bfd_session_type
+- bfd_state
+- bfd_timer
+- bfd_tx_count
+- bgp_admin_shutdown
+- bgp_connection_dropped_count
+- bgp_hold_keepalive_timer
+- bgp_identifier_wrong_signal
+- bgp_last_reset
+- bgp_maximum_prefix_signal
+- bgp_notification
+- bgp_peer_state
+- bgp_policy_denied_signal
+- bgp_prefix_received
+- bgp_remote_as
+- bgp_state
+- bgp_summary_state
+- bgp_up_down_time
+- bgp_wrong_as_signal
+- control_plane_drop_signal
+- forwarding_route_to_peer
+- interface
+- interface_admin_state
+- isis_state
+- ospf_state
+- prometheus_window_state
+- recent_log_keywords
+- resource_pressure
+- route_to_peer
+- upper_protocol_state
+- vpc_or_svi_risk
+- vrf
 status_rules:
-  active:
-    condition: "neighbor state is not established/full/up or BFD session is down"
+  active_bfd_down:
+    condition: BFD session exists and state is Down/AdminDown or down reason is present
     severity: warning
-    message: "current evidence indicates the routing neighbor issue is still active"
+    message: BFD evidence indicates the session is still abnormal
   recovered_or_transient:
-    condition: "current neighbor state is established/full/up while Prometheus fired in a previous window"
+    condition: BFD session is Up while alert fired in previous window and recent logs show earlier flap
     severity: info
-    message: "current evidence looks recovered or transient"
-  inconclusive:
-    condition: "required protocol or neighbor facts are missing"
+    message: BFD currently looks recovered or transient
+  transport_path_issue:
+    condition: route/ARP/interface evidence is abnormal or interface has flap/error/drop
     severity: warning
-    message: "manual review is required"
+    message: BFD down is likely caused by underlying transport/interface/path issue
+  control_plane_or_acl_issue:
+    condition: BFD rx does not increase or CoPP/control-plane drop signal is present
+    severity: warning
+    message: BFD packet may be dropped by path, ACL or control-plane policing
+  peer_side_issue:
+    condition: down reason contains Neighbor Signaled Session Down
+    severity: warning
+    message: peer device signaled the BFD down event; check peer-side interface, logs and BFD details
+  echo_or_vpc_design_risk:
+    condition: down reason contains Echo Function Failed or interface is SVI/vPC related
+    severity: warning
+    message: BFD echo or vPC/SVI design limitation may be involved
+  upper_protocol_impacted:
+    condition: BGP/OSPF/ISIS neighbor is also down
+    severity: critical
+    message: upper-layer routing protocol is also impacted
+  inconclusive:
+    condition: peer_ip, interface, vrf or BFD details are missing
+    severity: warning
+    message: manual review is required because key BFD evidence is missing
+  bgp_not_established_idle_active_connect:
+    condition: BGP peer state is Idle, Active or Connect
+    severity: warning
+    message: BGP session is not established; first check route to peer, source address, TCP/179 reachability, ACL/firewall and peer-side listener.
+  bgp_opensent_openconfirm:
+    condition: BGP peer state is OpenSent or OpenConfirm
+    severity: warning
+    message: TCP appears reachable but BGP Open/Keepalive negotiation is not complete; check remote-as, router-id, password, capability and timers.
+  bgp_established_prefix_abnormal:
+    condition: BGP peer is Established but prefix count is zero or abnormal
+    severity: warning
+    message: BGP session is up but route exchange is abnormal; check address-family, route policy, prefix-list, filter-list, next-hop and advertised/received routes.
+  bgp_hold_timer_expired:
+    condition: Last reset or logs contain hold timer expired
+    severity: warning
+    message: BGP keepalive/update was not received within hold time; check packet loss, interface errors, BFD, CPU/control-plane and peer-side health.
+  bgp_bfd_triggered:
+    condition: Last reset or logs contain BFD adjacency down
+    severity: warning
+    message: BFD likely triggered BGP down; prioritize BFD session, interface, path loss and BFD timer consistency.
+  bgp_wrong_as:
+    condition: Logs or notification contain peer in wrong AS
+    severity: critical
+    message: BGP remote-as mismatch or peer AS changed.
+  bgp_router_id_duplicate:
+    condition: Logs or notification contain BGP identifier wrong
+    severity: critical
+    message: BGP router-id duplicate or invalid; verify local/peer router-id.
+  bgp_max_prefix_exceeded:
+    condition: Logs or detail contain maximum-prefix exceeded
+    severity: critical
+    message: Maximum prefix threshold may have shut down the neighbor.
+  bgp_admin_shutdown:
+    condition: Detail/config indicates admin shutdown or neighbor shutdown
+    severity: info
+    message: Neighbor may be administratively shut down; verify intended maintenance or configuration.
+  bgp_route_or_fib_issue:
+    condition: Route/FIB to peer missing, default-only, wrong interface, unresolved, drop or glean
+    severity: warning
+    message: Underlying route or forwarding path to BGP peer is abnormal.
+  bgp_policy_issue:
+    condition: Prefixes denied due to policy, inbound updates discarded, advertised/accepted route count abnormal
+    severity: warning
+    message: BGP session may be established but route policy is filtering routes.
+  bgp_inconclusive:
+    condition: Peer detail, route, interface or logs are missing or contradictory
+    severity: warning
+    message: BGP evidence is incomplete; manual review is required.
+  bgp_physical_interface_out_of_scope:
+    condition: BGP neighbor abnormal alert requires physical interface diagnosis
+    severity: info
+    message: Physical interface diagnosis is out of scope for BGP neighbor playbook and should be handled by physical-interface alert categories.
 manual_review_conditions:
-  - "missing peer_ip or neighbor_id"
-  - "mcp command failed"
-  - "parser status is error"
-  - "Prometheus and device evidence conflict"
-  - "neighbor belongs to a VRF that cannot be inferred"
-  - "BFD down while BGP or OSPF still appears established"
+- BFD down and BGP down happen together
+- BFD down but upper-layer protocol still appears established
+- BFD echo/vPC/SVI limitation suspected
+- BFD peer detail command failed
+- BGP Down but route/interface evidence looks normal
+- BGP Established but prefix count is zero
+- BGP evidence suggests physical interface issue; correlate with physical-interface alert category
+- BGP peer detail command failed
+- CoPP or system internal command unavailable on current platform
+- FIB/forwarding route unresolved/drop/glean
+- device evidence conflicts with Prometheus or alert window
+- missing peer_ip
+- missing vrf
+- policy-related route loss suspected
+- route_to_peer cannot be inferred
+- route_to_peer missing or default-only
+- wrong AS / router-id / maximum-prefix / password suspected
+human_readable_analysis_flow:
+- 先判断 BFD 会话是否仍然 Down，以及是否存在 Down reason。
+- 如果接口 down/flap/error/drop 明显，优先判断为承载链路问题导致 BFD down。
+- 如果到 peer_ip 的 route/ARP 异常，优先判断为基础三层路径问题。
+- 如果 route/ARP/interface 正常但 BFD Rx 不增长，优先怀疑对端、路径 ACL 或 CoPP。
+- 如果 Down reason 为 Control Detection Time Expired，重点查丢包、CoPP、ACL、timer 过激进。
+- 如果 Down reason 为 Echo Function Failed，重点查 echo、SVI、vPC、非对称路径。
+- 如果 Down reason 为 Neighbor Signaled Session Down，优先去对端设备查。
+- 如果 BGP/OSPF/ISIS 也 down，说明 BFD 已影响路由收敛；如果上层协议仍 up，可能是 BFD 单独异常或历史瞬断。
+- BGP 告警先判断邻居当前状态：Established、Idle、Active、Connect、OpenSent、OpenConfirm 或前缀数异常。
+- 如果 Idle/Active/Connect，优先核查到 peer 的路由、源地址、TCP 179、ACL/防火墙、对端是否监听。
+- 如果 OpenSent/OpenConfirm，优先核查 remote-as、router-id、password、capability、address-family 和 timer。
+- 如果 Last reset 为 hold timer expired，优先核查链路丢包、接口错误、BFD、CPU/控制面和对端健康。
+- 如果 Last reset 为 BFD adjacency down，先按 BFD 链路处理，不要只盯 BGP 配置。
+- 如果 Established 但前缀为 0 或业务路由缺失，重点查 address-family activate、route-map、prefix-list、filter-list、maximum-prefix、next-hop 和 advertised/received routes。
+- 如果 BGP 表、RIB、FIB 不一致，重点查 next-hop 可达性、RIB failure、管理距离、平台转发表下发问题。
+- BGP 邻居异常默认不执行物理接口取证命令；物理接口 down/error/discard/光功率等问题由物理接口故障类告警处理。
+- BGP 告警重点判断邻居状态、Last reset、BGP/BFD 日志、BGP 配置、RIB/FIB 可达性、BFD 触发、收发路由和策略过滤。
+- 如果证据指向物理接口问题，应在综合执行结果中说明需要关联物理接口告警或接口 playbook，而不是在 BGP playbook 内直接展开接口取证。

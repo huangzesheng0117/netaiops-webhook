@@ -369,6 +369,11 @@ async def fail_execution_api(request_id: str, request: Request) -> dict:
 async def update_execution_result_api(request_id: str, request: Request) -> dict:
     try:
         payload = await request.json()
+        try:
+            from netaiops.log_command_hard_error_normalizer import normalize_log_command_false_hard_errors
+            payload = normalize_log_command_false_hard_errors(payload)
+        except Exception:
+            pass
     except Exception:
         raise HTTPException(status_code=400, detail="invalid json payload")
 
