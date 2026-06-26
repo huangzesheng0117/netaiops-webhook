@@ -1,49 +1,100 @@
 skill_name: interface_down_or_oper_status
-version: v6.3.0
+version: v9.1.0-cisco-interface-down
 family: interface_down_or_oper_status
+
 required_facts:
   - hostname
   - device_ip
   - interface
-  - oper_status
-  - admin_status
   - mcp_commands
+
 preferred_facts:
-  - interface_class
-  - port_channel
-  - member_interfaces
+  - alertname
+  - platform
+  - admin_status
+  - oper_status
   - line_protocol
+  - interface_type
+  - interface_mode
   - last_link_change
+  - link_flap_count
+  - errdisable_reason
+  - running_config_shutdown
+  - channel_group
+  - port_channel
+  - member_state
+  - vpc_state
+  - vlan_id
+  - vlan_state
+  - trunk_state
+  - allowed_vlans
+  - stp_state
+  - stp_guard_state
   - input_errors
   - crc
+  - fcs
+  - input_discards
+  - output_discards
   - output_errors
-  - output_drops
   - transceiver_present
   - rx_power_status
   - tx_power_status
-  - prometheus_window_state
+  - module_status
   - recent_log_keywords
+  - prometheus_window_state
+  - prometheus_oper_status
+  - prometheus_in_bps
+  - prometheus_out_bps
+  - prometheus_in_errors_delta
+
 status_rules:
-  active:
-    condition: "oper_status is down or line protocol is down"
+  active_down:
+    condition: "Prometheus oper_status or CLI evidence still indicates down/notconnect/err-disabled/suspended"
     severity: warning
     message: "current evidence indicates the interface status issue is still active"
   recovered_or_transient:
-    condition: "oper_status is up while Prometheus fired in a previous window"
+    condition: "CLI status is up/connected and Prometheus shows previous down or traffic dip only inside the historical window"
     severity: info
-    message: "current evidence looks recovered or transient"
+    message: "current evidence looks recovered or transient; correlate with recent flap logs"
+  administratively_down:
+    condition: "admin_status is down or running-config contains shutdown"
+    severity: info
+    message: "interface is administratively disabled; check planned change before any recovery action"
   physical_layer_suspected:
-    condition: "interface is down with transceiver issue, CRC growth, or link flap logs"
+    condition: "down/notconnect plus optic abnormal, CRC/FCS/input errors, no Rx light, or link-flap logs"
     severity: warning
-    message: "physical layer or peer-side issue should be checked"
+    message: "physical layer, optic/fiber/cable, peer port, speed/FEC, or ODF path should be checked"
+  protocol_layer_suspected:
+    condition: "physical layer is up but line protocol is down"
+    severity: warning
+    message: "encapsulation, keepalive, L2/L3 mode, sub-interface or Port-channel relation should be checked"
+  errdisabled_suspected:
+    condition: "err-disabled status or ERRDISABLE logs are present"
+    severity: warning
+    message: "check err-disable reason such as BPDU Guard, UDLD, link-flap, port-security or gbic/sfp"
+  bundle_or_vpc_suspected:
+    condition: "Port-channel member is suspended/individual/not bundled or vPC evidence is abnormal"
+    severity: warning
+    message: "Port-channel, LACP or vPC consistency should be checked manually"
+  vlan_or_stp_suspected:
+    condition: "VLAN missing/inactive or STP blocking/guard evidence is present"
+    severity: warning
+    message: "VLAN, trunk allowed VLAN, STP state or guard mechanism may explain the abnormal status"
+  hardware_or_module_suspected:
+    condition: "show module or logs indicate module/linecard/transceiver hardware abnormality"
+    severity: warning
+    message: "linecard, module, transceiver or hardware event should be reviewed"
   inconclusive:
-    condition: "required interface or status facts are missing"
+    condition: "required interface/status facts are missing or Prometheus and CLI evidence conflict"
     severity: warning
     message: "manual review is required"
+
 manual_review_conditions:
-  - "missing interface"
+  - "missing interface label"
   - "mcp command failed"
-  - "parser status is error"
-  - "Prometheus and device evidence conflict"
-  - "interface belongs to a port-channel but member relation is not clear"
-  - "fabric-facing link down on Leaf-Spine or Spine class"
+  - "Prometheus no data or query failed"
+  - "Prometheus and CLI evidence conflict"
+  - "interface belongs to a Port-channel but member relation is unclear"
+  - "vPC or LACP consistency requires second-level checks"
+  - "peer-side evidence is required"
+  - "any recovery action such as no shutdown is needed"

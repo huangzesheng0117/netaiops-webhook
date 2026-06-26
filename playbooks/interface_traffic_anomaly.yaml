@@ -1,12 +1,12 @@
-playbook_id: cisco_interface_or_link_traffic_drop
+playbook_id: interface_traffic_anomaly
 family: interface_traffic_anomaly
 skill_name: interface_traffic_anomaly
-description: Cisco interface/link traffic drop readonly investigation playbook alias.
-  It reuses interface_traffic_anomaly skill and evidence logic.
+description: Generic alias for Cisco interface traffic spike/drop anomaly. It is kept
+  for backward compatibility with existing classifier references.
 match:
   vendor: cisco
-  alertname_regex: (接口.?链路.?流量.?突降|骨干网.*流量.*突降|互联网.*流量.*突降|骨干.*利用率.*突降|互联网.*利用率.*突降|Traffic.*Drop)
-  content_regex: (流量|带宽|利用率|bps|Mbps|Gbps|突降|下降|归零|入向|出向|input|output|inbound|outbound)
+  alertname_regex: (接口.?链路.?流量.?突增|接口.?链路.?流量.?突降|接口.?链路.?流量.?突增.?突降|骨干网.*流量.*突增|骨干网.*流量.*突降|互联网.*流量.*突增|互联网.*流量.*突降|Traffic.*Spike|Traffic.*Drop|Traffic.*Anomaly)
+  content_regex: (流量|带宽|利用率|bps|Mbps|Gbps|突增|突降|入向|出向|input|output)
 target_fields:
   device_ip:
   - device_ip
@@ -67,15 +67,8 @@ prometheus_evidence_first:
   - interface
   stop_device_cli_if_not_confirmed: false
   unavailable_policy: continue_cli_evidence
-  note: 'v9 interface traffic drop evidence alias: reuse interface_traffic_anomaly
-    profile.'
 analysis_policy:
-  goal: 接口/链路流量突降类告警先判断是否真实突降，再区分接口 flap、监控采集、计数器清零、路由切走、QoS限速、STP/vPC/聚合变化、对端停止发送或业务源停止。
-  first_wave_limits:
-    max_commands: 14
-    readonly_only: true
-    no_config_change: true
-    no_clear_counter: true
+  goal: 兼容旧 interface_traffic_anomaly playbook id，实际逻辑同 cisco_interface_traffic_anomaly。
 notification_policy:
   template: v8_v9_standard
   command_display: 每条命令各自占一行

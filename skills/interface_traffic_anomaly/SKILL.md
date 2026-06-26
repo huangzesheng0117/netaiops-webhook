@@ -1,70 +1,109 @@
 ---
 name: interface_traffic_anomaly
-version: v6.3.0
+version: v9.3.0-cisco-interface-traffic-anomaly
 family: interface_traffic_anomaly
-description: Interface or internet line traffic spike/drop analysis skill.
+description: Cisco interface/link traffic spike and drop analysis skill for backbone and internet links.
 risk_level: readonly
-stage: v6.3
+stage: v9
 ---
 
 # interface_traffic_anomaly
 
 ## Scope
 
-This Skill is generated from net-internet Prometheus rule semantics.
+This Skill covers Cisco interface or link traffic spike/drop alerts, including:
 
-Covered alert names:
+- 骨干网流量突增
+- 骨干网流量突降
+- 互联网流量突增
+- 互联网流量突降
+- 接口/链路流量突降
+- 接口/链路流量突增/突降
 
-- 互联网线路流量突增
-- 互联网线路流量突降
-- 互联网链路流量突增
-- 互联网链路流量突降
+## Core principle
 
-## Investigation goal
+Do not immediately judge the event as "link abnormal" or "business abnormal".
+First confirm whether the traffic change really happened, or whether it is caused by monitoring sampling, SNMP index change, counter clearing, interface flap, Port-channel member change, traffic hash redistribution, duplicate collection of Port-channel/member traffic, QoS drops, VLAN/STP/vPC path change, route/path change, or real business change.
 
-Confirm whether interface traffic spike or drop is still visible, compare current traffic with previous baseline, correlate interface rate, errors, port-channel state and logs, and determine whether the change is business traffic surge/drop, line/provider issue, failover, monitoring artifact, or transient.
+## First judgement questions
 
-## Runtime boundary
+1. Is the change inbound or outbound?
+2. Is it traffic spike or traffic drop?
+3. Is the target a physical port, Port-channel, SVI, sub-interface or Tunnel?
+4. Is it only one interface or multiple links along the same service path?
+5. Does CLI current rate match Prometheus historical/current rate?
 
-Only readonly tools are allowed. This Skill must not execute configuration, clear, reload, debug-enable, shutdown, save, write, copy or destructive operations.
+## Prometheus evidence requirements
 
-## Evidence expectation
+Prometheus MCP evidence is mandatory when available.
 
-The final review should clearly show:
+Default profile: `interface_traffic_anomaly`.
 
-- 线路名称
-- 突增或突降方向
-- 当前流量和历史基线
-- 设备名称和设备 IP
-- 关联接口
-- 接口当前速率、带宽、错误计数
-- 是否伴随 link flap / 聚合成员变化
-- 是否仍处于异常变化状态
-- 建议下一步动作
+Minimum queries:
 
-<!-- V7_12_PROMETHEUS_FIRST_TRAFFIC_ANOMALY BEGIN -->
-## v7.12 Prometheus-first traffic anomaly rule
+- in_bps
+- out_bps
+- if_oper_status
+- in_errors_delta
+- out_discards_delta
 
-For internet/DCI line traffic spike or drop alerts, do not start from device CLI.
+Prometheus evidence should compare current value, previous value, delta, ratio, max, min, average and trend in the lookback window.
 
-Required workflow:
+## First CLI wave
 
-1. Query Prometheus first for the affected interface and direction.
-2. Fetch each point in the recent time window, normally 5 to 15 minutes around the alert.
-3. Compare current traffic with the previous baseline.
-4. Confirm whether the spike/drop really exists.
-5. Only after Prometheus confirms the trend, collect device-side evidence:
-   - interface current rate
-   - interface bandwidth or operational speed
-   - errors/discards
-   - port-channel state
-   - link flap or traffic-related logs
+For NX-OS/Nexus, no more than 14 readonly commands:
 
-The final review must explicitly include:
+- show clock
+- show interface status
+- show interface <INTERFACE>
+- show running-config interface <INTERFACE>
+- show logging last 500 | include <INTERFACE>|ETHPORT|IF_DOWN|IF_UP|ERR|ERRDISABLE|UDLD|STP|SPANTREE|SFP|XCVR|TRANSCEIVER|LACP|VPC|QOS|DROP|flap
+- show interface counters errors
+- show interface <INTERFACE> counters
+- show policy-map interface <INTERFACE>
+- show interface <INTERFACE> transceiver details
+- show port-channel summary
+- show vpc brief
+- show interface trunk
+- show spanning-tree interface <INTERFACE> detail
+- show vlan brief
 
-- current traffic series
-- previous baseline
-- spike/drop direction
-- whether Prometheus confirms the anomaly
-- whether device-side evidence supports a link, port-channel, provider, failover or traffic-source issue
-<!-- V7_12_PROMETHEUS_FIRST_TRAFFIC_ANOMALY END -->
+For IOS/IOS-XE, use equivalent `show interfaces` commands.
+
+## Decision paths
+
+- Spike with no errors/drops: prefer real business increase or path shift into the link.
+- Spike with output drops: prefer queue congestion, QoS drops or policing.
+- Drop with interface flap: prefer physical link instability.
+- Drop while interface remains up/up: prefer route/path shift, QoS policing, STP/vPC/Port-channel change or business source stop.
+- Only Port-channel member changes: prefer hashing redistribution or member change.
+- Broadcast/multicast spike: prefer L2 storm, multicast abnormality, unknown unicast flooding or loop.
+
+## Forbidden actions
+
+Never execute automatically:
+
+- configure terminal / conf t
+- shutdown / no shutdown
+- clear counters / clear interface
+- debug
+- reload
+- write memory / copy running-config startup-config
+- SPAN configuration
+- ACL configuration
+- QoS policy modification
+- interface reset or flap
+
+## Notification format
+
+Final notification must contain:
+
+1. 根据告警内容初步判断
+2. 告警含义分析
+3. 命令执行概况
+4. 命令分析
+5. Prometheus窗口证据
+6. 综合执行结果判断
+7. 建议
+
+Command lists must be one command per line.

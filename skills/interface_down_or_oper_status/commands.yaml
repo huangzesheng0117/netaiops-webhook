@@ -1,110 +1,231 @@
 skill_name: interface_down_or_oper_status
-version: v6.3.0
+version: v9.1.0-cisco-interface-down
 family: interface_down_or_oper_status
 risk_level: readonly
+readonly_only: true
+auto_execute_allowed: true
+
 allowed_tools:
   - mcp_netmiko_run_show
   - prometheus_range_query
   - parser_parse_cli_output
+
 allowed_capabilities:
+  - show_clock
+  - show_interface_status_summary
+  - show_ip_interface_brief
   - show_interface_detail
-  - show_interface_status
+  - show_interface_config
+  - show_errdisabled_status
+  - show_errdisable_recovery
+  - show_recent_interface_logs
   - show_interface_error_counters
   - show_interface_transceiver
+  - show_vlan_brief
+  - show_trunk_status
+  - show_stp_interface_detail
   - show_port_channel_summary
-  - show_recent_interface_logs
+  - show_lacp_neighbor
+  - show_vpc_brief
+  - show_vpc_consistency
+  - show_module
+  - show_cdp_neighbor
+  - show_lldp_neighbor
   - prometheus_range_query
   - parse_cli_output
+
 platform_commands:
   cisco_nxos:
+    show_clock:
+      template: "show clock"
+      readonly: true
+    show_interface_status_summary:
+      template: "show interface status"
+      readonly: true
     show_interface_detail:
       template: "show interface {interface}"
       readonly: true
-    show_interface_status:
-      template: "show interface {interface} status"
+    show_interface_config:
+      template: "show running-config interface {interface}"
+      readonly: true
+    show_errdisabled_status:
+      template: "show interface status err-disabled"
+      readonly: true
+    show_recent_interface_logs:
+      template: "show logging last 500 | include {interface}|ETHPORT|IF_DOWN|IF_UP|ERR|ERRDISABLE|UDLD|STP|SPANTREE|SFP|XCVR|TRANSCEIVER|LACP|VPC"
       readonly: true
     show_interface_error_counters:
-      template: "show interface {interface} counters errors"
+      template: "show interface counters errors"
       readonly: true
     show_interface_transceiver:
       template: "show interface {interface} transceiver details"
       readonly: true
+    show_vlan_brief:
+      template: "show vlan brief"
+      readonly: true
+    show_trunk_status:
+      template: "show interface trunk"
+      readonly: true
+    show_stp_interface_detail:
+      template: "show spanning-tree interface {interface} detail"
+      readonly: true
     show_port_channel_summary:
       template: "show port-channel summary"
       readonly: true
-    show_recent_interface_logs:
-      template: "show logging | include {interface}|LINK|Link|link|changed state|flap|down|up"
+    show_lacp_neighbor:
+      template: "show lacp neighbor"
       readonly: true
+      optional_followup: true
+    show_vpc_brief:
+      template: "show vpc brief"
+      readonly: true
+    show_vpc_consistency:
+      template: "show vpc consistency-parameters interface {port_channel}"
+      readonly: true
+      optional_followup: true
+    show_module:
+      template: "show module"
+      readonly: true
+    show_cdp_neighbor:
+      template: "show cdp neighbors interface {interface} detail"
+      readonly: true
+      optional_followup: true
+    show_lldp_neighbor:
+      template: "show lldp neighbors interface {interface} detail"
+      readonly: true
+      optional_followup: true
+
   cisco_iosxe:
+    show_clock:
+      template: "show clock"
+      readonly: true
+    show_ip_interface_brief:
+      template: "show ip interface brief"
+      readonly: true
+    show_interface_status_summary:
+      template: "show interfaces status"
+      readonly: true
     show_interface_detail:
       template: "show interfaces {interface}"
       readonly: true
-    show_interface_status:
-      template: "show interfaces {interface} status"
+    show_interface_config:
+      template: "show running-config interface {interface}"
+      readonly: true
+    show_errdisabled_status:
+      template: "show interfaces status err-disabled"
+      readonly: true
+    show_errdisable_recovery:
+      template: "show errdisable recovery"
+      readonly: true
+    show_recent_interface_logs:
+      template: "show logging | include {interface}|LINEPROTO|LINK|ERR|ERRDISABLE|UDLD|SPANTREE|STP|GBIC|SFP|TRANSCEIVER|LACP|PAGP"
       readonly: true
     show_interface_error_counters:
-      template: "show interfaces {interface} counters errors"
+      template: "show interfaces counters errors"
       readonly: true
     show_interface_transceiver:
-      template: "show interfaces {interface} transceiver details"
+      template: "show interfaces {interface} transceiver detail"
+      readonly: true
+    show_vlan_brief:
+      template: "show vlan brief"
+      readonly: true
+    show_trunk_status:
+      template: "show interfaces trunk"
+      readonly: true
+    show_stp_interface_detail:
+      template: "show spanning-tree interface {interface} detail"
       readonly: true
     show_port_channel_summary:
       template: "show etherchannel summary"
       readonly: true
-    show_recent_interface_logs:
-      template: "show logging | include {interface}|LINK|Line protocol|changed state|flap|down|up"
+    show_lacp_neighbor:
+      template: "show lacp neighbor"
       readonly: true
+      optional_followup: true
+    show_cdp_neighbor:
+      template: "show cdp neighbors {interface} detail"
+      readonly: true
+      optional_followup: true
+    show_lldp_neighbor:
+      template: "show lldp neighbors {interface} detail"
+      readonly: true
+      optional_followup: true
+
   cisco_ios:
+    show_clock:
+      template: "show clock"
+      readonly: true
+    show_ip_interface_brief:
+      template: "show ip interface brief"
+      readonly: true
+    show_interface_status_summary:
+      template: "show interfaces status"
+      readonly: true
     show_interface_detail:
       template: "show interfaces {interface}"
       readonly: true
-    show_interface_status:
-      template: "show interfaces {interface} status"
+    show_interface_config:
+      template: "show running-config interface {interface}"
+      readonly: true
+    show_errdisabled_status:
+      template: "show interfaces status err-disabled"
+      readonly: true
+    show_errdisable_recovery:
+      template: "show errdisable recovery"
+      readonly: true
+    show_recent_interface_logs:
+      template: "show logging | include {interface}|LINEPROTO|LINK|ERR|ERRDISABLE|UDLD|SPANTREE|STP|GBIC|SFP|TRANSCEIVER|LACP|PAGP"
       readonly: true
     show_interface_error_counters:
-      template: "show interfaces {interface} counters errors"
+      template: "show interfaces counters errors"
       readonly: true
     show_interface_transceiver:
-      template: "show interfaces {interface} transceiver details"
+      template: "show interfaces {interface} transceiver detail"
+      readonly: true
+    show_vlan_brief:
+      template: "show vlan brief"
+      readonly: true
+    show_trunk_status:
+      template: "show interfaces trunk"
+      readonly: true
+    show_stp_interface_detail:
+      template: "show spanning-tree interface {interface} detail"
       readonly: true
     show_port_channel_summary:
       template: "show etherchannel summary"
       readonly: true
-    show_recent_interface_logs:
-      template: "show logging | include {interface}|LINK|Line protocol|changed state|flap|down|up"
+    show_lacp_neighbor:
+      template: "show lacp neighbor"
       readonly: true
-  aci:
-    show_interface_detail:
-      template: "show interface {interface}"
+      optional_followup: true
+    show_cdp_neighbor:
+      template: "show cdp neighbors {interface} detail"
       readonly: true
-    show_interface_status:
-      template: "show interface {interface} status"
+      optional_followup: true
+    show_lldp_neighbor:
+      template: "show lldp neighbors {interface} detail"
       readonly: true
-    show_interface_error_counters:
-      template: "show interface {interface} counters errors"
-      readonly: true
-    show_interface_transceiver:
-      template: "show interface {interface} transceiver details"
-      readonly: true
-    show_port_channel_summary:
-      template: "show port-channel summary"
-      readonly: true
-    show_recent_interface_logs:
-      template: "show logging | include {interface}|LINK|Link|link|changed state|flap|down|up"
-      readonly: true
+      optional_followup: true
+
 command_limits:
-  max_commands_per_request: 8
+  max_commands_per_request: 14
   max_extra_rounds: 0
-readonly_only: true
+
 forbidden_patterns:
   - "configure terminal"
   - "conf t"
+  - "interface "
   - "shutdown"
   - "no shutdown"
   - "clear"
   - "reload"
+  - "reboot"
+  - "reset"
   - "write memory"
   - "copy running-config startup-config"
+  - "copy run start"
   - "delete"
   - "erase"
+  - "format"
   - "debug"
+  - "commit"

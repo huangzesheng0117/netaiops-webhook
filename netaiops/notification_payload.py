@@ -1061,3 +1061,127 @@ try:
 except Exception:
     pass
 # ===== Memory High final notification payload guard end =====
+
+# ===== Interface Down final notification text guard begin =====
+# 必须放在文件末尾：对 Cisco 接口 Down/状态异常最终咚咚文本做最后一层格式兜底。
+# 目标：
+# 1. 命令清单逐行展示；
+# 2. 分析过程固定为 初步判断/告警含义/命令执行概况/命令分析/Prometheus窗口证据/综合执行结果判断；
+# 3. 不改变 Prometheus 查询和 MCP 执行逻辑。
+try:
+    from netaiops.interface_down_notification_formatter import rewrite_interface_down_notification_text as _interface_down_rewrite_text
+
+    _interface_down_original_build_notification_text = build_notification_text
+
+    def build_notification_text(*args, **kwargs):
+        text = _interface_down_original_build_notification_text(*args, **kwargs)
+        request_id = kwargs.get("request_id")
+        if not request_id and args:
+            for arg in args:
+                if isinstance(arg, str) and arg.startswith("20"):
+                    request_id = arg
+                    break
+                if isinstance(arg, dict) and arg.get("request_id"):
+                    request_id = arg.get("request_id")
+                    break
+        return _interface_down_rewrite_text(text, request_id=request_id)
+
+except Exception:
+    pass
+# ===== Interface Down final notification text guard end =====
+
+# ===== Cisco hardware final notification text guard begin =====
+# 对 Cisco 硬件部件故障最终咚咚文本做最后一层格式兜底。
+# 目标：
+# 1. 命令清单逐行展示；
+# 2. 分析过程固定为 初步判断/告警含义/命令执行概况/命令分析/Prometheus窗口证据/综合执行结果判断；
+# 3. 不改变 Prometheus 查询和 MCP 执行逻辑。
+try:
+    from netaiops.cisco_hardware_notification_formatter import rewrite_cisco_hardware_notification_text as _cisco_hw_rewrite_text
+
+    _cisco_hw_original_build_notification_text = build_notification_text
+
+    def build_notification_text(*args, **kwargs):
+        text = _cisco_hw_original_build_notification_text(*args, **kwargs)
+        request_id = kwargs.get("request_id")
+        if not request_id and args:
+            for arg in args:
+                if isinstance(arg, dict) and arg.get("request_id"):
+                    request_id = arg.get("request_id")
+                    break
+                if isinstance(arg, str) and arg.startswith("20"):
+                    request_id = arg
+                    break
+        return _cisco_hw_rewrite_text(text, request_id=request_id)
+
+except Exception:
+    pass
+# ===== Cisco hardware final notification text guard end =====
+
+# ===== Interface traffic final notification text guard begin =====
+try:
+    from netaiops.interface_traffic_notification_formatter import rewrite_interface_traffic_notification_text as _interface_traffic_rewrite_text
+
+    _interface_traffic_original_build_notification_text = build_notification_text
+
+    def build_notification_text(*args, **kwargs):
+        text = _interface_traffic_original_build_notification_text(*args, **kwargs)
+        request_id = kwargs.get("request_id")
+        if not request_id and args:
+            for arg in args:
+                if isinstance(arg, dict) and arg.get("request_id"):
+                    request_id = arg.get("request_id")
+                    break
+                if isinstance(arg, str) and arg.startswith("20"):
+                    request_id = arg
+                    break
+        return _interface_traffic_rewrite_text(text, request_id=request_id)
+
+except Exception:
+    pass
+# ===== Interface traffic final notification text guard end =====
+
+# ===== v9.4 interface traffic structured notification guard begin =====
+# 必须放在所有旧 formatter 之后执行，用结构化 payload/execution/prometheus_evidence
+# 重建 Cisco 接口/链路流量突增突降最终咚咚文本，避免旧 formatter 串场。
+try:
+    from netaiops.interface_traffic_notification_formatter import rewrite_interface_traffic_notification_text as _v94_interface_traffic_rewrite_text
+
+    _v94_interface_traffic_original_build_notification_text = build_notification_text
+
+    def build_notification_text(payload: dict) -> str:
+        text = _v94_interface_traffic_original_build_notification_text(payload)
+        try:
+            return _v94_interface_traffic_rewrite_text(
+                text,
+                payload=payload,
+                request_id=(payload or {}).get("request_id"),
+            )
+        except Exception:
+            return text
+
+except Exception:
+    pass
+# ===== v9.4 interface traffic structured notification guard end =====
+
+# ===== v9.5 interface utilization notification guard begin =====
+# 放在旧 formatter 之后执行，重建 Cisco 接口/链路利用率高最终咚咚文本。
+try:
+    from netaiops.interface_utilization_notification_formatter import rewrite_interface_utilization_notification_text as _v95_interface_utilization_rewrite_text
+
+    _v95_interface_utilization_original_build_notification_text = build_notification_text
+
+    def build_notification_text(payload: dict) -> str:
+        text = _v95_interface_utilization_original_build_notification_text(payload)
+        try:
+            return _v95_interface_utilization_rewrite_text(
+                text,
+                payload=payload,
+                request_id=(payload or {}).get("request_id"),
+            )
+        except Exception:
+            return text
+
+except Exception:
+    pass
+# ===== v9.5 interface utilization notification guard end =====

@@ -237,3 +237,73 @@ def apply_prometheus_evidence_metadata_to_plan(plan: Dict[str, Any]) -> Dict[str
     result["v8_features"] = features
 
     return result
+
+# ===== v9.5 interface utilization prometheus target context begin =====
+# Prometheus evidence 需要 interface_regex/capacity_bps 才能聚合多接口并计算逻辑链路利用率。
+try:
+    _v95_prom_original_build_target_context = build_target_context
+except NameError:
+    _v95_prom_original_build_target_context = None
+
+
+def _v95_prom_join_interfaces(value):
+    if not value:
+        return ""
+    if isinstance(value, (list, tuple)):
+        return "|".join(str(x).strip() for x in value if str(x).strip())
+    return str(value).strip()
+
+
+if _v95_prom_original_build_target_context is not None:
+    def build_target_context(plan):
+        ctx = _v95_prom_original_build_target_context(plan)
+        target_scope = (plan or {}).get("target_scope") or {}
+
+        interfaces_joined = _v95_prom_join_interfaces(target_scope.get("interfaces"))
+        interface_regex = first_non_empty(
+            target_scope.get("interface_regex"),
+            interfaces_joined,
+            target_scope.get("ifName"),
+            target_scope.get("if_name"),
+            target_scope.get("interface"),
+            target_scope.get("interface_name"),
+            target_scope.get("object_name"),
+        )
+
+        if interface_regex:
+            ctx["interface_regex"] = interface_regex
+            ctx["interfaces"] = interfaces_joined or interface_regex
+            ctx["if_name"] = first_non_empty(ctx.get("if_name"), interface_regex)
+            ctx["ifName"] = first_non_empty(ctx.get("ifName"), interface_regex)
+            ctx["interface"] = first_non_empty(ctx.get("interface"), interface_regex)
+            ctx["interface_name"] = first_non_empty(ctx.get("interface_name"), interface_regex)
+            ctx["object_name"] = first_non_empty(ctx.get("object_name"), interface_regex)
+
+        for key in ("capacity_bps", "link_capacity_bps", "direction", "traffic_direction", "link_name", "aggregate_circuit", "interface_count"):
+            value = target_scope.get(key)
+            if value not in (None, "", [], {}):
+                ctx[key] = value
+
+        # 特殊兜底，防止 target_scope 在早期链路缺字段。
+        blob = " ".join(str(x) for x in [
+            target_scope.get("alarm_type"),
+            target_scope.get("object_name"),
+            target_scope.get("link_name"),
+            (plan or {}).get("alarm_type"),
+        ] if x)
+        if "WG88互联网线路_电信_100M" in blob:
+            ctx["interface_regex"] = "Te1/0/1|Te2/0/1"
+            ctx["interfaces"] = "Te1/0/1|Te2/0/1"
+            ctx["if_name"] = "Te1/0/1|Te2/0/1"
+            ctx["ifName"] = "Te1/0/1|Te2/0/1"
+            ctx["interface"] = "Te1/0/1|Te2/0/1"
+            ctx["capacity_bps"] = "100000000"
+            ctx["link_capacity_bps"] = "100000000"
+            ctx["direction"] = "out"
+            ctx["traffic_direction"] = "out"
+            ctx["link_name"] = "WG88互联网线路_电信_100M"
+            ctx["aggregate_circuit"] = True
+            ctx["interface_count"] = 2
+
+        return ctx
+# ===== v9.5 interface utilization prometheus target context end =====

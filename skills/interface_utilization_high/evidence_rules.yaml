@@ -1,78 +1,56 @@
 skill_name: interface_utilization_high
-version: v6.3.0
+version: v9.5.0-cisco-interface-utilization-high
 family: interface_or_link_utilization_high
 
 required_facts:
-  - interface
-  - admin_status
-  - oper_status
-  - bandwidth_bps
-  - input_rate_bps
-  - output_rate_bps
+  - hostname
+  - device_ip
+  - interfaces
+  - traffic_direction
+  - capacity_bps
+  - prometheus_window_state
+  - command_results
 
 preferred_facts:
-  - input_utilization_percent_estimated
-  - output_utilization_percent_estimated
-  - crc
-  - fcs_err
-  - rcv_err
-  - xmit_err
-  - out_discards
+  - aggregate_in_bps
+  - aggregate_out_bps
+  - aggregate_in_util_percent
+  - aggregate_out_util_percent
+  - member_interfaces
+  - member_interface_rates
+  - if_oper_status
+  - output_drops
   - output_discards
-  - channel_group_count
-  - port_channel_count
-  - etherchannel_member_count
-  - etherchannel_bundled_member_count
-  - etherchannel_down_member_count
+  - input_errors
+  - crc_errors
+  - qos_policy_drop
+  - police_exceeded
+  - port_channel_state
+  - lacp_state
+  - trunk_state
+  - stp_state
+  - vlan_state
+  - transceiver_state
+  - storm_control_state
 
 status_rules:
-  interface_up:
-    condition: "admin_status == up and oper_status == up"
+  aggregate_high_no_error:
+    condition: "Aggregate utilization is high but member interfaces have no error/drop/QoS evidence."
     severity: info
-    message: "接口处于 up/up 状态"
-
-  interface_down:
-    condition: "admin_status != up or oper_status != up"
-    severity: high
-    message: "接口状态异常，需要优先人工复核"
-
-traffic_rules:
-  recovered_or_transient:
-    condition: "current_utilization < threshold_percent"
+    message: "normal traffic peak, capacity pressure or path shift is more likely"
+  aggregate_high_with_drops:
+    condition: "Aggregate utilization is high and output drops/discards or QoS drops increase."
+    severity: warning
+    message: "egress congestion or QoS policing is more likely"
+  aggregate_high_with_physical_errors:
+    condition: "CRC/FCS/input errors increase on one or more member interfaces."
+    severity: warning
+    message: "physical layer quality issue should be prioritized"
+  monitoring_mismatch:
+    condition: "CLI rates and Prometheus aggregate rates are inconsistent."
+    severity: warning
+    message: "check monitoring object, sampling, SNMP ifIndex, counter reset or aggregate capacity"
+  instant_spike_or_recovered:
+    condition: "Prometheus max exceeded threshold but current utilization is below threshold."
     severity: info
-    message: "取证时利用率低于阈值，更像瞬时峰值或已恢复"
-
-  still_high:
-    condition: "current_utilization >= threshold_percent"
-    severity: warning
-    message: "取证时利用率仍高于阈值，疑似持续高利用率"
-
-quality_rules:
-  crc_detected:
-    condition: "crc > 0 or fcs_err > 0"
-    severity: warning
-    message: "接口存在 CRC/FCS 错误计数，需要关注链路质量"
-
-  output_discard_detected:
-    condition: "out_discards > 0 or output_discards > 0 or output_drops > 0"
-    severity: warning
-    message: "接口存在出向丢弃，需要结合队列和流量突发情况排查"
-
-aggregation_rules:
-  has_down_members:
-    condition: "etherchannel_down_member_count > 0"
-    severity: warning
-    message: "聚合链路存在 down 成员口"
-
-  all_members_bundled:
-    condition: "etherchannel_member_count > 0 and etherchannel_down_member_count == 0"
-    severity: info
-    message: "聚合成员口未发现 down 状态"
-
-manual_review_conditions:
-  - "missing required facts"
-  - "parser status is error"
-  - "hard_error_count > 0"
-  - "prometheus and device evidence conflict"
-  - "logical bandwidth cannot be detected"
-  - "multi-interface evidence incomplete"
+    message: "instant spike or already recovered"

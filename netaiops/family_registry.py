@@ -971,3 +971,442 @@ if _v78_original_classify_family is not None:
             "target_scope": target_scope,
         }
 # ===== v7.8 optical power final classifier end =====
+
+# ===== v9 cisco hardware component classifier begin =====
+# 目标：
+# - “硬件部件故障 / Cisco Hardware Component Fault / Hardware Fault”等泛硬件告警，
+#   即使没有明确 fan/power/temp/module 关键词，也不要落到 generic_network_readonly。
+# - 若能从文本中识别风扇/电源/温度/模块，则优先归入已有硬件 family，复用现有 evidence parser。
+import json as _v9_hw_json
+import re as _v9_hw_re
+
+try:
+    _v9_hw_original_classify_family = classify_family
+except NameError:
+    _v9_hw_original_classify_family = None
+
+
+def _v9_hw_safe_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            return _v9_hw_json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+    return str(value).strip()
+
+
+def _v9_hw_walk_text(obj, max_depth=5):
+    parts = []
+
+    def walk(value, depth=0):
+        if depth > max_depth or value is None:
+            return
+        if isinstance(value, dict):
+            for k, v in value.items():
+                parts.append(_v9_hw_safe_text(k))
+                walk(v, depth + 1)
+            return
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                walk(item, depth + 1)
+            return
+        parts.append(_v9_hw_safe_text(value))
+
+    walk(obj)
+    return " ".join([p for p in parts if p]).lower()
+
+
+def _v9_hw_pick_family(text):
+    if _v9_hw_re.search(r"风扇|fan|fantray", text, flags=_v9_hw_re.I):
+        return "hardware_fan_abnormal"
+    if _v9_hw_re.search(r"电源|power|powersupply|psu|supply|input lost|capacity", text, flags=_v9_hw_re.I):
+        return "hardware_power_abnormal"
+    if _v9_hw_re.search(r"温度|temperature|temp|thermal|overheat|高温", text, flags=_v9_hw_re.I):
+        return "hardware_temperature_high"
+    if _v9_hw_re.search(r"模块|板卡|线卡|module|linecard|supervisor|sup|slot|fabric|fex|stack|poe|ilpower|fru|oir", text, flags=_v9_hw_re.I):
+        return "chassis_slot_or_module_abnormal"
+    return "chassis_slot_or_module_abnormal"
+
+
+def _v9_hw_should_handle(text):
+    if not text:
+        return False
+    return bool(_v9_hw_re.search(
+        r"硬件部件故障|硬件故障|硬件异常|hardware component fault|hardware fault|cisco hardware|fru|传感器|sensor",
+        text,
+        flags=_v9_hw_re.I,
+    ))
+
+
+if _v9_hw_original_classify_family is not None:
+    def classify_family(event):
+        original = _v9_hw_original_classify_family(event)
+
+        original_family = ""
+        if isinstance(original, dict):
+            original_family = _v9_hw_safe_text(original.get("family"))
+
+        # 已经被更精确的 fan/power/temp/module family 命中时，不覆盖。
+        if original_family not in ("", "generic", "generic_network", "generic_network_readonly", "unknown"):
+            return original
+
+        text = _v9_hw_walk_text(event)
+        if not _v9_hw_should_handle(text):
+            return original
+
+        family = _v9_hw_pick_family(text)
+        base = dict(original or {}) if isinstance(original, dict) else {}
+
+        target_scope = dict(base.get("target_scope") or {})
+        if isinstance(event, dict):
+            labels = event.get("labels") if isinstance(event.get("labels"), dict) else {}
+            for key in ("device_ip", "ip", "hostname", "sysName", "instance", "vendor", "platform", "alarm_type", "alertname", "object_name"):
+                value = event.get(key)
+                if value in (None, "", [], {}):
+                    value = labels.get(key)
+                if value not in (None, "", [], {}):
+                    mapped_key = "device_ip" if key in ("ip", "instance") and not target_scope.get("device_ip") else key
+                    if mapped_key == "sysName":
+                        mapped_key = "hostname"
+                    if mapped_key == "alertname":
+                        mapped_key = "alarm_type"
+                    target_scope[mapped_key] = str(value).strip()
+
+        base.update({
+            "family": family,
+            "family_confidence": "high",
+            "match_source": "v9_cisco_hardware_component_classifier",
+            "match_reason": "matched generic Cisco hardware component fault wording",
+            "legacy_playbook_type": family,
+            "target_kind": "hardware",
+            "auto_execute_allowed": True,
+            "target_scope": target_scope,
+        })
+        return base
+# ===== v9 cisco hardware component classifier end =====
+
+# ===== v9 interface traffic anomaly classifier begin =====
+# 将骨干网/互联网/接口链路流量突增突降类告警兜底归入 interface_traffic_anomaly。
+import json as _v9_it_json
+import re as _v9_it_re
+
+try:
+    _v9_it_original_classify_family = classify_family
+except NameError:
+    _v9_it_original_classify_family = None
+
+
+def _v9_it_safe_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            return _v9_it_json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+    return str(value).strip()
+
+
+def _v9_it_walk_text(obj, max_depth=5):
+    parts = []
+
+    def walk(value, depth=0):
+        if depth > max_depth or value is None:
+            return
+        if isinstance(value, dict):
+            for k, v in value.items():
+                parts.append(_v9_it_safe_text(k))
+                walk(v, depth + 1)
+            return
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                walk(item, depth + 1)
+            return
+        parts.append(_v9_it_safe_text(value))
+
+    walk(obj)
+    return " ".join([p for p in parts if p])
+
+
+def _v9_it_should_handle(text):
+    if not text:
+        return False
+    return bool(_v9_it_re.search(
+        r"(接口.?链路.?流量.?突增|接口.?链路.?流量.?突降|接口.?链路.?流量.?突增.?突降|骨干网.*流量.*突增|骨干网.*流量.*突降|互联网.*流量.*突增|互联网.*流量.*突降|骨干.*利用率.*突增|骨干.*利用率.*突降|互联网.*利用率.*突增|互联网.*利用率.*突降|Traffic.*Spike|Traffic.*Drop|Traffic.*Anomaly)",
+        text,
+        flags=_v9_it_re.I,
+    ))
+
+
+def _v9_it_pick_direction(text):
+    if _v9_it_re.search(r"(入向|入口|inbound|input|in_bps|ifHCInOctets)", text, flags=_v9_it_re.I):
+        return "in"
+    if _v9_it_re.search(r"(出向|出口|outbound|output|out_bps|ifHCOutOctets)", text, flags=_v9_it_re.I):
+        return "out"
+    return ""
+
+
+def _v9_it_pick_change_type(text):
+    if _v9_it_re.search(r"(突增|升高|超过|高于|spike|increase|high)", text, flags=_v9_it_re.I):
+        return "spike"
+    if _v9_it_re.search(r"(突降|下降|降低|归零|drop|decrease|low)", text, flags=_v9_it_re.I):
+        return "drop"
+    return "anomaly"
+
+
+if _v9_it_original_classify_family is not None:
+    def classify_family(event):
+        original = _v9_it_original_classify_family(event)
+
+        original_family = ""
+        if isinstance(original, dict):
+            original_family = _v9_it_safe_text(original.get("family"))
+
+        if original_family in ("interface_traffic_anomaly", "interface_traffic_drop", "interface_utilization_high"):
+            return original
+
+        text = _v9_it_walk_text(event)
+        if not _v9_it_should_handle(text):
+            return original
+
+        base = dict(original or {}) if isinstance(original, dict) else {}
+        target_scope = dict(base.get("target_scope") or {})
+
+        if isinstance(event, dict):
+            labels = event.get("labels") if isinstance(event.get("labels"), dict) else {}
+            annotations = event.get("annotations") if isinstance(event.get("annotations"), dict) else {}
+            for key in ("device_ip", "ip", "instance", "hostname", "sysName", "interface", "ifName", "if_name", "object_name", "direction", "alarm_type", "alertname"):
+                value = event.get(key)
+                if value in (None, "", [], {}):
+                    value = labels.get(key)
+                if value in (None, "", [], {}):
+                    value = annotations.get(key)
+                if value not in (None, "", [], {}):
+                    mapped = key
+                    if key in ("ip", "instance") and not target_scope.get("device_ip"):
+                        mapped = "device_ip"
+                    if key == "sysName":
+                        mapped = "hostname"
+                    if key in ("ifName", "if_name", "object_name") and not target_scope.get("interface"):
+                        mapped = "interface"
+                    if key == "alertname":
+                        mapped = "alarm_type"
+                    target_scope[mapped] = str(value).strip()
+
+        direction = _v9_it_pick_direction(text)
+        if direction and not target_scope.get("direction"):
+            target_scope["direction"] = direction
+
+        target_scope["traffic_change_type"] = _v9_it_pick_change_type(text)
+
+        base.update({
+            "family": "interface_traffic_anomaly",
+            "family_confidence": "high",
+            "match_source": "v9_interface_traffic_anomaly_classifier",
+            "match_reason": "matched backbone/internet/interface traffic spike/drop wording",
+            "legacy_playbook_type": "interface_traffic_anomaly",
+            "target_kind": "interface",
+            "auto_execute_allowed": True,
+            "target_scope": target_scope,
+        })
+        return base
+# ===== v9 interface traffic anomaly classifier end =====
+
+# ===== v9.5 interface utilization high classifier begin =====
+# Cisco 接口/链路利用率高类告警兜底归类。
+# 特别支持 WG88互联网线路_电信_100M_利用率：Te1/0/1 + Te2/0/1 聚合，容量100M。
+import json as _v95_iu_json
+import re as _v95_iu_re
+
+try:
+    _v95_iu_original_classify_family = classify_family
+except NameError:
+    _v95_iu_original_classify_family = None
+
+
+def _v95_iu_safe_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            return _v95_iu_json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+    return str(value).strip()
+
+
+def _v95_iu_walk_text(obj, max_depth=5):
+    parts = []
+
+    def walk(value, depth=0):
+        if depth > max_depth or value is None:
+            return
+        if isinstance(value, dict):
+            for k, v in value.items():
+                parts.append(_v95_iu_safe_text(k))
+                walk(v, depth + 1)
+            return
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                walk(item, depth + 1)
+            return
+        parts.append(_v95_iu_safe_text(value))
+
+    walk(obj)
+    return " ".join([p for p in parts if p])
+
+
+def _v95_iu_match(text):
+    if not text:
+        return False
+    return bool(_v95_iu_re.search(
+        r"(接口.?链路.?利用率高|接口.?利用率高|链路.?利用率高|利用率超过|利用率高|带宽利用率|"
+        r"WG88互联网线路_电信_100M_利用率|bandwidth.*utilization.*high|utilization.*high)",
+        text,
+        flags=_v95_iu_re.I,
+    ))
+
+
+def _v95_iu_direction(text):
+    if _v95_iu_re.search(r"(出向|出口|outbound|output|out_bps|ifHCOutOctets)", text, flags=_v95_iu_re.I):
+        return "out"
+    if _v95_iu_re.search(r"(入向|入口|inbound|input|in_bps|ifHCInOctets)", text, flags=_v95_iu_re.I):
+        return "in"
+    return ""
+
+
+def _v95_iu_capacity_bps(text):
+    # 优先从类似 100M / 10G / 500K 的告警名称中解析逻辑链路容量。
+    m = _v95_iu_re.search(r"(?<!\d)(\d+(?:\.\d+)?)\s*([KMG])\s*(?:_|-|线路|带宽|利用率|$)", text, flags=_v95_iu_re.I)
+    if not m:
+        m = _v95_iu_re.search(r"(?<!\d)(\d+(?:\.\d+)?)\s*([KMG])", text, flags=_v95_iu_re.I)
+    if not m:
+        return ""
+    value = float(m.group(1))
+    unit = m.group(2).upper()
+    factor = {"K": 1000, "M": 1000 * 1000, "G": 1000 * 1000 * 1000}[unit]
+    return str(int(value * factor))
+
+
+def _v95_iu_extract_interface(text):
+    m = _v95_iu_re.search(r"\b(Te\d+/\d+/\d+|TenGigabitEthernet\d+/\d+/\d+|Gi\d+/\d+/\d+|GigabitEthernet\d+/\d+/\d+|Eth\d+/\d+|Ethernet\d+/\d+)\b", text)
+    if m:
+        return m.group(1)
+    return ""
+
+
+def _v95_iu_enrich_scope(scope, text):
+    if not isinstance(scope, dict):
+        scope = {}
+
+    direction = _v95_iu_direction(text)
+    if direction:
+        scope["direction"] = direction
+        scope["traffic_direction"] = direction
+
+    capacity = _v95_iu_capacity_bps(text)
+    if capacity:
+        scope["capacity_bps"] = capacity
+        scope["link_capacity_bps"] = capacity
+
+    # 特殊固定映射：WG88互联网线路_电信_100M_利用率
+    if "WG88互联网线路_电信_100M_利用率" in text or "WG88互联网线路_电信_100M" in text:
+        scope.update({
+            "hostname": scope.get("hostname") or "WG404-H0304-C95-INT-ACC",
+            "device_ip": scope.get("device_ip") or "10.189.250.8",
+            "ip": scope.get("ip") or scope.get("device_ip") or "10.189.250.8",
+            "instance": scope.get("instance") or scope.get("device_ip") or "10.189.250.8",
+            "interfaces": ["Te1/0/1", "Te2/0/1"],
+            "interface": "Te1/0/1|Te2/0/1",
+            "if_name": "Te1/0/1|Te2/0/1",
+            "ifName": "Te1/0/1|Te2/0/1",
+            "interface_name": "Te1/0/1|Te2/0/1",
+            "object_name": "WG88互联网线路_电信_100M",
+            "interface_regex": "Te1/0/1|Te2/0/1",
+            "capacity_bps": "100000000",
+            "link_capacity_bps": "100000000",
+            "link_name": "WG88互联网线路_电信_100M",
+            "aggregate_circuit": True,
+            "interface_count": 2,
+        })
+        if "出向" in text:
+            scope["direction"] = "out"
+            scope["traffic_direction"] = "out"
+        return scope
+
+    iface = _v95_iu_extract_interface(text)
+    if iface and not scope.get("interface"):
+        scope["interface"] = iface
+        scope["if_name"] = iface
+        scope["ifName"] = iface
+        scope["interface_name"] = iface
+        scope["interfaces"] = [iface]
+        scope["interface_regex"] = iface
+        scope["interface_count"] = 1
+
+    if scope.get("interfaces") and not scope.get("interface_regex"):
+        items = scope.get("interfaces")
+        if isinstance(items, (list, tuple)):
+            scope["interface_regex"] = "|".join(str(x).strip() for x in items if str(x).strip())
+            scope["interface"] = scope.get("interface") or scope["interface_regex"]
+            scope["if_name"] = scope.get("if_name") or scope["interface_regex"]
+            scope["ifName"] = scope.get("ifName") or scope["interface_regex"]
+            scope["interface_count"] = len([x for x in items if str(x).strip()])
+
+    if scope.get("interface") and not scope.get("interface_regex"):
+        scope["interface_regex"] = str(scope.get("interface"))
+
+    return scope
+
+
+if _v95_iu_original_classify_family is not None:
+    def classify_family(event):
+        original = _v95_iu_original_classify_family(event)
+        original_family = ""
+        if isinstance(original, dict):
+            original_family = _v95_iu_safe_text(original.get("family"))
+
+        text = _v95_iu_walk_text(event)
+        if not _v95_iu_match(text):
+            return original
+
+        base = dict(original or {}) if isinstance(original, dict) else {}
+        target_scope = dict(base.get("target_scope") or {})
+
+        if isinstance(event, dict):
+            labels = event.get("labels") if isinstance(event.get("labels"), dict) else {}
+            annotations = event.get("annotations") if isinstance(event.get("annotations"), dict) else {}
+            for key in ("device_ip", "ip", "instance", "hostname", "sysName", "interface", "ifName", "if_name", "object_name", "direction", "alarm_type", "alertname", "capacity_bps"):
+                value = event.get(key)
+                if value in (None, "", [], {}):
+                    value = labels.get(key)
+                if value in (None, "", [], {}):
+                    value = annotations.get(key)
+                if value not in (None, "", [], {}):
+                    mapped = key
+                    if key in ("ip", "instance") and not target_scope.get("device_ip"):
+                        mapped = "device_ip"
+                    if key == "sysName":
+                        mapped = "hostname"
+                    if key in ("ifName", "if_name") and not target_scope.get("interface"):
+                        mapped = "interface"
+                    if key == "alertname":
+                        mapped = "alarm_type"
+                    target_scope[mapped] = str(value).strip()
+
+        target_scope = _v95_iu_enrich_scope(target_scope, text)
+
+        base.update({
+            "family": "interface_or_link_utilization_high",
+            "family_confidence": "high",
+            "match_source": "v9_5_interface_utilization_high_classifier",
+            "match_reason": "matched Cisco interface/link utilization high wording",
+            "legacy_playbook_type": "cisco_interface_utilization_high",
+            "target_kind": "interface",
+            "auto_execute_allowed": True,
+            "target_scope": target_scope,
+        })
+        return base
+# ===== v9.5 interface utilization high classifier end =====

@@ -161,3 +161,30 @@ try:
 except Exception:
     pass
 # ===== log command false hard-error callback guard end =====
+
+# ===== v9 interface traffic CLI hard-error normalizer guard begin =====
+# 将设备返回的硬错误输出归一化为 failed，避免 Invalid interface format / % Invalid command
+# 被 MCP completed 状态误统计为成功。
+try:
+    from netaiops.cli_result_status_normalizer import normalize_execution_callback_payload as _v9_normalize_execution_callback_payload
+
+    _v9_original_build_execution_record_from_callback = build_execution_record_from_callback
+    _v9_original_save_callback_payload = save_callback_payload
+
+    def build_execution_record_from_callback(request_id: str, payload: dict) -> dict:
+        try:
+            payload = _v9_normalize_execution_callback_payload(payload)
+        except Exception:
+            pass
+        return _v9_original_build_execution_record_from_callback(request_id, payload)
+
+    def save_callback_payload(request_id: str, payload: dict) -> str:
+        try:
+            payload = _v9_normalize_execution_callback_payload(payload)
+        except Exception:
+            pass
+        return _v9_original_save_callback_payload(request_id, payload)
+
+except Exception:
+    pass
+# ===== v9 interface traffic CLI hard-error normalizer guard end =====

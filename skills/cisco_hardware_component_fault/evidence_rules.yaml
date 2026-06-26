@@ -1,0 +1,56 @@
+skill_name: cisco_hardware_component_fault
+version: v9.2.0-cisco-hardware-component-fault
+family: cisco_hardware_component_fault
+
+required_facts:
+  - hostname
+  - device_ip
+  - mcp_commands
+  - hardware_current_state
+
+preferred_facts:
+  - prometheus_window_state
+  - device_up_history
+  - temperature_current
+  - temperature_trend
+  - fan_status
+  - power_status
+  - power_redundancy
+  - module_status
+  - supervisor_status
+  - diagnostic_status
+  - suspicious_hardware_logs
+  - inventory_pid_sn
+  - uptime_or_reload_reason
+  - core_files
+
+status_rules:
+  active:
+    condition: "CLI evidence or Prometheus evidence still shows failed, absent, critical, warning, offline, powered-dn or abnormal hardware state"
+    severity: warning
+    message: "current evidence indicates the hardware alarm is still active or hardware redundancy is degraded"
+  recovered_or_transient:
+    condition: "current CLI state is normal and Prometheus window does not show sustained abnormal state"
+    severity: info
+    message: "current evidence looks recovered or transient; keep the event timeline for review"
+  site_environment_suspected:
+    condition: "temperature or power alarms happen on multiple devices or show input lost / high temperature without single part failure"
+    severity: warning
+    message: "external power, PDU, UPS, air conditioner or airflow issue is more likely"
+  critical_escalation:
+    condition: "temperature critical, multiple fan failures, single-power device PSU abnormal, module offline, supervisor not ready or diagnostic fail"
+    severity: critical
+    message: "urgent site or TAC escalation is recommended"
+  inconclusive:
+    condition: "required facts are missing or multiple commands failed"
+    severity: warning
+    message: "manual review is required"
+
+manual_review_conditions:
+  - "Prometheus metric unavailable"
+  - "CLI command unsupported on this platform"
+  - "hardware state and Prometheus state conflict"
+  - "fan/power/temp status ambiguous"
+  - "diagnostic command failed or unsupported"
+  - "standby supervisor not ready"
+  - "multiple devices have alarms at the same time"

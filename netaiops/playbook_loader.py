@@ -173,3 +173,95 @@ if _v711_original_build_execution_candidates_from_playbook is not None:
 
         return candidates
 # ===== v7.11 FortiGate readonly wrapper end =====
+
+# ===== v9.5 interface utilization playbook event enrichment begin =====
+# build_execution_candidates_from_playbook 当前只接收 event，不接收 family_result.target_scope。
+# 因此需要在这里针对接口/链路利用率高告警做一次轻量补全：
+# - WG88互联网线路_电信_100M_利用率 => Te1/0/1|Te2/0/1
+# - 对 {interface_each} 按 interfaces 展开
+import re as _v95_pl_re
+import json as _v95_pl_json
+
+try:
+    _v95_pl_original_build_execution_candidates_from_playbook = build_execution_candidates_from_playbook
+except NameError:
+    _v95_pl_original_build_execution_candidates_from_playbook = None
+
+
+def _v95_pl_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            return _v95_pl_json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
+    return str(value).strip()
+
+
+def _v95_pl_blob(event):
+    if not isinstance(event, dict):
+        return _v95_pl_text(event)
+    return " ".join([
+        _v95_pl_text(event),
+        _v95_pl_text(event.get("labels")),
+        _v95_pl_text(event.get("annotations")),
+    ])
+
+
+def _v95_pl_enrich_event(playbook, event):
+    if not isinstance(event, dict):
+        return event
+    pbid = str((playbook or {}).get("playbook_id") or "")
+    blob = _v95_pl_blob(event)
+
+    if "utilization" not in pbid and "利用率" not in blob and "WG88互联网线路_电信_100M" not in blob:
+        return event
+
+    enriched = dict(event)
+
+    # labels/annotations 里可能有目标字段，先扁平化补充。
+    for src_name in ("labels", "annotations"):
+        src = event.get(src_name)
+        if isinstance(src, dict):
+            for key in ("device_ip", "ip", "instance", "hostname", "sysName", "interface", "ifName", "if_name", "object_name", "direction", "capacity_bps"):
+                if not enriched.get(key) and src.get(key):
+                    enriched[key] = src.get(key)
+
+    if "WG88互联网线路_电信_100M" in blob:
+        enriched.setdefault("hostname", "WG404-H0304-C95-INT-ACC")
+        enriched.setdefault("device_ip", "10.189.250.8")
+        enriched.setdefault("ip", enriched.get("device_ip") or "10.189.250.8")
+        enriched.setdefault("instance", enriched.get("device_ip") or "10.189.250.8")
+        enriched["interfaces"] = ["Te1/0/1", "Te2/0/1"]
+        enriched["interface"] = "Te1/0/1|Te2/0/1"
+        enriched["ifName"] = "Te1/0/1|Te2/0/1"
+        enriched["if_name"] = "Te1/0/1|Te2/0/1"
+        enriched["interface_name"] = "Te1/0/1|Te2/0/1"
+        enriched["interface_regex"] = "Te1/0/1|Te2/0/1"
+        enriched["capacity_bps"] = "100000000"
+        enriched["link_capacity_bps"] = "100000000"
+        enriched["link_name"] = "WG88互联网线路_电信_100M"
+        enriched["aggregate_circuit"] = True
+        enriched["interface_count"] = 2
+        if "出向" in blob:
+            enriched["direction"] = "out"
+            enriched["traffic_direction"] = "out"
+
+    if enriched.get("interfaces") and not enriched.get("interface"):
+        interfaces = enriched.get("interfaces")
+        if isinstance(interfaces, (list, tuple)):
+            joined = "|".join(str(x).strip() for x in interfaces if str(x).strip())
+            enriched["interface"] = joined
+            enriched["ifName"] = joined
+            enriched["if_name"] = joined
+            enriched["interface_regex"] = joined
+
+    return enriched
+
+
+if _v95_pl_original_build_execution_candidates_from_playbook is not None:
+    def build_execution_candidates_from_playbook(playbook, event):
+        enriched_event = _v95_pl_enrich_event(playbook, event)
+        return _v95_pl_original_build_execution_candidates_from_playbook(playbook, enriched_event)
+# ===== v9.5 interface utilization playbook event enrichment end =====

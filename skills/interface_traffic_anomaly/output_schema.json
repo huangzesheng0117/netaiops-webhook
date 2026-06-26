@@ -1,42 +1,50 @@
 {
-  "facts": {
-    "anomaly_direction": "string",
-    "change_ratio": "number",
-    "current_rate_bps": "number",
-    "device_ip": "string",
-    "family": "string",
-    "hostname": "string",
-    "input_errors": "integer",
-    "input_rate_bps": "number",
-    "interface": "string",
-    "interface_bandwidth_bps": "number",
-    "line_name": "string",
-    "mcp_commands": "array",
-    "output_errors": "integer",
-    "output_rate_bps": "number",
-    "port_channel": "string",
-    "previous_rate_bps": "number",
-    "prometheus_window_state": "string",
-    "recent_log_keywords": "array",
-    "utilization_percent": "number"
-  },
+  "skill_name": "interface_traffic_anomaly",
+  "version": "v9.3.0-cisco-interface-traffic-anomaly",
   "family": "interface_traffic_anomaly",
+  "facts": {
+    "alarm_type": "string",
+    "traffic_class": "string",
+    "direction": "string",
+    "hostname": "string",
+    "device_ip": "string",
+    "interface": "string",
+    "prometheus_window_state": "string",
+    "current_cli_input_rate_bps": "number",
+    "current_cli_output_rate_bps": "number",
+    "prometheus_in_bps": "number",
+    "prometheus_out_bps": "number",
+    "if_oper_status": "string",
+    "input_errors": "number",
+    "crc_errors": "number",
+    "output_drops": "number",
+    "qos_drops": "number",
+    "port_channel_state": "string",
+    "vpc_state": "string",
+    "stp_state": "string",
+    "transceiver_state": "string"
+  },
   "judgement": {
+    "traffic_change_confirmed": "boolean",
+    "monitoring_or_sampling_suspected": "boolean",
+    "physical_layer_suspected": "boolean",
+    "qos_or_congestion_suspected": "boolean",
+    "port_channel_or_vpc_suspected": "boolean",
+    "l2_path_suspected": "boolean",
+    "business_or_route_change_suspected": "boolean",
     "confidence": "string",
-    "current_state": "string",
     "manual_review_required": "boolean"
   },
   "notification": {
-    "required_lines": [
-      "线路名称",
-      "突增/突降方向",
-      "当前流量和历史基线",
-      "设备名称和设备 IP",
-      "接口状态和速率",
-      "是否仍处于异常变化状态",
-      "建议下一步动作"
-    ]
-  },
-  "skill_name": "interface_traffic_anomaly",
-  "version": "v6.3.0"
+    "required_sections": [
+      "根据告警内容初步判断",
+      "告警含义分析",
+      "命令执行概况",
+      "命令分析",
+      "Prometheus窗口证据",
+      "综合执行结果判断",
+      "建议"
+    ],
+    "command_display": "one_command_per_line"
+  }
 }

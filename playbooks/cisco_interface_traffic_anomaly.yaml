@@ -1,43 +1,117 @@
 playbook_id: cisco_interface_traffic_anomaly
+family: interface_traffic_anomaly
+skill_name: interface_traffic_anomaly
+description: Cisco interface/link traffic spike or drop readonly investigation playbook,
+  covering backbone traffic spike/drop and internet traffic spike/drop.
 match:
   vendor: cisco
-  alertname_regex: ^(互联网线路流量突增|互联网线路流量突降|互联网链路流量突增|互联网链路流量突降|.*流量突增|.*流量突降)$
+  alertname_regex: (接口.?链路.?流量.?突增|接口.?链路.?流量.?突降|接口.?链路.?流量.?突增.?突降|骨干网.*流量.*突增|骨干网.*流量.*突降|互联网.*流量.*突增|互联网.*流量.*突降|骨干.*利用率.*突增|骨干.*利用率.*突降|互联网.*利用率.*突增|互联网.*利用率.*突降|Traffic.*Spike|Traffic.*Drop|Traffic.*Anomaly)
+  content_regex: (流量|带宽|利用率|bps|Mbps|Gbps|突增|突降|入向|出向|input|output|inbound|outbound)
+target_fields:
+  device_ip:
+  - device_ip
+  - ip
+  - instance
+  hostname:
+  - hostname
+  - sysName
+  - device
+  interface:
+  - interface
+  - ifName
+  - if_name
+  - object_name
+  - port
+  direction:
+  - direction
+  - traffic_direction
+  - alarm_direction
 execution:
   readonly_only: true
   auto_execute_allowed: true
-  max_commands: 6
+  max_commands: 14
   commands:
-  - show interface {interface_each}
-  - show interface {interface_each} status
-  - show interface {interface_each} counters errors
+  - show clock
+  - show interface status
+  - show interface {interface}
+  - show running-config interface {interface}
+  - show logging last 500 | include {interface}|ETHPORT|IF_DOWN|IF_UP|ERR|ERRDISABLE|UDLD|STP|SPANTREE|SFP|XCVR|TRANSCEIVER|LACP|VPC|QOS|DROP|flap
+  - show interface counters errors
+  - show interface {interface} counters
+  - show policy-map interface {interface}
+  - show interface {interface} transceiver details
   - show port-channel summary
-  - show logging | include {interface_each}|LINK|UPDOWN|flap|rate|traffic
+  - show lacp neighbor
+  - show interface trunk
+  - show spanning-tree interface {interface} detail
+  - show vlan brief
 prometheus_evidence_first:
   enabled: true
   backend_preference: prometheus_mcp
   fallback: http_api
-  evidence_profile: interface_traffic
+  evidence_profile: interface_traffic_anomaly
   query_names:
   - in_bps
   - out_bps
+  - if_oper_status
+  - in_errors_delta
+  - out_discards_delta
   lookback_minutes: 15
   compare_offset_minutes: 5
   step_seconds: 60
-  max_candidates_per_query: 1
-  sidecar_overall_timeout_seconds: 30
+  max_candidates_per_query: 2
+  sidecar_overall_timeout_seconds: 120
+  sidecar_parallel_workers: 4
   required_labels:
   - device_ip
-  - if_name
+  - interface
   stop_device_cli_if_not_confirmed: false
   unavailable_policy: continue_cli_evidence
-  note: 'v8 runtime metadata: traffic evidence uses 1m PromQL rate window; oper_status is not queried for traffic-only alerts.'
-  sidecar_parallel_workers: 3
-  rate_window: 1m
-device_evidence_after_prometheus:
-  enabled: true
-  commands:
-  - show interface {interface_each}
-  - show interface {interface_each} status
-  - show interface {interface_each} counters errors
-  - show port-channel summary
-  - show logging | include {interface_each}|LINK|UPDOWN|flap|rate|traffic
+  note: 'v9 interface traffic anomaly evidence: compare current/previous in/out bps,
+    interface oper status and error/discard deltas. Missing Prometheus data must not
+    block CLI evidence.'
+analysis_policy:
+  goal: 先确认流量突增/突降是否真实发生，再区分监控口径/采样/计数器清零、接口状态、错误包/丢包、QoS、聚合、VLAN/STP、vPC、光模块和路由路径变化等原因。
+  covered_alert_classes:
+  - 骨干网流量突增
+  - 骨干网流量突降
+  - 互联网流量突增
+  - 互联网流量突降
+  - 接口/链路流量突降
+  - 接口/链路流量突增/突降
+  judgement_order:
+  - 先通过 Prometheus 历史窗口确认 in_bps/out_bps 是否真的发生突增/突降，并区分入向/出向。
+  - 对比 CLI 当前 input/output rate 与 Prometheus 当前窗口，若明显不一致，优先考虑监控口径、采样周期、接口索引变化或聚合口/成员口重复统计。
+  - 确认接口是否 up/up、是否 flap、是否 last clearing 很新。
+  - 确认 CRC/FCS/input error/output drops/discards 是否增长。
+  - 确认 policy-map 是否有 drop、police exceeded、shape/queue 积压。
+  - 确认 Port-channel/vPC/LACP 成员是否变化，判断是否哈希重分担、成员减少或流量迁移。
+  - 确认 trunk/VLAN/STP 是否导致特定 VLAN 流量突降或改道。
+  - 确认光模块 Rx/Tx、温度、电压是否异常。
+  - 如果接口状态、错误、QoS、聚合、二层和光模块均正常，再建议进入第二批路由路径、业务源、NetFlow、ACL计数和对端设备排查。
+  result_split:
+    cli_prometheus_mismatch: CLI rate 与 Prometheus 不一致，优先判断为监控口径/采样/接口索引或聚合统计问题。
+    traffic_spike_no_error: 流量突增但接口无错误、无丢包，更偏向真实业务增长或路径切入。
+    traffic_spike_with_drops: 流量突增并伴随 output drops/discards 或 QoS drops，偏向出口拥塞、队列或策略限速。
+    traffic_drop_with_flap: 流量突降并伴随接口 flap，链路抖动是第一嫌疑。
+    traffic_drop_upup: 接口仍 up/up 但流量突降，优先考虑路由切走、QoS限速、STP/vPC/聚合变化或业务源停止。
+    port_channel_member_change: 只有聚合成员口流量突增/突降，优先判断哈希重分担或成员变化。
+    broadcast_multicast_spike: 广播/组播流量突增，优先查二层风暴、组播异常、未知单播泛洪或环路。
+  first_wave_limits:
+    max_commands: 14
+    readonly_only: true
+    no_config_change: true
+    no_clear_counter: true
+    no_debug: true
+    no_shutdown: true
+notification_policy:
+  template: v8_v9_standard
+  command_display: 每条命令各自占一行
+  required_sections:
+  - 根据告警内容初步判断
+  - 告警含义分析
+  - 命令执行概况
+  - 命令分析
+  - Prometheus窗口证据
+  - 综合执行结果判断
+  - 建议

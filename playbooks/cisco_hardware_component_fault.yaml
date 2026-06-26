@@ -1,13 +1,176 @@
 playbook_id: cisco_hardware_component_fault
+family: cisco_hardware_component_fault
+skill_name: cisco_hardware_component_fault
+description: Cisco hardware component fault readonly investigation playbook, covering
+  fan, power, temperature, module, supervisor, stack, PoE and FEX related hardware
+  alarms.
 match:
   vendor: cisco
-  alertname_regex: "^(电源状态|风扇状态)$"
+  alertname_regex: ^(硬件部件故障|硬件故障|硬件异常|风扇状态|风扇故障|电源状态|电源故障|温度异常|温度告警|设备温度高|模块异常|板卡异常|线卡异常|Supervisor异常|PoE供电异常|FEX硬件异常|Cisco
+    Hardware Component Fault|Cisco Hardware Fault|Cisco Fan Fault|Cisco Power Fault|Cisco
+    Temperature High|Cisco Module Fault)$
 execution:
   readonly_only: true
   auto_execute_allowed: true
-  max_commands: 5
+  max_commands: 14
   commands:
-    - "show environment"
-    - "show environment power"
-    - "show environment fan"
-    - "show logging | include Fan|Power|PSU|failed|absent|fault"
+  - show clock
+  - show version
+  - show environment
+  - show environment fan
+  - show environment fan detail
+  - show environment power
+  - show environment power detail
+  - show environment temperature
+  - show module
+  - show inventory
+  - show system resources
+  - show logging last 500 | include ENV|ENVMON|THERMAL|TEMP|TEMPERATURE|FAN|POWER|PS|PSU|FRU|OIR|MODULE|PLATFORM|SUP|SUPERVISOR|SENSOR|VOLT|XBAR|FABRIC|FEX|POE|ILPOWER
+  - show system cores
+  - show diagnostic result module all
+prometheus_evidence_first:
+  enabled: true
+  backend_preference: prometheus_mcp
+  fallback: http_api
+  evidence_profile: cisco_hardware_health
+  query_names:
+  - device_up
+  - temperature_celsius
+  - fan_state
+  - power_state
+  lookback_minutes: 15
+  compare_offset_minutes: 5
+  step_seconds: 60
+  max_candidates_per_query: 1
+  sidecar_overall_timeout_seconds: 150
+  required_labels:
+  - device_ip
+  stop_device_cli_if_not_confirmed: false
+  unavailable_policy: continue_cli_evidence
+  sidecar_parallel_workers: 4
+  note: 'v9 Cisco hardware evidence: valid SNMP exporter metrics are ordered first;
+    timeout and workers increased because Prometheus MCP SSE query/range calls may
+    take about 15s each.'
+commands:
+- order: 1
+  command: show clock
+  reason: 对齐设备时间、告警时间和硬件日志时间线
+  risk: low
+  readonly: true
+- order: 2
+  command: show version
+  reason: 确认设备型号、软件版本、运行时间、最近 reload 信息，辅助判断硬件事件是否伴随重启
+  risk: low
+  readonly: true
+- order: 3
+  command: show environment
+  reason: 查看设备风扇、电源、温度、电压、传感器等硬件环境总览
+  risk: low
+  readonly: true
+- order: 4
+  command: show environment fan
+  reason: 查看风扇或 fan tray 状态，判断 failed、absent、speed abnormal 或方向异常
+  risk: low
+  readonly: true
+- order: 5
+  command: show environment fan detail
+  reason: 查看风扇详细状态、转速、fan tray 或 zone 信息；不支持该命令时作为失败命令单独展示
+  risk: low
+  readonly: true
+- order: 6
+  command: show environment power
+  reason: 查看电源模块、输入、容量和冗余状态
+  risk: low
+  readonly: true
+- order: 7
+  command: show environment power detail
+  reason: 查看电源输入/输出、电压、电流和详细告警；不支持该命令时作为失败命令单独展示
+  risk: low
+  readonly: true
+- order: 8
+  command: show environment temperature
+  reason: 查看温度传感器、当前温度、阈值和温度告警状态
+  risk: low
+  readonly: true
+- order: 9
+  command: show module
+  reason: 查看 supervisor、linecard、fabric、stack member 或模块 online/offline/powered-dn
+    状态
+  risk: low
+  readonly: true
+- order: 10
+  command: show inventory
+  reason: 查看硬件 PID/SN，用于定位故障 FRU、准备 TAC/RMA 信息
+  risk: low
+  readonly: true
+- order: 11
+  command: show system resources
+  reason: 判断硬件事件是否伴随系统资源异常或平台压力
+  risk: low
+  readonly: true
+- order: 12
+  command: show logging last 500 | include ENV|ENVMON|THERMAL|TEMP|TEMPERATURE|FAN|POWER|PS|PSU|FRU|OIR|MODULE|PLATFORM|SUP|SUPERVISOR|SENSOR|VOLT|XBAR|FABRIC|FEX|POE|ILPOWER
+  reason: 查看硬件/环境相关日志，建立告警时间线并判断是否有 OIR、输入丢失、温度、风扇、电源或模块事件
+  risk: low
+  readonly: true
+- order: 13
+  command: show system cores
+  reason: 判断是否伴随 core 文件，辅助识别硬件事件触发的软件异常
+  risk: low
+  readonly: true
+- order: 14
+  command: show diagnostic result module all
+  reason: 查看模块在线诊断结果，判断是否存在硬件诊断失败
+  risk: low
+  readonly: true
+readonly_only: true
+auto_execute_allowed: true
+analysis_policy:
+  goal: 硬件告警首轮自动化只判断告警是否真实存在、是否当前仍存在、是否影响冗余或业务、疑似部件和外部供电/散热环境方向；不执行任何恢复、清理、切换、重启或配置动作。
+  judgement_order:
+  - 先用 Prometheus 窗口证据判断设备采集是否连续、温度/风扇/电源状态是否有历史异常或趋势。
+  - 再用 show environment 总览确认当前风扇、电源、温度、电压、传感器是否正常。
+  - 再区分告警类型：风扇、电源、温度、模块/线卡、Supervisor、PoE、FEX、传感器。
+  - 再判断影响范围：单部件降级、冗余丢失、模块 offline、温度 critical、多个部件同时异常、是否可能影响业务。
+  - 再结合日志时间线判断是否与断电、机房空调、PDU/UPS、市电、插拔、升级、reload 或多设备同时告警相关。
+  - 如果只是单风扇/单电源异常且业务未受影响，应提示尽快恢复冗余；如果温度 critical、多个风扇异常、单电源设备电源异常或模块 offline，应提示立即升级现场处理。
+  first_wave_limits:
+    max_commands: 14
+    no_config_change: true
+    no_reload_or_switchover: true
+    no_clear_or_delete: true
+    no_physical_action_by_automation: true
+  result_split:
+    fan_failed_temperature_normal: 风扇异常但温度正常，优先恢复风扇冗余并持续观察温度。
+    fan_failed_temperature_high: 风扇异常且温度升高，散热风险高，应尽快现场处理。
+    psu_failed: 电源模块失败，准备更换电源模块并评估冗余风险。
+    psu_input_lost: 电源输入丢失时优先查电源线、PDU、UPS、市电输入，而不是直接判断设备电源模块坏。
+    psu_absent: 电源 absent/not present 需确认是否未插、被拔出或设备未识别。
+    power_redundancy_lost: 业务可能仍正常，但供电冗余已丢失，应尽快恢复冗余。
+    temperature_warning: 温度 warning 需查机房温度、风道、风扇和灰尘/遮挡。
+    temperature_critical: 温度 critical 需立即处理，避免模块保护关机或业务中断。
+    module_failed_offline: 模块 failed/offline 需检查模块状态、插拔日志、诊断结果和受影响端口。
+    standby_supervisor_not_ready: 主备/SSO 风险，应避免贸然切换，先确认 standby supervisor 健康。
+    diagnostic_fail: 在线诊断失败时硬件故障概率高，应保留输出准备 TAC/RMA。
+    multi_device_same_time: 多个设备同一时间温度/电源异常，优先查机房供电、PDU、UPS、空调和机柜风道。
+  failure_policy: 任何单条只读命令失败不得阻断后续命令；最终通知中必须单独列出失败命令，并说明对应证据边界。
+notification_policy:
+  template: v8_standard
+  must_include:
+  - 设备
+  - 告警内容
+  - 初步判断
+  - 告警含义分析
+  - 命令执行概况
+  - 命令分析
+  - Prometheus窗口证据
+  - 综合执行结果判断
+  - 建议
+  command_display: 每条命令各自占一行
+  forbidden_terms:
+  - 第一批
+  - 第二批
+  - 第一波
+  - 第二波
+  - stage-1
+  - stage-2

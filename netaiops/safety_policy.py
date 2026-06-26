@@ -337,3 +337,131 @@ try:
 except NameError:
     DEFAULT_ALLOWED_CAPABILITIES = set(V5_EXPANDED_ALLOWED_CAPABILITIES)
 # ===== v5 expanded family safety allowlist end =====
+
+# ===== v9.6 interface utilization high safety max command exception begin =====
+# 背景：
+# - 全局 safety_policy.max_commands_per_request 仍保持 15，不能整体放开。
+# - interface_or_link_utilization_high 需要支持多接口聚合取证，首轮只读命令最多 30 条。
+# - 这里只针对该 family / playbook 放开 too_many_commands。
+# - 其它安全检查继续生效：unsafe_candidate、deny pattern、high_risk_device 等不会被绕过。
+try:
+    _v96_original_evaluate_plan_safety = evaluate_plan_safety
+except NameError:
+    _v96_original_evaluate_plan_safety = None
+
+
+_V96_INTERFACE_UTILIZATION_FAMILIES = {
+    "interface_or_link_utilization_high",
+}
+
+_V96_INTERFACE_UTILIZATION_PLAYBOOKS = {
+    "cisco_interface_or_link_utilization_high",
+    "cisco_interface_utilization_high",
+    "interface_or_link_utilization_high",
+}
+
+_V96_INTERFACE_UTILIZATION_MAX_COMMANDS = 30
+
+
+def _v96_safe_str(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v96_nested_get(mapping, *keys):
+    current = mapping
+    for key in keys:
+        if not isinstance(current, dict):
+            return ""
+        current = current.get(key)
+    return current
+
+
+def _v96_plan_family_or_playbook(plan_data):
+    if not isinstance(plan_data, dict):
+        return "", ""
+
+    family = _v96_safe_str(_v96_nested_get(plan_data, "family_result", "family"))
+    if not family:
+        family = _v96_safe_str(_v96_nested_get(plan_data, "classification", "family"))
+    if not family:
+        family = _v96_safe_str(_v96_nested_get(plan_data, "playbook_runtime", "family"))
+    if not family:
+        family = _v96_safe_str(plan_data.get("family"))
+
+    playbook_id = _v96_safe_str(_v96_nested_get(plan_data, "playbook_runtime", "playbook_id"))
+    if not playbook_id:
+        playbook_id = _v96_safe_str(_v96_nested_get(plan_data, "playbook", "playbook_id"))
+    if not playbook_id:
+        playbook_id = _v96_safe_str(plan_data.get("playbook_id"))
+
+    return family, playbook_id
+
+
+def _v96_is_interface_utilization_plan(plan_data):
+    family, playbook_id = _v96_plan_family_or_playbook(plan_data)
+    return family in _V96_INTERFACE_UTILIZATION_FAMILIES or playbook_id in _V96_INTERFACE_UTILIZATION_PLAYBOOKS
+
+
+def _v96_apply_interface_utilization_safety_exception(plan_data, safety_result):
+    if not isinstance(safety_result, dict):
+        return safety_result
+
+    if not _v96_is_interface_utilization_plan(plan_data):
+        return safety_result
+
+    candidates = plan_data.get("execution_candidates", []) if isinstance(plan_data, dict) else []
+    if candidates is None:
+        candidates = []
+
+    candidate_count = int(safety_result.get("candidate_count", len(candidates)) or 0)
+
+    # 只允许 30 条以内；超过 30 条仍然阻断。
+    if candidate_count > _V96_INTERFACE_UTILIZATION_MAX_COMMANDS:
+        result = dict(safety_result)
+        result["max_commands_per_request"] = _V96_INTERFACE_UTILIZATION_MAX_COMMANDS
+        reasons = list(result.get("reasons") or [])
+        if "too_many_commands" not in reasons:
+            reasons.append("too_many_commands")
+        result["reasons"] = list(dict.fromkeys(reasons))
+        result["allowed"] = False
+        result["family_max_commands_exception"] = {
+            "matched": True,
+            "family": _v96_plan_family_or_playbook(plan_data)[0],
+            "playbook_id": _v96_plan_family_or_playbook(plan_data)[1],
+            "max_commands_per_request": _V96_INTERFACE_UTILIZATION_MAX_COMMANDS,
+            "applied": False,
+            "reason": "candidate_count_exceeds_family_limit",
+        }
+        return result
+
+    reasons = list(safety_result.get("reasons") or [])
+
+    # 仅移除 too_many_commands；其它原因必须保留。
+    filtered_reasons = [r for r in reasons if r != "too_many_commands"]
+
+    result = dict(safety_result)
+    result["reasons"] = filtered_reasons
+    result["max_commands_per_request"] = _V96_INTERFACE_UTILIZATION_MAX_COMMANDS
+    result["allowed"] = len(filtered_reasons) == 0
+    result["family_max_commands_exception"] = {
+        "matched": True,
+        "family": _v96_plan_family_or_playbook(plan_data)[0],
+        "playbook_id": _v96_plan_family_or_playbook(plan_data)[1],
+        "max_commands_per_request": _V96_INTERFACE_UTILIZATION_MAX_COMMANDS,
+        "applied": "too_many_commands" in reasons,
+        "original_reasons": reasons,
+        "remaining_reasons": filtered_reasons,
+    }
+    return result
+
+
+if _v96_original_evaluate_plan_safety is not None:
+    def evaluate_plan_safety(plan_data):
+        result = _v96_original_evaluate_plan_safety(plan_data)
+        try:
+            return _v96_apply_interface_utilization_safety_exception(plan_data, result)
+        except Exception:
+            return result
+# ===== v9.6 interface utilization high safety max command exception end =====

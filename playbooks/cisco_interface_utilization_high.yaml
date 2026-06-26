@@ -1,4 +1,4 @@
-playbook_id: cisco_interface_or_link_utilization_high
+playbook_id: cisco_interface_utilization_high
 family: interface_or_link_utilization_high
 skill_name: interface_utilization_high
 description: Cisco interface/link utilization high readonly playbook, supporting single

@@ -28,35 +28,63 @@ profiles:
         - up{instance="{{ device_ip }}"}
         unit: state
         direction: all
-  interface_traffic:
-    description: 接口入/出方向流量 bps
+  interface_traffic: &id001
+    description: Cisco interface traffic spike/drop historical evidence. It compares
+      current and previous in/out bps, interface status, input error delta and output
+      discard delta.
     labels:
       required:
       - device_ip
-      - if_name
+      - interface
     queries:
       in_bps:
-        promql_candidates:
-        - rate(ifHCInOctets{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
-        - rate(ifInOctets{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
-        - rate(ifHCInOctets{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
-        - rate(ifInOctets{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        description: Inbound interface bps from ifHCInOctets.
         unit: bps
         direction: in
-      out_bps:
         promql_candidates:
-        - rate(ifHCOutOctets{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
-        - rate(ifOutOctets{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
-        - rate(ifHCOutOctets{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
-        - rate(ifOutOctets{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        - sum(irate(ifHCInOctets{ip="{{ device_ip }}",ifName=~"{{ interface }}"}[2m]))
+          * 8
+        - sum(irate(ifHCInOctets{ip="{{ device_ip }}",ifName="{{ interface }}"}[2m]))
+          * 8
+        - sum(irate(ifHCInOctets{instance="{{ device_ip }}",ifName=~"{{ interface
+          }}"}[2m])) * 8
+      out_bps:
+        description: Outbound interface bps from ifHCOutOctets.
         unit: bps
         direction: out
-      oper_status:
         promql_candidates:
-        - ifOperStatus{ip="{{ device_ip }}", ifName="{{ if_name }}"}
-        - ifOperStatus{instance="{{ device_ip }}", ifName="{{ if_name }}"}
+        - sum(irate(ifHCOutOctets{ip="{{ device_ip }}",ifName=~"{{ interface }}"}[2m]))
+          * 8
+        - sum(irate(ifHCOutOctets{ip="{{ device_ip }}",ifName="{{ interface }}"}[2m]))
+          * 8
+        - sum(irate(ifHCOutOctets{instance="{{ device_ip }}",ifName=~"{{ interface
+          }}"}[2m])) * 8
+      if_oper_status:
+        description: Interface operational status, usually 1=up, 2=down.
         unit: status
         direction: all
+        promql_candidates:
+        - max(ifOperStatus{ip="{{ device_ip }}",ifName=~"{{ interface }}"})
+        - max(ifOperStatus{ip="{{ device_ip }}",ifName="{{ interface }}"})
+        - max(ifOperStatus{instance="{{ device_ip }}",ifName=~"{{ interface }}"})
+      in_errors_delta:
+        description: Inbound error delta in the lookback window.
+        unit: count
+        direction: in
+        promql_candidates:
+        - sum(increase(ifInErrors{ip="{{ device_ip }}",ifName=~"{{ interface }}"}[15m]))
+        - sum(increase(ifInErrors{ip="{{ device_ip }}",ifName="{{ interface }}"}[15m]))
+        - sum(increase(ifInErrors{instance="{{ device_ip }}",ifName=~"{{ interface
+          }}"}[15m]))
+      out_discards_delta:
+        description: Outbound discard/drop delta in the lookback window.
+        unit: count
+        direction: out
+        promql_candidates:
+        - sum(increase(ifOutDiscards{ip="{{ device_ip }}",ifName=~"{{ interface }}"}[15m]))
+        - sum(increase(ifOutDiscards{ip="{{ device_ip }}",ifName="{{ interface }}"}[15m]))
+        - sum(increase(ifOutDiscards{instance="{{ device_ip }}",ifName=~"{{ interface
+          }}"}[15m]))
   interface_errors:
     description: 接口错误/丢弃计数 5 分钟增量
     labels:
@@ -100,7 +128,8 @@ profiles:
         unit: connections
         direction: all
   device_cpu_utilization:
-    description: Cisco device CPU utilization historical evidence. Current VictoriaMetrics only has cpmCPUTotal1minRev for device CPU utilization.
+    description: Cisco device CPU utilization historical evidence. Current VictoriaMetrics
+      only has cpmCPUTotal1minRev for device CPU utilization.
     queries:
       cpu_1min:
         description: Cisco CPU 1 minute utilization from CISCO-PROCESS-MIB cpmCPUTotal1minRev.
@@ -113,34 +142,225 @@ profiles:
     description: Cisco device filesystem / Flash / bootflash historical usage evidence.
     queries:
       filesystem_usage_percent:
-        description: Filesystem usage percent from HOST-RESOURCES-MIB hrStorage or CISCO-FLASH-MIB partition metrics.
+        description: Filesystem usage percent from HOST-RESOURCES-MIB hrStorage or
+          CISCO-FLASH-MIB partition metrics.
         unit: percent
         promql_candidates:
-        - 100 * avg by (ip, hrStorageDescr) (hrStorageUsed{ip="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"}) / avg by (ip, hrStorageDescr) (hrStorageSize{ip="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"})
-        - 100 * avg by (instance, hrStorageDescr) (hrStorageUsed{instance="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"}) / avg by (instance, hrStorageDescr) (hrStorageSize{instance="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"})
+        - 100 * avg by (ip, hrStorageDescr) (hrStorageUsed{ip="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"})
+          / avg by (ip, hrStorageDescr) (hrStorageSize{ip="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"})
+        - 100 * avg by (instance, hrStorageDescr) (hrStorageUsed{instance="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"})
+          / avg by (instance, hrStorageDescr) (hrStorageSize{instance="{{device_ip}}",hrStorageDescr=~".*(flash|bootflash|crashinfo|log|volatile).*"})
         - 100 * (1 - (ciscoFlashPartitionFreeSpace{ip="{{device_ip}}"} / ciscoFlashPartitionSize{ip="{{device_ip}}"}))
         - 100 * (1 - (ciscoFlashPartitionFreeSpace{instance="{{device_ip}}"} / ciscoFlashPartitionSize{instance="{{device_ip}}"}))
   device_memory_usage:
     description: Cisco device memory historical usage evidence.
     queries:
       memory_usage_percent:
-        description: Device memory usage percent from Cisco cseSysMemoryUtilization, cpmCPUMemoryUsed/Free, Cisco memory pool, HOST-RESOURCES-MIB, or generic memory metrics.
+        description: Device memory usage percent from Cisco cseSysMemoryUtilization,
+          cpmCPUMemoryUsed/Free, Cisco memory pool, HOST-RESOURCES-MIB, or generic
+          memory metrics.
         unit: percent
         promql_candidates:
         - avg by (ip) (cseSysMemoryUtilization{ip="{{device_ip}}"})
         - avg by (instance) (cseSysMemoryUtilization{instance="{{device_ip}}"})
         - avg by (instance) (cseSysMemoryUtilization{instance=~"{{device_ip}}(:.*)?"})
-        - 100 * avg by (ip) (cpmCPUMemoryUsed{ip="{{device_ip}}"}) / (avg by (ip) (cpmCPUMemoryUsed{ip="{{device_ip}}"}) + avg by (ip) (cpmCPUMemoryFree{ip="{{device_ip}}"}) )
-        - 100 * avg by (instance) (cpmCPUMemoryUsed{instance="{{device_ip}}"}) / (avg by (instance) (cpmCPUMemoryUsed{instance="{{device_ip}}"}) + avg by (instance) (cpmCPUMemoryFree{instance="{{device_ip}}"}) )
-        - 100 * avg by (instance) (cpmCPUMemoryUsed{instance=~"{{device_ip}}(:.*)?"}) / (avg by (instance) (cpmCPUMemoryUsed{instance=~"{{device_ip}}(:.*)?"}) + avg by (instance) (cpmCPUMemoryFree{instance=~"{{device_ip}}(:.*)?"})
+        - 100 * avg by (ip) (cpmCPUMemoryUsed{ip="{{device_ip}}"}) / (avg by (ip)
+          (cpmCPUMemoryUsed{ip="{{device_ip}}"}) + avg by (ip) (cpmCPUMemoryFree{ip="{{device_ip}}"})
           )
-        - 100 * avg by (ip, ciscoMemoryPoolName) (ciscoMemoryPoolUsed{ip="{{device_ip}}"}) / (avg by (ip, ciscoMemoryPoolName) (ciscoMemoryPoolUsed{ip="{{device_ip}}"}) + avg by (ip, ciscoMemoryPoolName) (ciscoMemoryPoolFree{ip="{{device_ip}}"})
+        - 100 * avg by (instance) (cpmCPUMemoryUsed{instance="{{device_ip}}"}) / (avg
+          by (instance) (cpmCPUMemoryUsed{instance="{{device_ip}}"}) + avg by (instance)
+          (cpmCPUMemoryFree{instance="{{device_ip}}"}) )
+        - 100 * avg by (instance) (cpmCPUMemoryUsed{instance=~"{{device_ip}}(:.*)?"})
+          / (avg by (instance) (cpmCPUMemoryUsed{instance=~"{{device_ip}}(:.*)?"})
+          + avg by (instance) (cpmCPUMemoryFree{instance=~"{{device_ip}}(:.*)?"})
           )
-        - 100 * avg by (instance, ciscoMemoryPoolName) (ciscoMemoryPoolUsed{instance="{{device_ip}}"}) / (avg by (instance, ciscoMemoryPoolName) (ciscoMemoryPoolUsed{instance="{{device_ip}}"}) + avg by (instance, ciscoMemoryPoolName)
-          (ciscoMemoryPoolFree{instance="{{device_ip}}"}) )
-        - 100 * avg by (ip, hrStorageDescr) (hrStorageUsed{ip="{{device_ip}}",hrStorageDescr=~".*(Memory|memory|RAM|Processor|DRAM).*"}) / avg by (ip, hrStorageDescr) (hrStorageSize{ip="{{device_ip}}",hrStorageDescr=~".*(Memory|memory|RAM|Processor|DRAM).*"})
-        - 100 * avg by (instance, hrStorageDescr) (hrStorageUsed{instance="{{device_ip}}",hrStorageDescr=~".*(Memory|memory|RAM|Processor|DRAM).*"}) / avg by (instance, hrStorageDescr) (hrStorageSize{instance="{{device_ip}}",hrStorageDescr=~".*(Memory|memory|RAM|Processor|DRAM).*"})
+        - 100 * avg by (ip, ciscoMemoryPoolName) (ciscoMemoryPoolUsed{ip="{{device_ip}}"})
+          / (avg by (ip, ciscoMemoryPoolName) (ciscoMemoryPoolUsed{ip="{{device_ip}}"})
+          + avg by (ip, ciscoMemoryPoolName) (ciscoMemoryPoolFree{ip="{{device_ip}}"})
+          )
+        - 100 * avg by (instance, ciscoMemoryPoolName) (ciscoMemoryPoolUsed{instance="{{device_ip}}"})
+          / (avg by (instance, ciscoMemoryPoolName) (ciscoMemoryPoolUsed{instance="{{device_ip}}"})
+          + avg by (instance, ciscoMemoryPoolName) (ciscoMemoryPoolFree{instance="{{device_ip}}"})
+          )
+        - 100 * avg by (ip, hrStorageDescr) (hrStorageUsed{ip="{{device_ip}}",hrStorageDescr=~".*(Memory|memory|RAM|Processor|DRAM).*"})
+          / avg by (ip, hrStorageDescr) (hrStorageSize{ip="{{device_ip}}",hrStorageDescr=~".*(Memory|memory|RAM|Processor|DRAM).*"})
+        - 100 * avg by (instance, hrStorageDescr) (hrStorageUsed{instance="{{device_ip}}",hrStorageDescr=~".*(Memory|memory|RAM|Processor|DRAM).*"})
+          / avg by (instance, hrStorageDescr) (hrStorageSize{instance="{{device_ip}}",hrStorageDescr=~".*(Memory|memory|RAM|Processor|DRAM).*"})
         - avg by (ip) (memory_usage_percent{ip="{{device_ip}}"})
         - avg by (instance) (memory_usage_percent{instance="{{device_ip}}"})
         - avg by (ip) (device_memory_usage_percent{ip="{{device_ip}}"})
         - avg by (instance) (device_memory_usage_percent{instance="{{device_ip}}"})
+  interface_down_status:
+    description: 'Cisco interface down/status abnormal historical evidence: oper status,
+      traffic trend and input error delta.'
+    labels:
+      required:
+      - device_ip
+      - if_name
+    queries:
+      oper_status:
+        promql_candidates:
+        - ifOperStatus{ip="{{ device_ip }}", ifName="{{ if_name }}"}
+        - ifOperStatus{instance="{{ device_ip }}", ifName="{{ if_name }}"}
+        unit: status
+        direction: all
+      in_bps:
+        promql_candidates:
+        - rate(ifHCInOctets{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        - rate(ifInOctets{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        - rate(ifHCInOctets{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+          * 8
+        - rate(ifInOctets{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+          * 8
+        unit: bps
+        direction: in
+      out_bps:
+        promql_candidates:
+        - rate(ifHCOutOctets{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) *
+          8
+        - rate(ifOutOctets{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m]) * 8
+        - rate(ifHCOutOctets{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+          * 8
+        - rate(ifOutOctets{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+          * 8
+        unit: bps
+        direction: out
+      in_errors_delta:
+        promql_candidates:
+        - increase(ifInErrors{ip="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+        - increase(ifInErrors{instance="{{ device_ip }}", ifName="{{ if_name }}"}[1m])
+        unit: count
+        direction: in
+  cisco_hardware_health:
+    description: Cisco hardware health historical evidence. For current NX-OS SNMP
+      exporter data, hardware metrics use ip label. Temperature uses entSensorValue
+      with entPhysicalName label; fan and power use cefcFanTrayOperStatus / cefcFRUPowerOperStatus
+      first.
+    labels:
+      required:
+      - device_ip
+    queries:
+      device_up:
+        description: Device or exporter up state.
+        unit: state
+        direction: all
+        promql_candidates:
+        - up{ip="{{ device_ip }}"}
+        - up{instance="{{ device_ip }}"}
+      temperature_celsius:
+        description: Cisco temperature sensor value in Celsius when available. Current
+          exporter exposes entSensorValue with entPhysicalName label.
+        unit: celsius
+        direction: all
+        promql_candidates:
+        - max(entSensorValue{ip="{{ device_ip }}",entPhysicalName=~".*(Temperature|temperature).*"})
+        - max(entSensorValue{ip="{{ device_ip }}",entPhysicalName=~".*(Temp|temp).*"})
+        - max(entSensorValue{ip="{{ device_ip }}",entPhysicalName=~".*(module|Module|FRONT|BACK|Inlet|Outlet).*"})
+        - max(entSensorStatus{ip="{{ device_ip }}",entPhysicalName=~".*(Temperature|temperature|module|Module|FRONT|BACK|Inlet|Outlet).*"})
+        - max(ciscoEnvMonTemperatureStatusValue{ip="{{ device_ip }}"})
+        - max(ciscoEnvMonTemperatureStatusValue{instance="{{ device_ip }}"})
+      fan_state:
+        description: Cisco fan or fan tray operational state. Current exporter exposes
+          cefcFanTrayOperStatus with ip label.
+        unit: state
+        direction: all
+        promql_candidates:
+        - max(cefcFanTrayOperStatus{ip="{{ device_ip }}"})
+        - max(ciscoEnvMonFanState{ip="{{ device_ip }}"})
+        - max(ciscoEnvMonFanStatusState{ip="{{ device_ip }}"})
+        - max(cefcFanTrayOperStatus{instance="{{ device_ip }}"})
+        - max(ciscoEnvMonFanState{instance="{{ device_ip }}"})
+        - max(ciscoEnvMonFanStatusState{instance="{{ device_ip }}"})
+      power_state:
+        description: Cisco power supply operational state. Current exporter exposes
+          cefcFRUPowerOperStatus with ip label.
+        unit: state
+        direction: all
+        promql_candidates:
+        - max(cefcFRUPowerOperStatus{ip="{{ device_ip }}"})
+        - max(ciscoEnvMonSupplyState{ip="{{ device_ip }}"})
+        - max(ciscoEnvMonSupplyStatusState{ip="{{ device_ip }}"})
+  interface_traffic_anomaly: *id001
+  interface_utilization_high: &id002
+    description: Cisco interface/link utilization high historical evidence. Supports
+      single interface and multi-interface aggregate circuits.
+    labels:
+      required:
+      - device_ip
+      - interface_regex
+      optional:
+      - capacity_bps
+      - direction
+      - interfaces
+    queries:
+      in_bps:
+        description: Aggregate inbound bps for one or more interfaces.
+        unit: bps
+        direction: in
+        promql_candidates:
+        - sum(irate(ifHCInOctets{ip="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}[2m])) * 8
+        - sum(irate(ifHCInOctets{ip="{{ device_ip }}",ifName=~"{{ if_name }}"}[2m]))
+          * 8
+        - sum(irate(ifHCInOctets{instance="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}[2m])) * 8
+      out_bps:
+        description: Aggregate outbound bps for one or more interfaces.
+        unit: bps
+        direction: out
+        promql_candidates:
+        - sum(irate(ifHCOutOctets{ip="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}[2m])) * 8
+        - sum(irate(ifHCOutOctets{ip="{{ device_ip }}",ifName=~"{{ if_name }}"}[2m]))
+          * 8
+        - sum(irate(ifHCOutOctets{instance="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}[2m])) * 8
+      in_util_percent:
+        description: Aggregate inbound utilization percent. Prefer alert logical capacity_bps
+          when provided.
+        unit: percent
+        direction: in
+        promql_candidates:
+        - sum(irate(ifHCInOctets{ip="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}[2m])) * 8 / {{ capacity_bps }} * 100
+        - sum(irate(ifHCInOctets{ip="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}[2m])) * 8 / sum(ifHighSpeed{ip="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}) / 1000000 * 100
+      out_util_percent:
+        description: Aggregate outbound utilization percent. Prefer alert logical
+          capacity_bps when provided.
+        unit: percent
+        direction: out
+        promql_candidates:
+        - sum(irate(ifHCOutOctets{ip="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}[2m])) * 8 / {{ capacity_bps }} * 100
+        - sum(irate(ifHCOutOctets{ip="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}[2m])) * 8 / sum(ifHighSpeed{ip="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}) / 1000000 * 100
+      if_oper_status:
+        description: Operational status for all member interfaces.
+        unit: status
+        direction: all
+        promql_candidates:
+        - max(ifOperStatus{ip="{{ device_ip }}",ifName=~"{{ interface_regex }}"})
+        - max(ifOperStatus{instance="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"})
+      in_errors_delta:
+        description: Aggregate inbound error increase in lookback window.
+        unit: count
+        direction: in
+        promql_candidates:
+        - sum(increase(ifInErrors{ip="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}[15m]))
+        - sum(increase(ifInErrors{instance="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}[15m]))
+      out_discards_delta:
+        description: Aggregate outbound discard increase in lookback window.
+        unit: count
+        direction: out
+        promql_candidates:
+        - sum(increase(ifOutDiscards{ip="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}[15m]))
+        - sum(increase(ifOutDiscards{instance="{{ device_ip }}",ifName=~"{{ interface_regex
+          }}"}[15m]))
+  interface_or_link_utilization_high: *id002

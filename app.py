@@ -35,6 +35,8 @@ from netaiops.plan_builder import (
     get_plan_by_request_id,
 )
 from netaiops.processor import process_event_async
+from netaiops.light_alert_formatter import build_light_notifications
+from netaiops.dongdong_card_sender import send_universal_card
 
 BASE_DIR = Path("/opt/netaiops-webhook")
 DATA_DIR = BASE_DIR / "data"
@@ -44,6 +46,9 @@ ANALYSIS_DIR = DATA_DIR / "analysis"
 PLAN_DIR = DATA_DIR / "plans"
 EXECUTION_DIR = DATA_DIR / "execution"
 REVIEW_DIR = DATA_DIR / "reviews"
+LIGHT_ALERT_DIR = DATA_DIR / "light_alerts"
+LIGHT_ALERT_RAW_DIR = LIGHT_ALERT_DIR / "raw"
+LIGHT_ALERT_NOTIFY_DIR = LIGHT_ALERT_DIR / "notify"
 CONFIG_FILE = BASE_DIR / "config.yaml"
 
 RAW_DIR.mkdir(parents=True, exist_ok=True)
@@ -52,6 +57,8 @@ ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
 PLAN_DIR.mkdir(parents=True, exist_ok=True)
 EXECUTION_DIR.mkdir(parents=True, exist_ok=True)
 REVIEW_DIR.mkdir(parents=True, exist_ok=True)
+LIGHT_ALERT_RAW_DIR.mkdir(parents=True, exist_ok=True)
+LIGHT_ALERT_NOTIFY_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = setup_logger()
 app = FastAPI(title="NetAIOps Webhook", version="3.0-a")
@@ -465,10 +472,362 @@ async def generate_review_api(request_id: str) -> dict:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+# =========================
+# Light alert routes
+# 独立轻量链路：Alertmanager -> Webhook -> 咚咚服务号通用卡片
+# 注意：该链路不进入原 /webhook/alertmanager AI 分析主链路。
+# =========================
+
+def send_light_alert_card_task(lite_request_id: str, notify_index: int, title: str, detail: str) -> None:
+    result_file = LIGHT_ALERT_NOTIFY_DIR / f"alertmanager_{lite_request_id}_{notify_index:03d}.send_result.json"
+
+    try:
+        send_result = send_universal_card(title=title, detail=detail)
+    except Exception as exc:
+        send_result = {
+            "ok": False,
+            "error": repr(exc),
+            "title": title,
+            "lite_request_id": lite_request_id,
+            "index": notify_index,
+        }
+
+    safe_write_json(
+        result_file,
+        {
+            "lite_request_id": lite_request_id,
+            "index": notify_index,
+            "title": title,
+            "send_result": send_result,
+            "created_at": now_utc_str(),
+        },
+    )
+
+    if send_result.get("ok"):
+        logger.info(
+            "light alert card sent lite_request_id=%s index=%s title=%s",
+            lite_request_id,
+            notify_index,
+            title,
+        )
+    else:
+        logger.error(
+            "light alert card send failed lite_request_id=%s index=%s title=%s result=%s",
+            lite_request_id,
+            notify_index,
+            title,
+            send_result,
+        )
+
+
+
+# Light alert mirror rate limit helpers
+
+def light_alert_mirror_get_alerts(payload: dict) -> list:
+    alerts = payload.get("alerts")
+    if isinstance(alerts, list):
+        return [item for item in alerts if isinstance(item, dict)]
+
+    data = payload.get("data")
+    if isinstance(data, dict) and isinstance(data.get("alerts"), list):
+        return [item for item in data.get("alerts") if isinstance(item, dict)]
+
+    if isinstance(payload.get("labels"), dict) or isinstance(payload.get("annotations"), dict):
+        return [payload]
+
+    return []
+
+
+def light_alert_mirror_rate_key(payload: dict, item: dict) -> str:
+    import hashlib
+    import json
+
+    labels = item.get("labels") if isinstance(item.get("labels"), dict) else {}
+    annotations = item.get("annotations") if isinstance(item.get("annotations"), dict) else {}
+    alerts = light_alert_mirror_get_alerts(payload)
+
+    try:
+        index = int(item.get("index", 0))
+    except Exception:
+        index = 0
+
+    source_alert = alerts[index] if 0 <= index < len(alerts) else {}
+    source_labels = source_alert.get("labels") if isinstance(source_alert.get("labels"), dict) else {}
+    source_annotations = source_alert.get("annotations") if isinstance(source_alert.get("annotations"), dict) else {}
+
+    fingerprint = (
+        source_alert.get("fingerprint")
+        or labels.get("fingerprint")
+        or source_labels.get("fingerprint")
+        or item.get("fingerprint")
+    )
+    if fingerprint:
+        return f"fingerprint:{fingerprint}"
+
+    merged_labels = {}
+    merged_labels.update(source_labels)
+    merged_labels.update(labels)
+
+    key_source = {
+        "alertname": merged_labels.get("alertname") or item.get("alert_name") or "",
+        "ip": merged_labels.get("ip") or merged_labels.get("device_ip") or merged_labels.get("instance") or "",
+        "sysName": merged_labels.get("sysName") or merged_labels.get("hostname") or "",
+        "ifName": merged_labels.get("ifName") or "",
+        "test_id": merged_labels.get("test_id") or "",
+        "interfaces": annotations.get("interfaces") or source_annotations.get("interfaces") or "",
+        "object_label": annotations.get("object_label") or source_annotations.get("object_label") or "",
+        "object_key": annotations.get("object_label_key") or source_annotations.get("object_label_key") or "",
+    }
+
+    raw = json.dumps(key_source, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return f"fallback:{digest}"
+
+
+def light_alert_mirror_should_send(payload: dict, item: dict, throttle_seconds: int = 3600) -> tuple:
+    import json
+    import time
+
+    status = (item.get("status") or "").strip().lower()
+    key = light_alert_mirror_rate_key(payload, item)
+
+    state_dir = LIGHT_ALERT_DIR / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state_file = state_dir / "mirror_rate_limit.json"
+
+    state = {}
+    if state_file.exists():
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            if not isinstance(state, dict):
+                state = {}
+        except Exception:
+            state = {}
+
+    # resolved 表示当前告警生命周期结束：
+    # 1. resolved 本身不限流，必须允许发送；
+    # 2. 同时清除该 fingerprint 的 firing 限流记录，避免恢复后再次 firing 被旧状态挡掉。
+    if status == "resolved":
+        had_entry = key in state
+        removed_entry = state.pop(key, None)
+        if had_entry:
+            safe_write_json(state_file, state)
+            logger.info(
+                "light alert mirror resolved cleared firing throttle key=%s title=%s",
+                key,
+                item.get("title", ""),
+            )
+        return True, {
+            "limited": False,
+            "reason": "resolved_cleared_firing_throttle" if had_entry else "resolved_no_existing_firing_throttle",
+            "status": status,
+            "key": key,
+            "cleared_firing_throttle": had_entry,
+            "removed_entry": removed_entry,
+            "throttle_seconds": throttle_seconds,
+            "title": item.get("title", ""),
+        }
+
+    if status != "firing":
+        return True, {
+            "limited": False,
+            "reason": "status_not_firing",
+            "status": status,
+            "key": key,
+            "throttle_seconds": throttle_seconds,
+        }
+
+    now_ts = time.time()
+
+    entry = state.get(key)
+    last_sent_at = 0.0
+    if isinstance(entry, dict):
+        try:
+            last_sent_at = float(entry.get("last_sent_at", 0))
+        except Exception:
+            last_sent_at = 0.0
+
+    if last_sent_at and now_ts - last_sent_at < throttle_seconds:
+        remaining = int(throttle_seconds - (now_ts - last_sent_at))
+        return False, {
+            "limited": True,
+            "reason": "firing_throttled",
+            "status": status,
+            "key": key,
+            "remaining_seconds": remaining,
+            "last_sent_at": last_sent_at,
+            "last_sent_at_utc": entry.get("last_sent_at_utc") if isinstance(entry, dict) else "",
+            "throttle_seconds": throttle_seconds,
+            "title": item.get("title", ""),
+        }
+
+    cutoff = now_ts - 7 * 24 * 3600
+    cleaned = {}
+    for k, v in state.items():
+        if not isinstance(v, dict):
+            continue
+        try:
+            ts = float(v.get("last_sent_at", 0))
+        except Exception:
+            ts = 0
+        if ts >= cutoff:
+            cleaned[k] = v
+
+    cleaned[key] = {
+        "last_sent_at": now_ts,
+        "last_sent_at_utc": now_utc_str(),
+        "title": item.get("title", ""),
+        "alert_name": item.get("alert_name", ""),
+        "status": status,
+        "throttle_seconds": throttle_seconds,
+    }
+    safe_write_json(state_file, cleaned)
+
+    return True, {
+        "limited": False,
+        "reason": "firing_first_or_expired",
+        "status": status,
+        "key": key,
+        "throttle_seconds": throttle_seconds,
+        "title": item.get("title", ""),
+    }
+
+def mirror_light_alert_payload_task(payload: dict) -> None:
+    try:
+        result = build_light_notifications(payload)
+        original_lite_request_id = result.get("lite_request_id", "unknown")
+        lite_request_id = f"mirror_{original_lite_request_id}"
+        result["lite_request_id"] = lite_request_id
+        result["source"] = "mirror_from_webhook_alertmanager"
+        result["mirror_rate_limit_policy"] = {
+            "firing_throttle_seconds": 3600,
+            "resolved_throttled": False,
+            "scope": "mirror_from_/webhook/alertmanager_only",
+        }
+
+        raw_file = LIGHT_ALERT_RAW_DIR / f"alertmanager_{lite_request_id}.json"
+        notify_file = LIGHT_ALERT_NOTIFY_DIR / f"alertmanager_{lite_request_id}.notifications.json"
+
+        safe_write_json(
+            raw_file,
+            {
+                "lite_request_id": lite_request_id,
+                "source": "mirror_from_webhook_alertmanager",
+                "payload": payload,
+                "created_at": now_utc_str(),
+            },
+        )
+
+        sent_count = 0
+        throttled_count = 0
+        rate_limit_decisions = []
+
+        for item in result.get("notifications", []):
+            should_send, decision = light_alert_mirror_should_send(payload, item, throttle_seconds=3600)
+            decision["index"] = item.get("index")
+            decision["title"] = item.get("title")
+            decision["alert_name"] = item.get("alert_name")
+            rate_limit_decisions.append(decision)
+
+            if not should_send:
+                throttled_count += 1
+                logger.info(
+                    "light alert mirror suppressed by rate limit lite_request_id=%s index=%s key=%s remaining_seconds=%s title=%s",
+                    lite_request_id,
+                    item.get("index"),
+                    decision.get("key"),
+                    decision.get("remaining_seconds"),
+                    item.get("title"),
+                )
+                continue
+
+            send_light_alert_card_task(
+                lite_request_id,
+                int(item.get("index", 0)),
+                item.get("title", ""),
+                item.get("detail", ""),
+            )
+            sent_count += 1
+
+        result["mirror_rate_limit_decisions"] = rate_limit_decisions
+        result["mirror_sent_count"] = sent_count
+        result["mirror_throttled_count"] = throttled_count
+        safe_write_json(notify_file, result)
+
+        logger.info(
+            "mirrored alertmanager payload to light card lite_request_id=%s alert_count=%s notification_count=%s sent_count=%s throttled_count=%s skipped_count=%s",
+            lite_request_id,
+            result.get("alert_count"),
+            result.get("notification_count"),
+            sent_count,
+            throttled_count,
+            result.get("skipped_count"),
+        )
+
+    except Exception as exc:
+        logger.exception("mirror alertmanager payload to light card failed: %r", exc)
+
+
+
+@app.post("/light-alert/alertmanager")
+async def light_alert_alertmanager(request: Request, background_tasks: BackgroundTasks) -> dict:
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid json payload")
+
+    result = build_light_notifications(payload)
+    lite_request_id = result["lite_request_id"]
+
+    raw_file = LIGHT_ALERT_RAW_DIR / f"alertmanager_{lite_request_id}.json"
+    notify_file = LIGHT_ALERT_NOTIFY_DIR / f"alertmanager_{lite_request_id}.notifications.json"
+
+    safe_write_json(
+        raw_file,
+        {
+            "lite_request_id": lite_request_id,
+            "source": "alertmanager_light",
+            "payload": payload,
+            "created_at": now_utc_str(),
+        },
+    )
+    safe_write_json(notify_file, result)
+
+    for item in result.get("notifications", []):
+        background_tasks.add_task(
+            send_light_alert_card_task,
+            lite_request_id,
+            int(item.get("index", 0)),
+            item.get("title", ""),
+            item.get("detail", ""),
+        )
+
+    logger.info(
+        "received light alertmanager webhook lite_request_id=%s alert_count=%s notification_count=%s skipped_count=%s",
+        lite_request_id,
+        result.get("alert_count"),
+        result.get("notification_count"),
+        result.get("skipped_count"),
+    )
+
+    return {
+        "status": "accepted",
+        "source": "alertmanager_light",
+        "lite_request_id": lite_request_id,
+        "alert_count": result.get("alert_count"),
+        "notification_count": result.get("notification_count"),
+        "skipped_count": result.get("skipped_count"),
+        "raw_file": str(raw_file),
+        "notify_file": str(notify_file),
+    }
+
+
+
 @app.post("/webhook/alertmanager")
 async def webhook_alertmanager(request: Request, background_tasks: BackgroundTasks) -> dict:
     try:
         payload = await request.json()
+        background_tasks.add_task(mirror_light_alert_payload_task, payload)
     except Exception:
         raise HTTPException(status_code=400, detail="invalid json payload")
 
@@ -677,6 +1036,83 @@ def v4_internal_auto_pipeline(request_id: str):
         "result": result,
     }
 
+
+
+
+# ===== light mirror resolved inside v5 skip helper begin =====
+def _light_mirror_is_resolved_alert_for_v5_skip(alert: dict) -> bool:
+    if not isinstance(alert, dict):
+        return False
+
+    labels = alert.get("labels") if isinstance(alert.get("labels"), dict) else {}
+    annotations = alert.get("annotations") if isinstance(alert.get("annotations"), dict) else {}
+
+    status = (
+        str(alert.get("status") or "")
+        or str(labels.get("status") or "")
+        or str(annotations.get("status") or "")
+    ).strip().lower()
+
+    restored = (
+        str(alert.get("restored") or "")
+        or str(labels.get("restored") or "")
+        or str(annotations.get("restored") or "")
+    ).strip().lower()
+
+    if status in {"resolved", "resolve", "restored"}:
+        return True
+    if restored in {"true", "1", "yes", "y"}:
+        return True
+    return False
+
+
+def _light_mirror_extract_resolved_payload_for_v5_skip(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        return {}
+
+    alerts = payload.get("alerts")
+    if isinstance(alerts, list):
+        resolved_alerts = [item for item in alerts if _light_mirror_is_resolved_alert_for_v5_skip(item)]
+        if not resolved_alerts:
+            return {}
+
+        copied = dict(payload)
+        copied["alerts"] = resolved_alerts
+        copied["status"] = "resolved"
+        copied["source"] = "resolved_mirrored_inside_v5_skip"
+        return copied
+
+    if _light_mirror_is_resolved_alert_for_v5_skip(payload):
+        copied = dict(payload)
+        copied["status"] = "resolved"
+        copied["source"] = "resolved_mirrored_inside_v5_skip"
+        return copied
+
+    return {}
+
+
+def mirror_resolved_alerts_to_light_from_v5_skip(payload: dict) -> None:
+    try:
+        import threading
+
+        resolved_payload = _light_mirror_extract_resolved_payload_for_v5_skip(payload)
+        if not resolved_payload:
+            return
+
+        thread = threading.Thread(
+            target=mirror_light_alert_payload_task,
+            args=(resolved_payload,),
+            daemon=True,
+        )
+        thread.start()
+        logger.info(
+            "scheduled resolved alert payload to light mirror inside v5 skip middleware alert_count=%s",
+            len(resolved_payload.get("alerts", [])) if isinstance(resolved_payload.get("alerts"), list) else 1,
+        )
+    except Exception as exc:
+        logger.exception("failed to schedule resolved alert payload inside v5 skip middleware: %r", exc)
+# ===== light mirror resolved inside v5 skip helper end =====
+
 # ===== v5 skip resolved alertmanager/prometheus alerts begin =====
 # Resolved 恢复告警不进入分析流程：
 # 1. 全 resolved payload：直接返回 skipped。
@@ -703,6 +1139,11 @@ try:
 
                 try:
                     payload = _v5sr_json.loads(body.decode("utf-8", errors="replace") or "{}")
+                    # light mirror resolved inside v5 skip call
+                    try:
+                        mirror_resolved_alerts_to_light_from_v5_skip(payload)
+                    except Exception as exc:
+                        logger.exception("mirror resolved payload inside v5 skip failed: %r", exc)
                 except Exception:
                     async def receive_original():
                         return {

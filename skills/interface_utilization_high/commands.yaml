@@ -1,67 +1,63 @@
 skill_name: interface_utilization_high
-version: v6.3.0
+version: v9.5.0-cisco-interface-utilization-high
 family: interface_or_link_utilization_high
 risk_level: readonly
-
 allowed_tools:
-  - mcp_netmiko_run_show
-  - prometheus_range_query
-  - parser_parse_cli_output
-
-allowed_capabilities:
-  - show_interface_detail
-  - show_interface_error_counters
-  - show_interface_aggregation
-  - prometheus_interface_window
-  - parse_cli_output
-
+- mcp_netmiko_run_show
+- prometheus_range_query
+- parser_parse_cli_output
+readonly_only: true
+command_limits:
+  max_commands_per_request: 30
+  max_extra_rounds: 0
 platform_commands:
   cisco_iosxe:
-    show_interface_detail:
-      template: "show interfaces {interface}"
-      parser: cisco_show_interfaces
-      readonly: true
-
-    show_interface_error_counters:
-      template: "show interfaces {interface} counters errors"
-      parser: cisco_show_interfaces_counters_errors
-      readonly: true
-
-    show_interface_aggregation:
-      template: "show etherchannel summary"
-      parser: cisco_etherchannel_summary
-      readonly: true
-
-  cisco_ios:
-    show_interface_detail:
-      template: "show interfaces {interface}"
-      parser: cisco_show_interfaces
-      readonly: true
-
-    show_interface_error_counters:
-      template: "show interfaces {interface} counters errors"
-      parser: cisco_show_interfaces_counters_errors
-      readonly: true
-
-    show_interface_aggregation:
-      template: "show etherchannel summary"
-      parser: cisco_etherchannel_summary
-      readonly: true
-
-command_limits:
-  max_commands_per_request: 8
-  max_extra_rounds: 0
-  readonly_only: true
-
+    global:
+    - show clock
+    - show ip interface brief
+    - show interfaces status
+    - show logging | include {interface}|LINEPROTO|LINK|ERR|ERRDISABLE|UDLD|SPANTREE|STP|LACP|PAGP|QOS|POLICE|DROP|TRANSCEIVER|SFP|flap
+    - show interfaces counters errors
+    - show etherchannel summary
+    - show lacp neighbor
+    - show interfaces trunk
+    - show vlan brief
+    per_interface:
+    - show interfaces {interface_each}
+    - show running-config interface {interface_each}
+    - show interfaces {interface_each} counters
+    - show policy-map interface {interface_each}
+    - show interfaces {interface_each} transceiver detail
+    - show spanning-tree interface {interface_each} detail
+    - show mac address-table interface {interface_each}
+  cisco_nxos:
+    global:
+    - show clock
+    - show interface status
+    - show logging last 500 | include {interface}|ETHPORT|IF_DOWN|IF_UP|ERR|ERRDISABLE|UDLD|STP|SPANTREE|SFP|XCVR|TRANSCEIVER|LACP|VPC|QOS|DROP|flap
+    - show interface counters errors
+    - show port-channel summary
+    - show lacp neighbor
+    - show interface trunk
+    - show vlan brief
+    per_interface:
+    - show interface {interface_each}
+    - show running-config interface {interface_each}
+    - show interface {interface_each} counters
+    - show policy-map interface {interface_each}
+    - show interface {interface_each} transceiver details
+    - show spanning-tree interface {interface_each} detail
+    - show mac address-table interface {interface_each}
 forbidden_patterns:
-  - "configure terminal"
-  - "conf t"
-  - "shutdown"
-  - "no shutdown"
-  - "clear counters"
-  - "reload"
-  - "write memory"
-  - "copy running-config startup-config"
-  - "delete"
-  - "erase"
-  - "debug"
+- configure terminal
+- conf t
+- shutdown
+- no shutdown
+- 'clear '
+- 'debug '
+- reload
+- write memory
+- copy running-config startup-config
+- monitor session
+- 'policy-map '
+- 'service-policy '

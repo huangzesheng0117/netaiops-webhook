@@ -1,50 +1,75 @@
 skill_name: interface_traffic_anomaly
-version: v6.3.0
+version: v9.3.0-cisco-interface-traffic-anomaly
 family: interface_traffic_anomaly
+
 required_facts:
   - hostname
   - device_ip
   - interface
-  - anomaly_direction
-  - mcp_commands
-preferred_facts:
-  - line_name
-  - current_rate_bps
-  - previous_rate_bps
-  - change_ratio
-  - input_rate_bps
-  - output_rate_bps
-  - interface_bandwidth_bps
-  - utilization_percent
-  - input_errors
-  - output_errors
-  - port_channel
+  - traffic_direction
   - prometheus_window_state
-  - recent_log_keywords
+  - mcp_commands
+
+preferred_facts:
+  - current_cli_input_rate
+  - current_cli_output_rate
+  - prometheus_in_bps
+  - prometheus_out_bps
+  - if_oper_status
+  - interface_admin_status
+  - interface_oper_status
+  - last_clearing
+  - link_flap_count
+  - input_errors
+  - crc_errors
+  - output_drops
+  - output_discards
+  - qos_policy_drop
+  - police_exceeded
+  - transceiver_rx
+  - transceiver_tx
+  - port_channel_members
+  - vpc_state
+  - trunk_allowed_vlan
+  - stp_state
+  - vlan_state
+  - broadcast_multicast_counters
+
 status_rules:
-  spike_active:
-    condition: "anomaly_direction is spike and current traffic remains much higher than baseline"
+  monitoring_suspected:
+    condition: "CLI rate and Prometheus current rate are obviously inconsistent, or Last clearing is very recent, or target interface naming/index is ambiguous."
     severity: warning
-    message: "traffic spike is still active"
-  drop_active:
-    condition: "anomaly_direction is drop and current traffic remains much lower than baseline"
-    severity: warning
-    message: "traffic drop is still active"
-  recovered_or_transient:
-    condition: "current traffic has returned close to baseline"
+    message: "monitoring sampling, SNMP index, counter reset or collection object should be checked first"
+  real_spike_no_error:
+    condition: "Prometheus and CLI both show traffic spike, interface is up/up, and no error/drop/QoS evidence is present."
     severity: info
-    message: "current evidence looks recovered or transient"
-  link_or_failover_suspected:
-    condition: "traffic drop with interface down, flap or port-channel change"
+    message: "real traffic increase or path shift is more likely"
+  spike_with_congestion:
+    condition: "traffic spike is accompanied by output drops, discards, policy-map drops or police exceeded."
     severity: warning
-    message: "line, interface, port-channel or failover should be checked"
-  inconclusive:
-    condition: "baseline/current traffic facts are missing"
+    message: "queue congestion, QoS or policing is more likely"
+  drop_with_flap:
+    condition: "traffic drop is accompanied by link flap or interface down/up logs."
+    severity: critical
+    message: "link instability is likely the direct reason"
+  drop_upup_path_shift:
+    condition: "traffic drop is present while interface remains up/up without physical error."
     severity: warning
-    message: "manual review is required"
+    message: "route/path shift, STP/vPC/Port-channel change or business source stop is more likely"
+  port_channel_redistribution:
+    condition: "Only member interface traffic changes while Port-channel total traffic may stay stable."
+    severity: info
+    message: "hash redistribution or member change is more likely"
+  l2_storm_suspected:
+    condition: "broadcast or multicast counters increase abnormally, or storm-control/STP/MAC evidence is abnormal."
+    severity: warning
+    message: "L2 storm, multicast issue, unknown unicast flooding or loop should be checked"
+
 manual_review_conditions:
-  - "missing interface"
-  - "missing current or previous traffic value"
-  - "mcp command failed"
-  - "parser status is error"
-  - "Prometheus and device evidence conflict"
+  - "Prometheus data unavailable"
+  - "CLI rate conflicts with Prometheus"
+  - "target interface is Port-channel member"
+  - "QoS policy command unsupported or failed"
+  - "vPC command unsupported on non-vPC platform"
+  - "route prefix is not provided, so path change cannot be verified in first wave"
+  - "NetFlow or ACL counter analysis is required"

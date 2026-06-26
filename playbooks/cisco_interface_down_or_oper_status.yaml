@@ -1,15 +1,169 @@
 playbook_id: cisco_interface_down_or_oper_status
+family: interface_down_or_oper_status
+skill_name: interface_down_or_oper_status
+description: Cisco interface down or operational status abnormal readonly investigation playbook. Default first-wave commands are optimized for NX-OS/Nexus while the shared skill keeps IOS/IOS-XE mappings for human and adaptive use.
 match:
   vendor: cisco
-  alertname_regex: "^(非ACI端口|非ACI端口状态|Leaf-Spine互联端口|Leaf-Spine互联端口状态|BorderLeaf端口|BorderLeaf端口状态|Spine端口|Spine端口状态|接口状态异常|端口状态异常|互联网边界交换机-互联网线路端口down|互联网链路端口down|互联网线路接口down|互联网链路接口down)$"
+  alertname_regex: "^(非ACI端口|非ACI端口状态|Leaf-Spine互联端口|Leaf-Spine互联端口状态|BorderLeaf端口|BorderLeaf端口状态|Spine端口|Spine端口状态|接口状态异常|端口状态异常|接口Down|端口Down|接口down|端口down|接口状态Down|端口状态Down|接口状态异常/Down|Cisco Interface Down|互联网边界交换机-互联网线路端口down|互联网链路端口down|互联网线路接口down|互联网链路接口down)$"
+
 execution:
   readonly_only: true
   auto_execute_allowed: true
-  max_commands: 7
+  max_commands: 14
   commands:
+    - "show clock"
+    - "show interface status"
     - "show interface {interface_each}"
-    - "show interface {interface_each} status"
-    - "show interface {interface_each} counters errors"
+    - "show running-config interface {interface_each}"
+    - "show interface status err-disabled"
+    - "show logging last 500 | include {interface_each}|ETHPORT|IF_DOWN|IF_UP|ERR|ERRDISABLE|UDLD|STP|SPANTREE|SFP|XCVR|TRANSCEIVER|LACP|VPC"
+    - "show interface counters errors"
     - "show interface {interface_each} transceiver details"
+    - "show vlan brief"
+    - "show interface trunk"
+    - "show spanning-tree interface {interface_each} detail"
     - "show port-channel summary"
-    - "show logging | include {interface_each}|LINK|Link|link|changed state|flap|down|up"
+    - "show vpc brief"
+    - "show module"
+
+prometheus_evidence_first:
+  enabled: true
+  backend_preference: prometheus_mcp
+  fallback: http_api
+  evidence_profile: interface_down_status
+  query_names:
+    - oper_status
+    - in_bps
+    - out_bps
+    - in_errors_delta
+  lookback_minutes: 15
+  compare_offset_minutes: 5
+  step_seconds: 60
+  max_candidates_per_query: 1
+  sidecar_overall_timeout_seconds: 45
+  required_labels:
+    - device_ip
+    - if_name
+  stop_device_cli_if_not_confirmed: false
+  unavailable_policy: continue_cli_evidence
+  sidecar_parallel_workers: 3
+  rate_window: 1m
+  note: "v9 interface-down evidence: use Prometheus MCP to check ifOperStatus, traffic and input-error history; failure must not block CLI evidence."
+
+commands:
+  - order: 1
+    command: "show clock"
+    reason: "对齐设备时间、告警时间和日志时间"
+    risk: low
+    readonly: true
+  - order: 2
+    command: "show interface status"
+    reason: "快速查看接口 connected/notconnect/disabled/err-disabled/suspended/inactive 等状态"
+    risk: low
+    readonly: true
+  - order: 3
+    command: "show interface {interface_each}"
+    reason: "查看目标接口物理状态、line protocol、速率、MTU、错误、drop、flap"
+    risk: low
+    readonly: true
+  - order: 4
+    command: "show running-config interface {interface_each}"
+    reason: "查看 shutdown、switchport、trunk、channel-group、speed、vPC、STP 等配置"
+    risk: low
+    readonly: true
+  - order: 5
+    command: "show interface status err-disabled"
+    reason: "确认接口是否被 err-disable 以及保护触发原因"
+    risk: low
+    readonly: true
+  - order: 6
+    command: "show logging last 500 | include {interface_each}|ETHPORT|IF_DOWN|IF_UP|ERR|ERRDISABLE|UDLD|STP|SPANTREE|SFP|XCVR|TRANSCEIVER|LACP|VPC"
+    reason: "查看目标接口近期 up/down、err-disable、光模块、LACP、vPC、STP 等事件"
+    risk: low
+    readonly: true
+  - order: 7
+    command: "show interface counters errors"
+    reason: "查看 CRC/FCS/discard/drop 等错误计数总览"
+    risk: low
+    readonly: true
+  - order: 8
+    command: "show interface {interface_each} transceiver details"
+    reason: "查看光模块、收发光、温度、电压等 DOM 信息"
+    risk: low
+    readonly: true
+  - order: 9
+    command: "show vlan brief"
+    reason: "确认 VLAN 是否存在、active 或 suspend，辅助判断 access/SVI/trunk 相关问题"
+    risk: low
+    readonly: true
+  - order: 10
+    command: "show interface trunk"
+    reason: "确认 trunk、allowed VLAN、native VLAN、active VLAN"
+    risk: low
+    readonly: true
+  - order: 11
+    command: "show spanning-tree interface {interface_each} detail"
+    reason: "确认 STP 是否阻塞、保护触发或存在拓扑变化"
+    risk: low
+    readonly: true
+  - order: 12
+    command: "show port-channel summary"
+    reason: "判断聚合成员是否 bundled、suspended、individual 或 down"
+    risk: low
+    readonly: true
+  - order: 13
+    command: "show vpc brief"
+    reason: "在 Nexus 场景确认 vPC peer-link、keepalive、member 状态"
+    risk: low
+    readonly: true
+  - order: 14
+    command: "show module"
+    reason: "判断是否存在线卡/模块异常导致端口异常"
+    risk: low
+    readonly: true
+
+readonly_only: true
+auto_execute_allowed: true
+
+analysis_policy:
+  goal: "首轮自动化只做快速归类，不做二级/三级深挖，不执行任何恢复或配置动作。"
+  judgement_order:
+    - "先根据 Prometheus ifOperStatus 窗口判断接口异常是否仍持续、是否瞬时抖动或已恢复。"
+    - "再根据 CLI 当前接口状态区分 administratively down、down/down、up/down、err-disabled、suspended/notconnect/inactive。"
+    - "再判断接口类型：物理口、trunk、access、Port-channel 成员、SVI、子接口、FEX/fabric 口。"
+    - "再结合日志、错误计数、光模块、VLAN/STP、Port-channel/vPC、模块状态归因。"
+    - "如果第一轮显示是 LACP/vPC consistency、对端、FEC、光纤/ODF 或硬件模块问题，只在建议里提示进入专项排查，不继续自动追加命令。"
+  first_wave_limits:
+    max_commands: 14
+    no_cdp_lldp_by_default: true
+    no_lacp_neighbor_or_vpc_consistency_by_default: true
+    no_show_version_by_default: true
+  result_split:
+    administratively_down: "配置中存在 shutdown 或接口 admin down，优先核对变更记录；恢复 no shutdown 属于变更动作，不自动执行。"
+    physical_down_or_notconnect: "优先检查光模块、光纤/网线、ODF、对端端口、速率/FEC。"
+    protocol_down: "物理层 up 但协议层 down，优先检查封装、keepalive、Port-channel、子接口、二三层模式。"
+    err_disabled: "根据 reason 分流到 BPDU Guard、UDLD、link-flap、port-security、gbic/sfp 等方向。"
+    suspended_or_individual: "进入 Port-channel/LACP/vPC 一致性方向，但二级命令不在首轮自动执行。"
+    vlan_or_stp: "trunk allowed VLAN、VLAN active、STP blocking/guard 可能导致业务异常。"
+    optic_or_physical_error: "Rx/Tx 光功率异常、CRC/FCS/input error、link flap 支持物理层或对端问题判断。"
+    module_abnormal: "show module 或日志出现模块异常时，提示检查线卡/模块/硬件事件。"
+  failure_policy: "任何单条只读命令失败不得阻断后续命令，最终咚咚结论中必须列出失败命令及其对判断的影响。"
+
+notification_policy:
+  template: "v8_standard"
+  must_include:
+    - "设备与接口"
+    - "告警含义"
+    - "Prometheus窗口证据"
+    - "命令执行概况"
+    - "聚合后的命令分析"
+    - "当前状态判断"
+    - "结论边界"
+    - "建议"
+  forbidden_terms:
+    - "第一批"
+    - "第二批"
+    - "第一波"
+    - "第二波"
+    - "stage-1"
+    - "stage-2"

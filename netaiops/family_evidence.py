@@ -1284,3 +1284,46 @@ if _v79_original_build_family_evidence_summary is not None:
             pass
         return summary
 # ===== v7.9 interface error delta evidence enrichment end =====
+
+# ===== v9 cisco hardware component evidence compatibility begin =====
+# 若后续某些路径直接把 family/playbook_id 保持为 cisco_hardware_component_fault，
+# 这里把它转为 chassis_slot_or_module_abnormal，复用已有硬件 evidence parser。
+try:
+    _v9_hw_ev_original_build_family_evidence_summary = build_family_evidence_summary
+except NameError:
+    _v9_hw_ev_original_build_family_evidence_summary = None
+
+
+def _v9_hw_ev_safe_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _v9_hw_ev_get_family(execution_data):
+    execution_data = execution_data or {}
+    for value in [
+        ((execution_data.get("family_result") or {}).get("family")),
+        ((execution_data.get("classification") or {}).get("family")),
+        ((execution_data.get("classification") or {}).get("playbook_type")),
+        ((execution_data.get("playbook") or {}).get("playbook_id")),
+    ]:
+        text = _v9_hw_ev_safe_text(value)
+        if text:
+            return text
+    return ""
+
+
+if _v9_hw_ev_original_build_family_evidence_summary is not None:
+    def build_family_evidence_summary(execution_data):
+        family = _v9_hw_ev_get_family(execution_data)
+        if family == "cisco_hardware_component_fault":
+            cloned = dict(execution_data or {})
+            family_result = dict(cloned.get("family_result") or {})
+            family_result["family"] = "chassis_slot_or_module_abnormal"
+            family_result["legacy_playbook_type"] = "chassis_slot_or_module_abnormal"
+            cloned["family_result"] = family_result
+            return _v9_hw_ev_original_build_family_evidence_summary(cloned)
+
+        return _v9_hw_ev_original_build_family_evidence_summary(execution_data)
+# ===== v9 cisco hardware component evidence compatibility end =====

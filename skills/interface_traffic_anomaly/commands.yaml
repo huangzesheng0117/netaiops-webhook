@@ -1,81 +1,113 @@
 skill_name: interface_traffic_anomaly
-version: v6.3.0
+version: v9.3.0-cisco-interface-traffic-anomaly
 family: interface_traffic_anomaly
 risk_level: readonly
 allowed_tools:
-  - mcp_netmiko_run_show
-  - prometheus_range_query
-  - parser_parse_cli_output
-allowed_capabilities:
-  - show_interface_detail
-  - show_interface_status
-  - show_interface_error_counters
-  - show_port_channel_summary
-  - show_recent_interface_logs
-  - prometheus_range_query
-  - parse_cli_output
+- mcp_netmiko_run_show
+- prometheus_range_query
+- parser_parse_cli_output
 platform_commands:
-  cisco_iosxe:
-    show_interface_detail:
-      template: "show interface {interface}"
-      readonly: true
-    show_interface_status:
-      template: "show interface {interface} status"
-      readonly: true
-    show_interface_error_counters:
-      template: "show interface {interface} counters errors"
-      readonly: true
-    show_port_channel_summary:
-      template: "show port-channel summary"
-      readonly: true
-    show_recent_interface_logs:
-      template: "show logging | include {interface}|LINK|UPDOWN|flap|rate|traffic"
-      readonly: true
-  cisco_ios:
-    show_interface_detail:
-      template: "show interface {interface}"
-      readonly: true
-    show_interface_status:
-      template: "show interface {interface} status"
-      readonly: true
-    show_interface_error_counters:
-      template: "show interface {interface} counters errors"
-      readonly: true
-    show_port_channel_summary:
-      template: "show etherchannel summary"
-      readonly: true
-    show_recent_interface_logs:
-      template: "show logging | include {interface}|LINK|UPDOWN|flap|rate|traffic"
-      readonly: true
   cisco_nxos:
-    show_interface_detail:
-      template: "show interface {interface}"
+    show_clock:
+      template: show clock
       readonly: true
     show_interface_status:
-      template: "show interface {interface} status"
+      template: show interface status
       readonly: true
-    show_interface_error_counters:
-      template: "show interface {interface} counters errors"
+    show_interface_detail:
+      template: show interface {interface}
+      readonly: true
+    show_interface_running_config:
+      template: show running-config interface {interface}
+      readonly: true
+    show_interface_logs:
+      template: show logging last 500 | include {interface}|ETHPORT|IF_DOWN|IF_UP|ERR|ERRDISABLE|UDLD|STP|SPANTREE|SFP|XCVR|TRANSCEIVER|LACP|VPC|QOS|DROP|flap
+      readonly: true
+    show_interface_errors:
+      template: show interface counters errors
+      readonly: true
+    show_interface_counters:
+      template: show interface {interface} counters
+      readonly: true
+    show_policy_map_interface:
+      template: show policy-map interface {interface}
+      readonly: true
+    show_interface_transceiver:
+      template: show interface {interface} transceiver details
       readonly: true
     show_port_channel_summary:
-      template: "show port-channel summary"
+      template: show port-channel summary
       readonly: true
-    show_recent_interface_logs:
-      template: "show logging | include {interface}|LINK|UPDOWN|flap|rate|traffic"
+    show_vpc_brief:
+      template: show lacp neighbor
+      readonly: true
+    show_interface_trunk:
+      template: show interface trunk
+      readonly: true
+    show_spanning_tree_interface:
+      template: show spanning-tree interface {interface} detail
+      readonly: true
+    show_vlan_brief:
+      template: show vlan brief
+      readonly: true
+  cisco_iosxe:
+    show_clock:
+      template: show clock
+      readonly: true
+    show_ip_interface_brief:
+      template: show ip interface brief
+      readonly: true
+    show_interfaces_status:
+      template: show interfaces status
+      readonly: true
+    show_interface_detail:
+      template: show interfaces {interface}
+      readonly: true
+    show_interface_running_config:
+      template: show running-config interface {interface}
+      readonly: true
+    show_interface_logs:
+      template: show logging | include {interface}|LINEPROTO|LINK|ERR|ERRDISABLE|UDLD|SPANTREE|STP|LACP|PAGP|QOS|POLICE|DROP|TRANSCEIVER|SFP|flap
+      readonly: true
+    show_interface_errors:
+      template: show interfaces counters errors
+      readonly: true
+    show_interface_counters:
+      template: show interfaces {interface} counters
+      readonly: true
+    show_policy_map_interface:
+      template: show policy-map interface {interface}
+      readonly: true
+    show_interface_transceiver:
+      template: show interfaces {interface} transceiver detail
+      readonly: true
+    show_etherchannel_summary:
+      template: show etherchannel summary
+      readonly: true
+    show_interfaces_trunk:
+      template: show interfaces trunk
+      readonly: true
+    show_spanning_tree_interface:
+      template: show spanning-tree interface {interface} detail
+      readonly: true
+    show_vlan_brief:
+      template: show vlan brief
       readonly: true
 command_limits:
-  max_commands_per_request: 8
+  max_commands_per_request: 14
   max_extra_rounds: 0
 readonly_only: true
 forbidden_patterns:
-  - "configure"
-  - "conf t"
-  - "clear"
-  - "reload"
-  - "shutdown"
-  - "no shutdown"
-  - "debug"
-  - "write"
-  - "copy"
-  - "delete"
-  - "erase"
+- configure terminal
+- conf t
+- shutdown
+- no shutdown
+- 'clear '
+- 'debug '
+- reload
+- write memory
+- copy running-config startup-config
+- monitor session
+- 'span '
+- 'policy-map '
+- 'service-policy '

@@ -1,0 +1,46 @@
+{
+  "skill_name": "cisco_hardware_component_fault",
+  "version": "v9.2.0-cisco-hardware-component-fault",
+  "family": "cisco_hardware_component_fault",
+  "facts": {
+    "alarm_type": "string",
+    "hostname": "string",
+    "device_ip": "string",
+    "mcp_commands": "array",
+    "prometheus_window_state": "string",
+    "hardware_current_state": "string",
+    "temperature_current": "number",
+    "temperature_trend": "string",
+    "fan_status": "string",
+    "power_status": "string",
+    "power_redundancy": "string",
+    "module_status": "string",
+    "supervisor_status": "string",
+    "diagnostic_status": "string",
+    "suspicious_hardware_logs": "array",
+    "inventory_pid_sn": "array",
+    "uptime_or_reload_reason": "string",
+    "core_files": "array"
+  },
+  "judgement": {
+    "current_state": "string",
+    "fault_class": "string",
+    "impact_scope": "string",
+    "confidence": "string",
+    "manual_review_required": "boolean",
+    "site_environment_suspected": "boolean",
+    "urgent_escalation_required": "boolean"
+  },
+  "notification": {
+    "required_sections": [
+      "根据告警内容初步判断",
+      "告警含义分析",
+      "命令执行概况",
+      "命令分析",
+      "Prometheus窗口证据",
+      "综合执行结果判断",
+      "建议"
+    ],
+    "command_display": "one_command_per_line"
+  }
+}

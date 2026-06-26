@@ -1,0 +1,175 @@
+skill_name: cisco_hardware_component_fault
+version: v9.2.0-cisco-hardware-component-fault
+family: cisco_hardware_component_fault
+risk_level: readonly
+
+allowed_tools:
+  - mcp_netmiko_run_show
+  - prometheus_range_query
+  - parser_parse_cli_output
+
+allowed_capabilities:
+  - show_clock
+  - show_version
+  - show_environment
+  - show_environment_fan
+  - show_environment_fan_detail
+  - show_environment_power
+  - show_environment_power_detail
+  - show_environment_temperature
+  - show_module
+  - show_inventory
+  - show_system_resources
+  - show_hardware_logs
+  - show_system_cores
+  - show_diagnostic_result
+  - prometheus_range_query
+  - parse_cli_output
+
+platform_commands:
+  cisco_nxos:
+    show_clock:
+      template: "show clock"
+      readonly: true
+    show_version:
+      template: "show version"
+      readonly: true
+    show_environment:
+      template: "show environment"
+      readonly: true
+    show_environment_fan:
+      template: "show environment fan"
+      readonly: true
+    show_environment_fan_detail:
+      template: "show environment fan detail"
+      readonly: true
+    show_environment_power:
+      template: "show environment power"
+      readonly: true
+    show_environment_power_detail:
+      template: "show environment power detail"
+      readonly: true
+    show_environment_temperature:
+      template: "show environment temperature"
+      readonly: true
+    show_module:
+      template: "show module"
+      readonly: true
+    show_inventory:
+      template: "show inventory"
+      readonly: true
+    show_system_resources:
+      template: "show system resources"
+      readonly: true
+    show_hardware_logs:
+      template: "show logging last 500 | include ENV|ENVMON|THERMAL|TEMP|TEMPERATURE|FAN|POWER|PS|PSU|FRU|OIR|MODULE|PLATFORM|SUP|SUPERVISOR|SENSOR|VOLT|XBAR|FABRIC|FEX|POE|ILPOWER"
+      readonly: true
+    show_system_cores:
+      template: "show system cores"
+      readonly: true
+    show_diagnostic_result:
+      template: "show diagnostic result module all"
+      readonly: true
+
+  cisco_iosxe:
+    show_clock:
+      template: "show clock"
+      readonly: true
+    show_version:
+      template: "show version"
+      readonly: true
+    show_environment:
+      template: "show environment all"
+      readonly: true
+    show_environment_status:
+      template: "show environment status"
+      readonly: true
+    show_environment_fan:
+      template: "show environment fan"
+      readonly: true
+    show_environment_power:
+      template: "show environment power"
+      readonly: true
+    show_environment_temperature:
+      template: "show environment temperature"
+      readonly: true
+    show_environment_history:
+      template: "show environment history"
+      readonly: true
+    show_platform:
+      template: "show platform"
+      readonly: true
+    show_inventory:
+      template: "show inventory"
+      readonly: true
+    show_redundancy:
+      template: "show redundancy"
+      readonly: true
+    show_hardware_logs:
+      template: "show logging | include ENV|ENVMON|THERMAL|TEMP|TEMPERATURE|FAN|POWER|PS|PSU|FRU|OIR|MODULE|PLATFORM|STACK|REDUNDANCY|SUPERVISOR|SENSOR|VOLT|PoE|ILPOWER"
+      readonly: true
+    show_diagnostic_result:
+      template: "show diagnostic result"
+      readonly: true
+    show_power_inline:
+      template: "show power inline"
+      readonly: true
+
+  cisco_ios:
+    show_clock:
+      template: "show clock"
+      readonly: true
+    show_version:
+      template: "show version"
+      readonly: true
+    show_environment:
+      template: "show environment all"
+      readonly: true
+    show_environment_status:
+      template: "show environment status"
+      readonly: true
+    show_environment_fan:
+      template: "show environment fan"
+      readonly: true
+    show_environment_power:
+      template: "show environment power"
+      readonly: true
+    show_environment_temperature:
+      template: "show environment temperature"
+      readonly: true
+    show_platform:
+      template: "show platform"
+      readonly: true
+    show_inventory:
+      template: "show inventory"
+      readonly: true
+    show_hardware_logs:
+      template: "show logging | include ENV|ENVMON|THERMAL|TEMP|TEMPERATURE|FAN|POWER|PS|PSU|FRU|OIR|MODULE|PLATFORM|STACK|REDUNDANCY|SUPERVISOR|SENSOR|VOLT|PoE|ILPOWER"
+      readonly: true
+    show_diagnostic_result:
+      template: "show diagnostic result"
+      readonly: true
+
+command_limits:
+  max_commands_per_request: 14
+  max_extra_rounds: 0
+
+readonly_only: true
+
+forbidden_patterns:
+  - "configure terminal"
+  - "conf t"
+  - "shutdown"
+  - "no shutdown"
+  - "reload"
+  - "redundancy force-switchover"
+  - "clear "
+  - "delete "
+  - "erase "
+  - "format "
+  - "write memory"
+  - "copy running-config startup-config"
+  - "debug "
+  - "diagnostic start"
+  - "power "
+  - "module reload"
