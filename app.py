@@ -192,6 +192,74 @@ async def health() -> dict:
     }
 
 
+
+
+# =========================
+# v10 Evidence Hub Detail API
+# 只读查询 data/evidence_hub/requests/<request_id>/ 下的结构化证据。
+# 不触发设备命令、不发送咚咚、不修改原始 data。
+# =========================
+
+
+def _v10_evidence_api_response(func, request_id: str):
+    try:
+        return func(request_id, base_dir=BASE_DIR)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.get("/evidence/{request_id}/summary")
+async def get_evidence_summary_api(request_id: str) -> dict:
+    from netaiops.evidence_hub.detail_api import get_evidence_summary
+
+    return _v10_evidence_api_response(get_evidence_summary, request_id)
+
+
+@app.get("/evidence/{request_id}/raw")
+async def get_evidence_raw_api(request_id: str) -> dict:
+    from netaiops.evidence_hub.detail_api import get_evidence_section
+
+    try:
+        return get_evidence_section(request_id, "raw", base_dir=BASE_DIR)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.get("/evidence/{request_id}/metrics")
+async def get_evidence_metrics_api(request_id: str) -> dict:
+    from netaiops.evidence_hub.detail_api import get_evidence_metrics
+
+    return _v10_evidence_api_response(get_evidence_metrics, request_id)
+
+
+@app.get("/evidence/{request_id}/device")
+async def get_evidence_device_api(request_id: str) -> dict:
+    from netaiops.evidence_hub.detail_api import get_evidence_device
+
+    return _v10_evidence_api_response(get_evidence_device, request_id)
+
+
+@app.get("/evidence/{request_id}/review")
+async def get_evidence_review_api(request_id: str) -> dict:
+    from netaiops.evidence_hub.detail_api import get_evidence_review
+
+    return _v10_evidence_api_response(get_evidence_review, request_id)
+
+
+@app.get("/evidence/{request_id}")
+async def get_evidence_detail_api(request_id: str) -> dict:
+    from netaiops.evidence_hub.detail_api import get_evidence_detail
+
+    return _v10_evidence_api_response(get_evidence_detail, request_id)
+
 @app.get("/request/{request_id}/summary")
 async def get_request_summary_api(request_id: str) -> dict:
     try:

@@ -14,6 +14,16 @@ from .schema import (
     utc_now,
     validate_request_id,
 )
+from .detail_api import (
+    api_route_manifest,
+    detail_exists,
+    get_evidence_detail,
+    get_evidence_device,
+    get_evidence_metrics,
+    get_evidence_review,
+    get_evidence_section,
+    get_evidence_summary,
+)
 from .detail_url import (
     build_detail_url,
     evidence_hub_default_to_local,
@@ -54,6 +64,14 @@ __all__ = [
     "build_evidence_detail",
     "find_request_artifacts",
     "get_evidence_hub_base_url",
+    "get_evidence_summary",
+    "get_evidence_section",
+    "get_evidence_review",
+    "get_evidence_metrics",
+    "get_evidence_device",
+    "get_evidence_detail",
+    "detail_exists",
+    "api_route_manifest",
     "normalize_base_url",
     "get_default_local_base_url",
     "evidence_hub_url_config_summary",
