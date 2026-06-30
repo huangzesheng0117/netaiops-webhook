@@ -15,12 +15,12 @@ class TestEvidenceHubUiApi(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    def _make_detail(self, base: Path, rid: str = "rid_ui") -> Path:
+    def _make_detail(self, base: Path, rid: str = "rid_ui", hostname: str = "SH16-G03-DCI-BN-SW01") -> Path:
         detail_dir = base / "data" / "evidence_hub" / "requests" / rid
         summary_data = {
             "request_id": rid,
             "title": "NetAIOps告警分析 - interface_down",
-            "device": {"hostname": "SH16-G03-DCI-BN-SW01", "device_ip": "10.187.251.101"},
+            "device": {"hostname": hostname, "device_ip": "10.187.251.101"},
             "object": "Te1/0/1",
             "family": "interface_down",
             "judgement": "接口当前仍处于 down，需要先确认对端和业务影响。",
@@ -45,7 +45,7 @@ class TestEvidenceHubUiApi(unittest.TestCase):
             "data": {
                 "request_id": rid,
                 "family": "interface_down",
-                "hostname": "SH16-G03-DCI-BN-SW01",
+                "hostname": hostname,
                 "device_ip": "10.187.251.101",
                 "object_name": "Te1/0/1",
                 "detail_url": f"http://example/evidence-ui/{rid}",
@@ -66,31 +66,58 @@ class TestEvidenceHubUiApi(unittest.TestCase):
             "status": "found",
             "data": {"review_text": "Review 正常"},
         })
+        self._write_json(detail_dir / "plan.json", {
+            "section": "plan",
+            "status": "found",
+            "data": {"selected_playbook_id": "interface_down"},
+        })
+        self._write_json(detail_dir / "raw_payload.json", {
+            "section": "raw_payload",
+            "status": "found",
+            "data": {"alerts": []},
+        })
         return detail_dir
 
-    def test_index_page_contains_request_link_and_filters(self):
+    def test_index_page_contains_request_link_filters_and_batch8_actions(self):
         with tempfile.TemporaryDirectory() as td:
             base = Path(td)
             self._make_detail(base, "rid_ui_index")
             html = build_evidence_index_html(base_dir=base, limit=10)
             self.assertIn("Evidence Hub", html)
+            self.assertIn("v10 Batch 8", html)
             self.assertIn('/evidence-ui/rid_ui_index', html)
+            self.assertIn('name="request_id"', html)
             self.assertIn('name="device_ip"', html)
             self.assertIn('name="family"', html)
-            self.assertIn('/evidence/rid_ui_index', html)
+            self.assertIn('data-copy-value="rid_ui_index"', html)
+            self.assertIn("复制ID", html)
+            self.assertIn('/evidence/rid_ui_index/metrics', html)
+            self.assertIn('/evidence/rid_ui_index/device', html)
+            self.assertIn('/evidence/rid_ui_index/review', html)
 
     def test_index_page_filter(self):
         with tempfile.TemporaryDirectory() as td:
             base = Path(td)
-            self._make_detail(base, "rid_match")
-            self._make_detail(base, "rid_other")
+            self._make_detail(base, "rid_match", hostname="SH16-G03-DCI-BN-SW01")
+            self._make_detail(base, "rid_other", hostname="SH16-G03-DCI-BN-SW01")
             html = build_evidence_index_html(base_dir=base, hostname="SH16-G03")
             self.assertIn("rid_match", html)
             self.assertIn("rid_other", html)
             none_html = build_evidence_index_html(base_dir=base, hostname="NO-SUCH-HOST")
             self.assertIn("暂无 Evidence Hub 详情记录", none_html)
 
-    def test_detail_page_contains_core_sections(self):
+    def test_index_page_pagination_and_request_id_filter(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            self._make_detail(base, "rid_one")
+            self._make_detail(base, "rid_two")
+            html = build_evidence_index_html(base_dir=base, limit=1, offset=0)
+            self.assertIn("下一页", html)
+            filtered = build_evidence_index_html(base_dir=base, request_id="rid_one", limit=10)
+            self.assertIn("rid_one", filtered)
+            self.assertNotIn("rid_two</a>", filtered)
+
+    def test_detail_page_contains_core_sections_and_batch8_interactions(self):
         with tempfile.TemporaryDirectory() as td:
             base = Path(td)
             self._make_detail(base, "rid_ui_detail")
@@ -100,7 +127,14 @@ class TestEvidenceHubUiApi(unittest.TestCase):
             self.assertIn("Prometheus Evidence", html)
             self.assertIn("MCP 命令执行结果", html)
             self.assertIn("Review / Analysis", html)
-            self.assertIn('/evidence/rid_ui_detail', html)
+            self.assertIn('data-copy-value="rid_ui_detail"', html)
+            self.assertIn("分区入口", html)
+            self.assertIn('#section-metrics_evidence', html)
+            self.assertIn('id="section-device_evidence"', html)
+            self.assertIn('/evidence/rid_ui_detail/metrics', html)
+            self.assertIn('/evidence/rid_ui_detail/device', html)
+            self.assertIn('/evidence/rid_ui_detail/review', html)
+            self.assertIn('onclick="setAllEvidenceSections(true)"', html)
 
     def test_detail_page_escapes_html(self):
         with tempfile.TemporaryDirectory() as td:
@@ -120,11 +154,14 @@ class TestEvidenceHubUiApi(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 build_evidence_detail_html("missing_rid", base_dir=base)
 
-    def test_manifest_contains_ui_routes(self):
+    def test_manifest_contains_ui_routes_and_batch8_version(self):
         manifest = ui_route_manifest()
-        self.assertEqual(manifest["batch"], "v10_batch7")
-        self.assertIn("GET /evidence-ui", manifest["routes"])
-        self.assertIn("GET /evidence-ui/{request_id}", manifest["routes"])
+        self.assertEqual(manifest["version"], "v10.batch8.ui")
+        paths = {item["path"] for item in manifest["routes"]}
+        self.assertIn("/evidence-ui", paths)
+        self.assertIn("/evidence-ui/{request_id}", paths)
+        self.assertIn("no_device_commands", manifest["boundaries"])
+        self.assertIn("no_external_assets", manifest["boundaries"])
 
 
 if __name__ == "__main__":
