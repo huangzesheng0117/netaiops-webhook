@@ -128,6 +128,39 @@ def read_json_file(path: Path) -> dict:
         return json.load(f)
 
 
+def _v10_build_evidence_detail_after_review(request_id: str, stage: str = "pipeline_after_review") -> dict:
+    """Build Evidence Hub detail as a non-blocking v10 sidecar."""
+    try:
+        from netaiops.evidence_hub.integration import build_evidence_detail_safe
+
+        return build_evidence_detail_safe(
+            request_id=request_id,
+            base_dir=BASE_DIR,
+            config=CONFIG,
+            stage=stage,
+            logger=logger,
+            overwrite=True,
+        )
+    except Exception as exc:
+        try:
+            logger.exception(
+                "v10 evidence hub integration failed request_id=%s stage=%s: %r",
+                request_id,
+                stage,
+                exc,
+            )
+        except Exception:
+            pass
+        return {
+            "ok": False,
+            "status": "error",
+            "stage": stage,
+            "request_id": request_id,
+            "enabled": True,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+
 def latest_analysis_file() -> Path:
     files = sorted(ANALYSIS_DIR.glob("*.analysis.json"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not files:
@@ -459,12 +492,17 @@ async def get_review_by_request_id_api(request_id: str) -> dict:
 async def generate_review_api(request_id: str) -> dict:
     try:
         result = generate_review_for_request_id(request_id)
+        evidence_detail_result = _v10_build_evidence_detail_after_review(
+            request_id,
+            stage="review_generate_api",
+        )
         return {
             "status": "ok",
             "action": "generate_review",
             "request_id": request_id,
             "file": result["review_file"],
             "data": result["review_data"],
+            "evidence_detail_result": evidence_detail_result,
         }
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
@@ -928,6 +966,10 @@ def v4_execution_result(request_id: str, payload: dict):
         }
 
     review_result = generate_review_for_request_id(request_id)
+    evidence_detail_result = _v10_build_evidence_detail_after_review(
+        request_id,
+        stage="v4_execution_result_after_review",
+    )
     summary = get_request_summary(request_id)
     notify_result = send_notification(request_id)
 

@@ -14,6 +14,12 @@ from .schema import (
     utc_now,
     validate_request_id,
 )
+from .integration import (
+    build_detail_url,
+    build_evidence_detail_safe,
+    evidence_hub_enabled,
+    get_evidence_hub_base_url,
+)
 from .writer import (
     SOURCE_PATTERNS,
     SourceArtifact,
@@ -38,4 +44,8 @@ __all__ = [
     "SourceArtifact",
     "build_evidence_detail",
     "find_request_artifacts",
+    "get_evidence_hub_base_url",
+    "evidence_hub_enabled",
+    "build_evidence_detail_safe",
+    "build_detail_url",
 ]
