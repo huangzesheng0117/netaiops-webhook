@@ -195,6 +195,41 @@ async def health() -> dict:
 
 
 # =========================
+
+
+# =========================
+# v10 Evidence Hub List / Search API
+# 只读扫描 data/evidence_hub/requests/ 下的 summary/meta 索引。
+# 不触发设备命令、不发送咚咚、不修改原始 data。
+# =========================
+
+
+@app.get("/evidence")
+async def list_evidence_api(
+    limit: int = 50,
+    offset: int = 0,
+    device_ip: str = "",
+    family: str = "",
+    hostname: str = "",
+    request_id: str = "",
+    q: str = "",
+) -> dict:
+    from netaiops.evidence_hub.list_api import get_evidence_list
+
+    try:
+        return get_evidence_list(
+            base_dir=BASE_DIR,
+            limit=limit,
+            offset=offset,
+            device_ip=device_ip,
+            family=family,
+            hostname=hostname,
+            request_id=request_id,
+            q=q,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
 # v10 Evidence Hub Detail API
 # 只读查询 data/evidence_hub/requests/<request_id>/ 下的结构化证据。
 # 不触发设备命令、不发送咚咚、不修改原始 data。
