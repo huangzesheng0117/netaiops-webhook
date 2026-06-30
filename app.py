@@ -1901,3 +1901,55 @@ def v7_llm_health(include_models: bool = False, chat_smoke: bool = False):
         }
 # ===== v7.10 LLM resilience APIs end =====
 
+# =========================
+
+# =========================
+# v10 Evidence Hub Minimal Frontend UI
+# 只读展示 data/evidence_hub/requests/ 下的结构化证据。
+# 不触发设备命令、不发送咚咚、不修改原始 data。
+# =========================
+
+
+@app.get("/evidence-ui")
+async def evidence_ui_index_api(
+    limit: int = 50,
+    offset: int = 0,
+    device_ip: str = "",
+    family: str = "",
+    hostname: str = "",
+    request_id: str = "",
+    q: str = "",
+):
+    from fastapi.responses import HTMLResponse
+    from netaiops.evidence_hub.ui_api import build_evidence_index_html
+
+    try:
+        html = build_evidence_index_html(
+            base_dir=BASE_DIR,
+            limit=limit,
+            offset=offset,
+            device_ip=device_ip,
+            family=family,
+            hostname=hostname,
+            request_id=request_id,
+            q=q,
+        )
+        return HTMLResponse(content=html)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/evidence-ui/{request_id}")
+async def evidence_ui_detail_api(request_id: str):
+    from fastapi.responses import HTMLResponse
+    from netaiops.evidence_hub.ui_api import build_evidence_detail_html
+
+    try:
+        html = build_evidence_detail_html(request_id, base_dir=BASE_DIR)
+        return HTMLResponse(content=html)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+# End v10 Evidence Hub Minimal Frontend UI
