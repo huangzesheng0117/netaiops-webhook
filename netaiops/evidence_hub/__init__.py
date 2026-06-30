@@ -1,8 +1,4 @@
-"""Evidence Hub package for NetAIOps Webhook v10.
-
-Batch 1 only provides schema primitives. It does not integrate with the
-production alert pipeline yet.
-"""
+"""Evidence Hub package for NetAIOps Webhook v10."""
 
 from .schema import (
     DEFAULT_BASE_DIR,
@@ -18,6 +14,12 @@ from .schema import (
     utc_now,
     validate_request_id,
 )
+from .writer import (
+    SOURCE_PATTERNS,
+    SourceArtifact,
+    build_evidence_detail,
+    find_request_artifacts,
+)
 
 __all__ = [
     "DEFAULT_BASE_DIR",
@@ -32,4 +34,8 @@ __all__ = [
     "safe_request_id",
     "utc_now",
     "validate_request_id",
+    "SOURCE_PATTERNS",
+    "SourceArtifact",
+    "build_evidence_detail",
+    "find_request_artifacts",
 ]
