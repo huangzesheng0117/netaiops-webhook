@@ -198,3 +198,10 @@ prometheus:
     interface_output_utilization_percent: ""
     interface_input_bps: ""
     interface_output_bps: ""
+
+# v10 Evidence Hub detail URL config.
+# Production can use external_base_url directly, or override with env EVIDENCE_HUB_BASE_URL.
+evidence_hub:
+  enabled: true
+  base_url: http://127.0.0.1:18080
+  default_to_local: true
