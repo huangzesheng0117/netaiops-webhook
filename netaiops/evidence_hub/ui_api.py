@@ -158,6 +158,11 @@ def _page(title: str, body: str) -> str:
     .evidence-table code {{ background: #f3f4f6; padding: 2px 4px; border-radius: 4px; }}
     .metrics-table th, .metrics-table td {{ white-space: nowrap; }}
     .kv {{ grid-template-columns: 140px 1fr; }}
+
+    /* BATCH13_7_RAW_OUTPUT_CSS_START */
+    .raw-output-pre {{ white-space: pre-wrap; word-break: normal; overflow-x: auto; max-height: 720px; line-height: 1.5; tab-size: 4; }}
+    .raw-output-pre code {{ white-space: inherit; }}
+    /* BATCH13_7_RAW_OUTPUT_CSS_END */
     /* BATCH13_5_HUMAN_READABLE_UI_CSS_END */
   </style>
   <script>
@@ -636,6 +641,30 @@ def _batch136_cmd_output(item: Mapping[str, Any]) -> str:
     return ""
 
 
+
+# BATCH13_7_RAW_OUTPUT_NEWLINE_HELPERS_START
+# Render command raw output as plain preformatted text instead of JSON-encoding the string.
+# Without this, real newline characters in device output are displayed as literal \n, which is unreadable.
+def _batch137_normalize_output_text(value: Any) -> str:
+    text = _text(value)
+    if not text:
+        return ""
+    # json.loads() normally converts JSON \n into real newlines, but some upstream fields may be double-escaped.
+    # This normalization is applied only to device raw output rendering, not to raw JSON sections.
+    text = text.replace("\\r\\n", "\n")
+    text = text.replace("\\n", "\n")
+    text = text.replace("\\r", "\r")
+    text = text.replace("\\t", "\t")
+    return text
+
+
+def _batch137_output_pre(value: Any, *, max_chars: int = 40000) -> str:
+    text = _batch137_normalize_output_text(value)
+    if len(text) > max_chars:
+        text = text[:max_chars] + "\n... [truncated by Evidence Hub UI]"
+    return f'<pre class="raw-output-pre">{_h(text)}</pre>'
+# BATCH13_7_RAW_OUTPUT_NEWLINE_HELPERS_END
+
 def _batch136_render_command_tables(section_doc: Any) -> str:
     commands = [c for c in _batch136_command_results(section_doc) if isinstance(c, Mapping)]
     if not commands:
@@ -660,7 +689,7 @@ def _batch136_render_command_tables(section_doc: Any) -> str:
         reason = _batch136_cmd_failure_reason(item) if include_reason else _text(item.get("reason") or "")
         output = _batch136_cmd_output(item)
         if output:
-            output_block = '<details><summary>查看设备原始输出</summary>' + _json_pre(output, max_chars=40000) + '</details>'
+            output_block = '<details><summary>查看设备原始输出</summary>' + _batch137_output_pre(output, max_chars=40000) + '</details>'
         else:
             output_block = '<span class="muted">未保存原始输出</span>'
         return '<tr>' + f'<td>{_h(order)}</td><td>{status}</td><td><code>{_h(command)}</code><br><span class="muted">{_h(capability)}</span></td><td>{_h(reason)}</td><td>{output_block}</td>' + '</tr>'
