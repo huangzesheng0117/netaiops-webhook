@@ -153,6 +153,10 @@ def _page(title: str, body: str) -> str:
     .human-note .muted, .human-note + .muted {{ color: #667085; }}
     .human-note ul {{ margin: 6px 0 0 22px; padding: 0; }}
     .human-note li {{ margin: 3px 0; }}
+    .evidence-table {{ margin: 10px 0 18px 0; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }}
+    .evidence-table th, .evidence-table td {{ font-size: 13px; vertical-align: top; }}
+    .evidence-table code {{ background: #f3f4f6; padding: 2px 4px; border-radius: 4px; }}
+    .metrics-table th, .metrics-table td {{ white-space: nowrap; }}
     .kv {{ grid-template-columns: 140px 1fr; }}
     /* BATCH13_5_HUMAN_READABLE_UI_CSS_END */
   </style>
@@ -554,6 +558,260 @@ def _detail_toolbar(request_id: str, sections: Mapping[str, Any]) -> str:
 
 
 
+
+# BATCH13_6_READABLE_TABLES_START
+# Frontend-only readable tables for command evidence and Prometheus evidence.
+# These helpers only render already persisted Evidence Hub JSON. They never execute commands.
+def _batch136_bool_ok(value: Any) -> bool:
+    if value is True:
+        return True
+    v = _text(value).strip().lower()
+    return v in {"ok", "true", "success", "completed", "done", "pass", "passed"}
+
+
+def _batch136_is_failed(value: Any) -> bool:
+    if value is False:
+        return True
+    v = _text(value).strip().lower()
+    return v in {"failed", "fail", "error", "exception", "timeout", "hard_error", "blocked"}
+
+
+def _batch136_command_results(section_doc: Any) -> list[Any]:
+    data = _batch135_data(section_doc)
+    candidates = []
+    if isinstance(data, Mapping):
+        candidates.extend([data.get("command_results"), data.get("commands"), data.get("results"), data.get("items")])
+        execution = data.get("execution")
+        if isinstance(execution, Mapping):
+            candidates.extend([execution.get("command_results"), execution.get("commands"), execution.get("results"), execution.get("items")])
+    for item in candidates:
+        if isinstance(item, list):
+            return item
+    return []
+
+
+def _batch136_cmd_status(item: Mapping[str, Any]) -> str:
+    status = _text(item.get("dispatch_status") or item.get("status") or item.get("result") or item.get("state") or "")
+    if not status:
+        if item.get("success") is True:
+            return "completed"
+        if item.get("success") is False:
+            return "failed"
+    return status or "unknown"
+
+
+def _batch136_cmd_status_label(item: Mapping[str, Any]) -> str:
+    status = _batch136_cmd_status(item)
+    if _batch136_bool_ok(status) or item.get("success") is True:
+        return '<span class="badge">成功</span>'
+    if _batch136_is_failed(status) or item.get("success") is False:
+        return '<span class="badge warning">失败</span>'
+    return f'<span class="badge warning">{_h(status or "未知")}</span>'
+
+
+def _batch136_cmd_failure_reason(item: Mapping[str, Any]) -> str:
+    judge = item.get("judge") if isinstance(item.get("judge"), Mapping) else {}
+    parsed = item.get("parsed") if isinstance(item.get("parsed"), Mapping) else {}
+    reason_parts = []
+    for source in (item, judge, parsed):
+        if not isinstance(source, Mapping):
+            continue
+        for key in ("error", "failure_reason", "reason", "summary", "message", "error_message"):
+            value = _text(source.get(key)).strip()
+            if value and value not in reason_parts:
+                reason_parts.append(value)
+    output = _text(item.get("output") or item.get("stdout") or item.get("stderr") or "").strip()
+    if "% Invalid command" in output and not any("Invalid command" in p for p in reason_parts):
+        reason_parts.append("设备 CLI 返回 % Invalid command，说明该命令不适配当前平台/模式或命令格式不被支持。")
+    if "timeout" in output.lower() and not any("timeout" in p.lower() for p in reason_parts):
+        reason_parts.append("命令执行或 MCP 调用可能超时。")
+    return "；".join(reason_parts) or "未记录明确失败原因，请展开原始输出查看。"
+
+
+def _batch136_cmd_output(item: Mapping[str, Any]) -> str:
+    for key in ("output", "stdout", "stderr", "raw_output", "raw", "result_text"):
+        value = _text(item.get(key)).strip()
+        if value:
+            return value
+    return ""
+
+
+def _batch136_render_command_tables(section_doc: Any) -> str:
+    commands = [c for c in _batch136_command_results(section_doc) if isinstance(c, Mapping)]
+    if not commands:
+        return '<div class="human-note"><strong>命令明细：</strong>当前没有解析到标准 command_results 列表。下方仍保留原始 JSON。</div>'
+    success = []
+    failed = []
+    other = []
+    for item in commands:
+        status = _batch136_cmd_status(item)
+        if _batch136_bool_ok(status) or item.get("success") is True:
+            success.append(item)
+        elif _batch136_is_failed(status) or item.get("success") is False:
+            failed.append(item)
+        else:
+            other.append(item)
+
+    def row(item: Mapping[str, Any], include_reason: bool) -> str:
+        command = _text(item.get("command") or item.get("cli") or item.get("cmd") or "")
+        capability = _text(item.get("capability") or item.get("name") or "")
+        order = _text(item.get("order") or "")
+        status = _batch136_cmd_status_label(item)
+        reason = _batch136_cmd_failure_reason(item) if include_reason else _text(item.get("reason") or "")
+        output = _batch136_cmd_output(item)
+        if output:
+            output_block = '<details><summary>查看设备原始输出</summary>' + _json_pre(output, max_chars=40000) + '</details>'
+        else:
+            output_block = '<span class="muted">未保存原始输出</span>'
+        return '<tr>' + f'<td>{_h(order)}</td><td>{status}</td><td><code>{_h(command)}</code><br><span class="muted">{_h(capability)}</span></td><td>{_h(reason)}</td><td>{output_block}</td>' + '</tr>'
+
+    rows_success = "".join(row(item, False) for item in success) or '<tr><td colspan="5" class="muted">无成功命令</td></tr>'
+    rows_failed = "".join(row(item, True) for item in failed) or '<tr><td colspan="5" class="muted">无失败命令</td></tr>'
+    rows_other = "".join(row(item, True) for item in other)
+    other_table = ""
+    if rows_other:
+        other_table = '<h4>其他状态命令</h4><table class="evidence-table"><thead><tr><th>序号</th><th>状态</th><th>命令</th><th>说明</th><th>原始输出</th></tr></thead><tbody>' + rows_other + '</tbody></table>'
+    return (
+        '<div class="human-note">'
+        f'<strong>命令明细：</strong>本次共记录 {len(commands)} 条设备只读命令，成功 {len(success)} 条，失败 {len(failed)} 条。'
+        '前端只展示 Evidence Hub 已保存的命令与输出，不会重新连接设备执行命令。'
+        '</div>'
+        '<h4>执行成功命令</h4><table class="evidence-table"><thead><tr><th>序号</th><th>状态</th><th>命令</th><th>说明</th><th>设备原始输出</th></tr></thead><tbody>' + rows_success + '</tbody></table>'
+        '<h4>执行失败命令</h4><table class="evidence-table"><thead><tr><th>序号</th><th>状态</th><th>命令</th><th>失败原因</th><th>设备返回/原始输出</th></tr></thead><tbody>' + rows_failed + '</tbody></table>'
+        + other_table
+    )
+
+
+def _batch136_metric_value(value: Any, unit: str = "") -> str:
+    try:
+        num = float(value)
+    except Exception:
+        text = _text(value)
+        return text if text else "-"
+    unit_text = _text(unit).strip()
+    if unit_text == "bps":
+        abs_num = abs(num)
+        if abs_num >= 1_000_000_000:
+            return f"{num / 1_000_000_000:.2f} Gbps"
+        if abs_num >= 1_000_000:
+            return f"{num / 1_000_000:.2f} Mbps"
+        if abs_num >= 1_000:
+            return f"{num / 1_000:.2f} Kbps"
+        return f"{num:.2f} bps"
+    if unit_text == "percent":
+        return f"{num:.2f} percent"
+    if unit_text == "count":
+        return f"{num:.2f} count"
+    if unit_text == "status":
+        return f"{num:.2f} status"
+    if unit_text:
+        return f"{num:.2f} {unit_text}"
+    return f"{num:.2f}"
+
+
+def _batch136_ratio(value: Any) -> str:
+    try:
+        num = float(value)
+    except Exception:
+        return "-"
+    return f"{num * 100:.2f}%"
+
+
+def _batch136_query_window_text(window: Any) -> str:
+    if not isinstance(window, Mapping):
+        return "-"
+    lookback = window.get("lookback_minutes")
+    offset = window.get("compare_offset_minutes")
+    step = window.get("step") or window.get("step_seconds")
+    parts = []
+    if lookback not in (None, ""):
+        parts.append(f"过去{lookback}分钟")
+    if step not in (None, ""):
+        parts.append(f"step={step}")
+    if offset not in (None, ""):
+        parts.append(f"对比偏移={offset}分钟")
+    if parts:
+        return "，".join(parts)
+    start = _text(window.get("start_iso_utc") or window.get("start") or "")
+    end = _text(window.get("end_iso_utc") or window.get("end") or "")
+    return f"{start} ~ {end}" if start or end else "-"
+
+
+def _batch136_metric_analysis(evidence: Mapping[str, Any]) -> Mapping[str, Any]:
+    analysis = evidence.get("analysis") if isinstance(evidence.get("analysis"), Mapping) else {}
+    analyses = analysis.get("analyses") if isinstance(analysis.get("analyses"), list) else []
+    for item in analyses:
+        if isinstance(item, Mapping):
+            return item
+    return {}
+
+
+def _batch136_metric_rows(section_doc: Any) -> list[Mapping[str, Any]]:
+    data = _batch135_data(section_doc)
+    evidences = []
+    if isinstance(data, Mapping):
+        if isinstance(data.get("evidences"), list):
+            evidences = data.get("evidences") or []
+        elif isinstance(data.get("data"), Mapping) and isinstance(data["data"].get("evidences"), list):
+            evidences = data["data"].get("evidences") or []
+    rows = []
+    for ev in evidences:
+        if isinstance(ev, Mapping):
+            row = dict(ev)
+            row["_analysis"] = _batch136_metric_analysis(ev)
+            rows.append(row)
+    return rows
+
+
+def _batch136_render_prometheus_table(section_doc: Any) -> str:
+    status = _text(section_doc.get("status") if isinstance(section_doc, Mapping) else "")
+    rows = _batch136_metric_rows(section_doc)
+    if not rows:
+        reason = "本次没有生成可表格化的 Prometheus 指标证据。"
+        if status == "missing":
+            reason += "当前分区状态为 missing，通常表示该 family 没有生成 Prometheus evidence 文件，或测试告警缺少对应时间序列。"
+        return f'<div class="human-note"><strong>Prometheus指标明细：</strong>{_h(reason)}下方仍保留原始 JSON。</div>'
+    success = sum(1 for ev in rows if ev.get("ok") is True or _batch136_bool_ok(ev.get("status")))
+    failed = len(rows) - success
+    html_rows = []
+    for ev in rows:
+        name = _text(ev.get("query_name") or ev.get("name") or "")
+        unit = _text(ev.get("unit") or "")
+        analysis = ev.get("_analysis") if isinstance(ev.get("_analysis"), Mapping) else {}
+        ok = ev.get("ok") is True or _batch136_bool_ok(ev.get("status")) or analysis.get("ok") is True
+        state = '<span class="badge">成功</span>' if ok else '<span class="badge warning">失败/无数据</span>'
+        html_rows.append(
+            '<tr>'
+            f'<td>{_h(name)}</td><td>{state}</td><td>{_h(_batch136_query_window_text(ev.get("query_window")))}</td>'
+            f'<td>{_h(_batch136_metric_value(analysis.get("current"), unit))}</td>'
+            f'<td>{_h(_batch136_metric_value(analysis.get("offset"), unit))}</td>'
+            f'<td>{_h(_batch136_metric_value(analysis.get("delta"), unit))}</td>'
+            f'<td>{_h(_batch136_ratio(analysis.get("change_ratio")))}</td>'
+            f'<td>{_h(_batch136_metric_value(analysis.get("window_max"), unit))}</td>'
+            f'<td>{_h(_batch136_metric_value(analysis.get("window_min"), unit))}</td>'
+            f'<td>{_h(_batch136_metric_value(analysis.get("window_avg"), unit))}</td>'
+            f'<td>{_h(analysis.get("trend_verdict") or "-")}</td>'
+            f'<td>{_h(ev.get("error") or ev.get("status") or "")}</td>'
+            '</tr>'
+        )
+    return (
+        '<div class="human-note">'
+        f'<strong>Prometheus指标明细：</strong>本次共解析 {len(rows)} 项 Prometheus 窗口证据，成功 {success} 项，失败/无数据 {failed} 项。'
+        '</div>'
+        '<table class="evidence-table metrics-table"><thead><tr>'
+        '<th>指标名</th><th>状态</th><th>查询窗口</th><th>当前值</th><th>对比值</th><th>变化量</th><th>变化比例</th><th>窗口最大值</th><th>窗口最小值</th><th>窗口平均值</th><th>趋势判断</th><th>错误/状态</th>'
+        '</tr></thead><tbody>' + "".join(html_rows) + '</tbody></table>'
+    )
+
+
+def _batch136_section_extra(section: str, section_doc: Any) -> str:
+    if section == "device_evidence":
+        return _batch136_render_command_tables(section_doc)
+    if section == "metrics_evidence":
+        return _batch136_render_prometheus_table(section_doc)
+    return ""
+# BATCH13_6_READABLE_TABLES_END
+
 def _sections_card(sections: Mapping[str, Any]) -> str:
     preferred_order = [
         "metrics_evidence",
@@ -573,18 +831,19 @@ def _sections_card(sections: Mapping[str, Any]) -> str:
         if section not in sections:
             continue
         title = SECTION_TITLES.get(section, section)
+        extra = _batch136_section_extra(section, sections[section])
         blocks.append(
             f"<details class=\"evidence-section\" id=\"section-{_h(section)}\">"
             f"<summary>{_h(title)}</summary>"
             f"{_batch135_section_note(section, sections[section])}"
+            f"{extra}"
             f"<div class=\"muted\">原始 JSON</div>"
             f"{_json_pre(sections[section])}"
             "</details>"
         )
     if not blocks:
         return "<div class=\"card muted\">暂无详情分区。</div>"
-    return '<div class="card"><h3>完整证据分区</h3><p class="muted">每个分区先给工程师可读解读，再保留完整原始 JSON，便于继续追溯。</p>' + "\n".join(blocks) + "</div>"
-
+    return '<div class="card"><h3>完整证据分区</h3><p class="muted">每个分区先给工程师可读解读，再按需要提供表格化证据，最后保留完整原始 JSON，便于继续追溯。</p>' + "\n".join(blocks) + "</div>"
 def build_evidence_detail_html(request_id: str, *, base_dir: Path = DEFAULT_BASE_DIR) -> str:
     """Build one request detail page HTML."""
     rid = safe_request_id(request_id)
