@@ -932,9 +932,38 @@ async def light_alert_alertmanager(request: Request, background_tasks: Backgroun
             "created_at": now_utc_str(),
         },
     )
-    safe_write_json(notify_file, result)
+
+    # Batch 14.1：直接轻量入口复用 mirror 已验证的共享限流状态。
+    # firing：同一 key 3600 秒内仅调度发送一次。
+    # resolved：始终允许发送，并清除对应 firing 状态。
+    # pending：仍由 build_light_notifications() 跳过。
+    sent_count = 0
+    throttled_count = 0
+    rate_limit_decisions = []
 
     for item in result.get("notifications", []):
+        should_send, decision = light_alert_mirror_should_send(
+            payload,
+            item,
+            throttle_seconds=3600,
+        )
+        decision["index"] = item.get("index")
+        decision["title"] = item.get("title")
+        decision["alert_name"] = item.get("alert_name")
+        rate_limit_decisions.append(decision)
+
+        if not should_send:
+            throttled_count += 1
+            logger.info(
+                "direct light alert suppressed by rate limit lite_request_id=%s index=%s key=%s remaining_seconds=%s title=%s",
+                lite_request_id,
+                item.get("index"),
+                decision.get("key"),
+                decision.get("remaining_seconds"),
+                item.get("title"),
+            )
+            continue
+
         background_tasks.add_task(
             send_light_alert_card_task,
             lite_request_id,
@@ -942,12 +971,30 @@ async def light_alert_alertmanager(request: Request, background_tasks: Backgroun
             item.get("title", ""),
             item.get("detail", ""),
         )
+        sent_count += 1
+
+    result["source"] = "alertmanager_light"
+    result["direct_rate_limit_policy"] = {
+        "firing_throttle_seconds": 3600,
+        "resolved_throttled": False,
+        "state_file": str(LIGHT_ALERT_DIR / "state" / "mirror_rate_limit.json"),
+        "state_scope": "shared_by_direct_and_mirror_light_alert_paths",
+        "scope": "direct_/light-alert/alertmanager",
+    }
+    result["rate_limit_decisions"] = rate_limit_decisions
+    result["sent_count"] = sent_count
+    result["throttled_count"] = throttled_count
+
+    # 必须在限流决策完成后再写通知记录，确保运行时文件可审计。
+    safe_write_json(notify_file, result)
 
     logger.info(
-        "received light alertmanager webhook lite_request_id=%s alert_count=%s notification_count=%s skipped_count=%s",
+        "received light alertmanager webhook lite_request_id=%s alert_count=%s notification_count=%s sent_count=%s throttled_count=%s skipped_count=%s",
         lite_request_id,
         result.get("alert_count"),
         result.get("notification_count"),
+        sent_count,
+        throttled_count,
         result.get("skipped_count"),
     )
 
@@ -956,12 +1003,15 @@ async def light_alert_alertmanager(request: Request, background_tasks: Backgroun
         "source": "alertmanager_light",
         "lite_request_id": lite_request_id,
         "alert_count": result.get("alert_count"),
+        # notification_count 保持兼容：表示 formatter 生成的候选通知数。
         "notification_count": result.get("notification_count"),
+        "sent_count": sent_count,
+        "throttled_count": throttled_count,
         "skipped_count": result.get("skipped_count"),
+        "rate_limit_decisions": rate_limit_decisions,
         "raw_file": str(raw_file),
         "notify_file": str(notify_file),
     }
-
 
 
 @app.post("/webhook/alertmanager")
