@@ -146,6 +146,15 @@ def _page(title: str, body: str) -> str:
     .kv {{ display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; }}
     .kv div:nth-child(odd) {{ color: #6b7280; }}
     .nowrap {{ white-space: nowrap; }}
+
+    /* BATCH13_5_HUMAN_READABLE_UI_CSS_START */
+    .human-note {{ margin: 10px 0 14px 0; padding: 12px 14px; border: 1px solid #d8e4ff; border-left: 4px solid #2563eb; border-radius: 10px; background: #f6f9ff; color: #172033; line-height: 1.75; }}
+    .human-note strong {{ font-weight: 700; }}
+    .human-note .muted, .human-note + .muted {{ color: #667085; }}
+    .human-note ul {{ margin: 6px 0 0 22px; padding: 0; }}
+    .human-note li {{ margin: 3px 0; }}
+    .kv {{ grid-template-columns: 140px 1fr; }}
+    /* BATCH13_5_HUMAN_READABLE_UI_CSS_END */
   </style>
   <script>
     function fallbackCopy(text) {{
@@ -306,22 +315,188 @@ def build_evidence_index_html(
     return _page("Evidence Hub", body)
 
 
-def _summary_card(summary: Mapping[str, Any], request_id: str) -> str:
+
+# BATCH13_5_HUMAN_READABLE_HELPERS_START
+# Frontend-only human-readable helpers. These functions only change HTML rendering.
+# They do not mutate Evidence Hub stored data and do not trigger device commands or DingDong sending.
+def _batch135_status_label(value: Any) -> str:
+    v = _text(value).strip().lower()
+    if v in {"found", "generated", "ok", "present", "true", "success"}:
+        return '<span class="badge">已生成</span>'
+    if v in {"missing", "not_found", "false", "none", "", "no_data"}:
+        return '<span class="badge warning">缺失/未生成</span>'
+    if v in {"error", "fail", "failed", "exception"}:
+        return '<span class="badge warning">异常</span>'
+    return _h(value or "未知")
+
+
+def _batch135_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return default
+
+
+def _batch135_data(section_doc: Any) -> Any:
+    if isinstance(section_doc, Mapping):
+        return section_doc.get("data") if "data" in section_doc else section_doc
+    return section_doc
+
+
+def _batch135_device_fields(summary: Mapping[str, Any]) -> Dict[str, str]:
     device = summary.get("device") if isinstance(summary.get("device"), Mapping) else {}
+    hostname = _text(device.get("hostname") or device.get("device_name") or summary.get("hostname") or "")
+    device_ip = _text(device.get("device_ip") or device.get("ip") or summary.get("device_ip") or "")
+    return {"hostname": hostname, "device_ip": device_ip}
+
+
+def _batch135_detail_url(summary: Mapping[str, Any], request_id: str) -> str:
+    detail_url = _text(summary.get("detail_url") or "").strip()
+    if detail_url:
+        return detail_url
+    return f"/evidence-ui/{request_id}"
+
+
+def _batch135_evidence_status_sentence(evidence_status: Mapping[str, Any]) -> str:
+    if not evidence_status:
+        return "当前详情页没有读取到证据状态汇总，建议展开下方完整证据分区查看原始 JSON。"
+    parts = []
+    labels = {
+        "analysis": "AI 分析结果",
+        "detail": "详情页索引",
+        "metrics": "Prometheus 指标证据",
+        "device": "设备取证结果",
+        "review": "Review 复核结果",
+    }
+    for key, label in labels.items():
+        if key in evidence_status:
+            value = _text(evidence_status.get(key))
+            if value in {"found", "generated", "ok", "present"}:
+                parts.append(f"{label}已生成")
+            elif value in {"missing", "not_found", ""}:
+                parts.append(f"{label}缺失")
+            else:
+                parts.append(f"{label}状态为 {value}")
+    if not parts:
+        for key, value in evidence_status.items():
+            parts.append(f"{key}={_text(value)}")
+    return "；".join(parts) + "。"
+
+
+def _batch135_command_stats_sentence(command_stats: Mapping[str, Any]) -> str:
+    if not command_stats:
+        return "当前详情页没有读取到命令统计。若该告警不需要设备取证，这可能是正常现象。"
+    total = _batch135_int(command_stats.get("total_commands"))
+    completed = _batch135_int(command_stats.get("completed_commands"))
+    failed = _batch135_int(command_stats.get("failed_commands"))
+    partial = _batch135_int(command_stats.get("partial_commands"))
+    hard_error = _batch135_int(command_stats.get("hard_error_count"))
+    status = _text(command_stats.get("execution_status") or "未知")
+    if total <= 0:
+        return f"本次没有执行设备侧命令，执行状态为 {status}。"
+    if failed == 0 and hard_error == 0:
+        return f"本次计划执行 {total} 条设备只读命令，已完成 {completed} 条，未发现失败命令，执行状态为 {status}。"
+    return (
+        f"本次计划执行 {total} 条设备只读命令，已完成 {completed} 条，失败 {failed} 条，"
+        f"部分成功 {partial} 条，硬错误 {hard_error} 条，执行状态为 {status}。"
+        "失败命令不会影响详情页展示，但排障时应优先展开 MCP 命令执行结果查看失败原因。"
+    )
+
+
+def _batch135_command_counts(section_doc: Any) -> Dict[str, int]:
+    data = _batch135_data(section_doc)
+    commands = []
+    if isinstance(data, Mapping):
+        for key in ("commands", "results", "command_results", "items"):
+            if isinstance(data.get(key), list):
+                commands = data.get(key) or []
+                break
+        if not commands and isinstance(data.get("execution"), Mapping):
+            execution = data.get("execution")
+            for key in ("commands", "results", "command_results"):
+                if isinstance(execution.get(key), list):
+                    commands = execution.get(key) or []
+                    break
+    total = len(commands)
+    success = 0
+    failed = 0
+    for item in commands:
+        if not isinstance(item, Mapping):
+            continue
+        status = _text(item.get("status") or item.get("result") or item.get("state")).lower()
+        ok = item.get("success")
+        if ok is True or status in {"success", "ok", "completed", "done"}:
+            success += 1
+        elif ok is False or status in {"failed", "fail", "error", "exception", "timeout"}:
+            failed += 1
+    return {"total": total, "success": success, "failed": failed}
+
+
+def _batch135_section_note(section: str, section_doc: Any) -> str:
+    status = ""
+    if isinstance(section_doc, Mapping):
+        status = _text(section_doc.get("status") or "")
+    data = _batch135_data(section_doc)
+    title = SECTION_TITLES.get(section, section)
+    body = ""
+    if section == "metrics_evidence":
+        if status == "missing":
+            body = "本次没有生成 Prometheus 指标证据。常见原因包括该 family 暂未配置 PromQL、测试告警没有对应时间序列，或历史样本缺少指标文件。"
+        else:
+            body = "本区展示 Prometheus 指标侧证据，用于确认告警窗口内的指标走势、阈值命中情况和取证时间点。"
+    elif section == "device_evidence":
+        counts = _batch135_command_counts(section_doc)
+        if counts["total"]:
+            body = f"本区展示 MCP/设备侧只读命令取证结果。本区共解析到 {counts['total']} 条命令记录，其中成功 {counts['success']} 条，失败 {counts['failed']} 条。"
+        else:
+            body = "本区展示 MCP/设备侧只读命令取证结果。当前未解析到标准命令列表，建议直接查看下方原始 JSON。"
+    elif section == "review":
+        body = "本区展示 Review / Analysis 复核结果，用于说明最终判断、建议和证据充分性。"
+    elif section == "analysis_result":
+        body = "本区展示 LLM 分析结果，主要用于追溯模型如何根据告警、指标和设备证据形成判断。"
+    elif section == "alert_context":
+        body = "本区展示告警基础上下文，包括告警名称、设备、接口、labels/annotations 等归一化前后的关键信息。"
+    elif section == "normalized_event":
+        body = "本区展示 Normalized Event，即系统把原始 Alertmanager payload 标准化后的事件结构。"
+    elif section == "classification":
+        body = "本区展示告警分类 / Family 识别结果，用于确认本次告警进入了哪类 playbook 或分析分支。"
+    elif section == "plan":
+        body = "本区展示 Plan / Playbook 计划，包括本次计划取哪些证据、是否允许自动执行只读命令等。"
+    elif section == "notification_summary":
+        body = "本区展示 Batch 10 生成的短文本通知摘要，用于对应 AI 分析群里看到的瘦身版咚咚通知。"
+    elif section == "raw_payload":
+        body = "本区保留原始 Alertmanager payload，便于追溯最初输入。该部分通常较长，排障时一般最后查看。"
+    elif section == "meta":
+        body = "本区展示 Evidence Hub 索引元数据，包括 request_id、生成时间、detail_url、缺失分区等。"
+    else:
+        body = f"本区展示 {title} 的原始证据内容。"
+    return (
+        '<div class="human-note">'
+        f'<strong>人类可读解读：</strong>{_h(body)}'
+        f'<div class="muted">原始状态：{_h(status or "未知")}；下方仍完整保留原始 JSON。</div>'
+        '</div>'
+    )
+# BATCH13_5_HUMAN_READABLE_HELPERS_END
+
+
+
+def _summary_card(summary: Mapping[str, Any], request_id: str) -> str:
+    device_fields = _batch135_device_fields(summary)
     recommendations = "".join(f"<li>{_h(item)}</li>" for item in _as_list(summary.get("recommendations")))
     if not recommendations:
         recommendations = "<li class=\"muted\">暂无建议摘要</li>"
-    detail_url = summary.get("detail_url")
-    detail_link = '<span class="muted">未生成</span>'
-    if detail_url:
-        detail_link = f'<a href="{_h(detail_url)}">{_h(detail_url)}</a>'
+    detail_url = _batch135_detail_url(summary, request_id)
+    detail_link = f'<a href="{_h(detail_url)}">{_h(detail_url)}</a>'
+    if not summary.get("detail_url"):
+        detail_link += '<br><span class="muted">后端 summary/meta 未写入 detail_url，前端按当前 request_id 补偿展示。</span>'
     return f"""
 <div class=\"card\">
   <div class=\"toolbar\"><a class=\"btn secondary\" href=\"/evidence-ui\">返回列表</a>{_copy_button(request_id, "复制 request_id")}<a class=\"btn secondary\" href=\"/evidence/{_h(request_id)}\">Full JSON</a></div>
   <h2>{_h(summary.get('title') or 'NetAIOps告警分析')}</h2>
   <div class=\"kv\">
     <div>request_id</div><div>{_h(request_id)}</div>
-    <div>设备</div><div>{_h(device.get('hostname'))} <span class=\"muted\">{_h(device.get('device_ip'))}</span></div>
+    <div>设备名称</div><div>{_h(device_fields.get('hostname'))}</div>
+    <div>设备IP</div><div>{_h(device_fields.get('device_ip'))}</div>
     <div>告警对象</div><div>{_h(summary.get('object'))}</div>
     <div>Family</div><div>{_h(summary.get('family'))}</div>
     <div>详情链接</div><div>{detail_link}</div>
@@ -337,19 +512,26 @@ def _status_card(summary: Mapping[str, Any]) -> str:
     evidence_status = summary.get("evidence_status") if isinstance(summary.get("evidence_status"), Mapping) else {}
     command_stats = summary.get("command_stats") if isinstance(summary.get("command_stats"), Mapping) else {}
     status_rows = "".join(
-        f"<tr><td>{_h(key)}</td><td>{_h(value)}</td></tr>"
+        f"<tr><td>{_h(key)}</td><td>{_batch135_status_label(value)}</td><td>{_h(value)}</td></tr>"
         for key, value in evidence_status.items()
-    ) or "<tr><td colspan=\"2\" class=\"muted\">暂无 evidence_status</td></tr>"
+    ) or "<tr><td colspan=\"3\" class=\"muted\">暂无 evidence_status</td></tr>"
     command_rows = "".join(
         f"<tr><td>{_h(key)}</td><td>{_h(value)}</td></tr>"
         for key, value in command_stats.items()
     ) or "<tr><td colspan=\"2\" class=\"muted\">暂无 command_stats</td></tr>"
     return f"""
 <div class=\"grid\">
-  <div class=\"card\"><h3>证据状态</h3><table>{status_rows}</table></div>
-  <div class=\"card\"><h3>命令统计</h3><table>{command_rows}</table></div>
+  <div class=\"card\">
+    <h3>证据状态</h3>
+    <div class=\"human-note\"><strong>工程师可读摘要：</strong>{_h(_batch135_evidence_status_sentence(evidence_status))}</div>
+    <table><thead><tr><th>证据项</th><th>人工解释</th><th>原始状态</th></tr></thead><tbody>{status_rows}</tbody></table>
+  </div>
+  <div class=\"card\">
+    <h3>命令统计</h3>
+    <div class=\"human-note\"><strong>工程师可读摘要：</strong>{_h(_batch135_command_stats_sentence(command_stats))}</div>
+    <table>{command_rows}</table>
+  </div>
 </div>"""
-
 
 def _detail_toolbar(request_id: str, sections: Mapping[str, Any]) -> str:
     section_links = []
@@ -369,6 +551,7 @@ def _detail_toolbar(request_id: str, sections: Mapping[str, Any]) -> str:
         + " ".join(api_links)
         + '</div></div>'
     )
+
 
 
 def _sections_card(sections: Mapping[str, Any]) -> str:
@@ -393,13 +576,14 @@ def _sections_card(sections: Mapping[str, Any]) -> str:
         blocks.append(
             f"<details class=\"evidence-section\" id=\"section-{_h(section)}\">"
             f"<summary>{_h(title)}</summary>"
+            f"{_batch135_section_note(section, sections[section])}"
+            f"<div class=\"muted\">原始 JSON</div>"
             f"{_json_pre(sections[section])}"
             "</details>"
         )
     if not blocks:
         return "<div class=\"card muted\">暂无详情分区。</div>"
-    return '<div class="card"><h3>完整证据分区</h3>' + "\n".join(blocks) + "</div>"
-
+    return '<div class="card"><h3>完整证据分区</h3><p class="muted">每个分区先给工程师可读解读，再保留完整原始 JSON，便于继续追溯。</p>' + "\n".join(blocks) + "</div>"
 
 def build_evidence_detail_html(request_id: str, *, base_dir: Path = DEFAULT_BASE_DIR) -> str:
     """Build one request detail page HTML."""
@@ -433,5 +617,6 @@ def ui_route_manifest() -> JsonDict:
             "no_dingdong_send",
             "no_data_mutation",
             "no_external_assets",
+            "human_readable_rendering",
         ],
     }
