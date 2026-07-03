@@ -160,9 +160,30 @@ def _page(title: str, body: str) -> str:
     .kv {{ grid-template-columns: 140px 1fr; }}
 
     /* BATCH13_7_RAW_OUTPUT_CSS_START */
-    .raw-output-pre {{ white-space: pre-wrap; word-break: normal; overflow-x: auto; max-height: 720px; line-height: 1.5; tab-size: 4; }}
+    .raw-output-pre {{ white-space: pre; word-break: normal; overflow: auto; max-height: 720px; min-width: 320px; width: 100%; box-sizing: border-box; line-height: 1.5; tab-size: 4; resize: horizontal; }}
     .raw-output-pre code {{ white-space: inherit; }}
     /* BATCH13_7_RAW_OUTPUT_CSS_END */
+
+    /* BATCH13_8_RAW_OUTPUT_INTERACTION_CSS_START */
+    .command-table-shell {{ --raw-output-width: 48%; margin: 10px 0 22px 0; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; overflow: hidden; }}
+    .command-table-toolbar {{ display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; background: #f8fafc; }}
+    .command-table-toolbar label {{ display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #475569; }}
+    .command-table-toolbar input[type="range"] {{ width: 180px; min-width: 0; padding: 0; }}
+    .command-output-width-value {{ display: inline-block; min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }}
+    .command-table-scroll {{ overflow-x: auto; }}
+    .command-evidence-table {{ table-layout: fixed; min-width: 1180px; margin: 0; border: 0; }}
+    .command-evidence-table .col-order {{ width: 56px; }}
+    .command-evidence-table .col-status {{ width: 76px; }}
+    .command-evidence-table .col-command {{ width: 21%; }}
+    .command-evidence-table .col-reason {{ width: auto; }}
+    .command-evidence-table .col-output {{ width: var(--raw-output-width); }}
+    .command-evidence-table td {{ overflow-wrap: anywhere; }}
+    .command-evidence-table td.raw-output-cell {{ overflow: visible; }}
+    .raw-output-details {{ min-width: 320px; }}
+    .raw-output-toolbar {{ display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin: 8px 0 6px 0; }}
+    .raw-output-copy {{ padding: 5px 9px; font-size: 12px; }}
+    .raw-output-copy-source {{ min-width: 0; }}
+    /* BATCH13_8_RAW_OUTPUT_INTERACTION_CSS_END */
     /* BATCH13_5_HUMAN_READABLE_UI_CSS_END */
   </style>
   <script>
@@ -189,7 +210,41 @@ def _page(title: str, body: str) -> str:
     function setAllEvidenceSections(openState) {{
       document.querySelectorAll('details.evidence-section').forEach(function(el) {{ el.open = openState; }});
     }}
+    function setCommandOutputWidth(control) {{
+      var shell = control.closest('.command-table-shell');
+      if (!shell) return;
+      var value = Math.max(35, Math.min(78, parseInt(control.value || '48', 10)));
+      shell.style.setProperty('--raw-output-width', value + '%');
+      var valueNode = shell.querySelector('.command-output-width-value');
+      if (valueNode) valueNode.textContent = value + '%';
+    }}
+    function setCommandOutputWidthPreset(button) {{
+      var shell = button.closest('.command-table-shell');
+      if (!shell) return;
+      var control = shell.querySelector('.command-output-width');
+      if (!control) return;
+      control.value = button.getAttribute('data-width') || '48';
+      setCommandOutputWidth(control);
+    }}
+    document.addEventListener('input', function(ev) {{
+      var control = ev.target.closest('.command-output-width');
+      if (control) setCommandOutputWidth(control);
+    }});
     document.addEventListener('click', function(ev) {{
+      var rawCopy = ev.target.closest('[data-copy-target]');
+      if (rawCopy) {{
+        ev.preventDefault();
+        ev.stopPropagation();
+        var target = document.getElementById(rawCopy.getAttribute('data-copy-target') || '');
+        if (target) copyEvidenceText(target.textContent || '', rawCopy);
+        return;
+      }}
+      var preset = ev.target.closest('.command-output-width-preset');
+      if (preset) {{
+        ev.preventDefault();
+        setCommandOutputWidthPreset(preset);
+        return;
+      }}
       var btn = ev.target.closest('[data-copy-value]');
       if (!btn) return;
       copyEvidenceText(btn.getAttribute('data-copy-value') || '', btn);
@@ -665,6 +720,48 @@ def _batch137_output_pre(value: Any, *, max_chars: int = 40000) -> str:
     return f'<pre class="raw-output-pre">{_h(text)}</pre>'
 # BATCH13_7_RAW_OUTPUT_NEWLINE_HELPERS_END
 
+
+# BATCH13_8_RAW_OUTPUT_INTERACTION_HELPERS_START
+def _batch138_raw_output_block(value: Any, output_id: str) -> str:
+    safe_id = _h(output_id)
+    return (
+        '<details class="raw-output-details">'
+        '<summary>查看设备原始输出</summary>'
+        '<div class="raw-output-toolbar">'
+        f'<button type="button" class="secondary raw-output-copy" data-copy-target="{safe_id}">复制原始输出</button>'
+        '</div>'
+        f'<div id="{safe_id}" class="raw-output-copy-source">'
+        f'{_batch137_output_pre(value, max_chars=40000)}'
+        '</div>'
+        '</details>'
+    )
+
+
+def _batch138_command_table_shell(title: str, rows: str) -> str:
+    return (
+        '<div class="command-table-shell">'
+        '<div class="command-table-toolbar">'
+        '<label>原始输出列宽 '
+        '<input type="range" class="command-output-width" min="35" max="78" value="48" step="1" aria-label="调整原始输出列宽">'
+        '<output class="command-output-width-value">48%</output>'
+        '</label>'
+        '<button type="button" class="secondary command-output-width-preset" data-width="72">扩大输出</button>'
+        '<button type="button" class="secondary command-output-width-preset" data-width="48">恢复默认</button>'
+        '</div>'
+        '<div class="command-table-scroll">'
+        '<table class="evidence-table command-evidence-table">'
+        '<colgroup>'
+        '<col class="col-order"><col class="col-status"><col class="col-command"><col class="col-reason"><col class="col-output">'
+        '</colgroup>'
+        f'<thead><tr><th>序号</th><th>状态</th><th>命令</th><th>{_h(title)}</th><th>设备返回/原始输出</th></tr></thead>'
+        f'<tbody>{rows}</tbody>'
+        '</table>'
+        '</div>'
+        '</div>'
+    )
+# BATCH13_8_RAW_OUTPUT_INTERACTION_HELPERS_END
+
+
 def _batch136_render_command_tables(section_doc: Any) -> str:
     commands = [c for c in _batch136_command_results(section_doc) if isinstance(c, Mapping)]
     if not commands:
@@ -681,7 +778,7 @@ def _batch136_render_command_tables(section_doc: Any) -> str:
         else:
             other.append(item)
 
-    def row(item: Mapping[str, Any], include_reason: bool) -> str:
+    def row(item: Mapping[str, Any], include_reason: bool, output_id: str) -> str:
         command = _text(item.get("command") or item.get("cli") or item.get("cmd") or "")
         capability = _text(item.get("capability") or item.get("name") or "")
         order = _text(item.get("order") or "")
@@ -689,27 +786,45 @@ def _batch136_render_command_tables(section_doc: Any) -> str:
         reason = _batch136_cmd_failure_reason(item) if include_reason else _text(item.get("reason") or "")
         output = _batch136_cmd_output(item)
         if output:
-            output_block = '<details><summary>查看设备原始输出</summary>' + _batch137_output_pre(output, max_chars=40000) + '</details>'
+            output_block = _batch138_raw_output_block(output, output_id)
         else:
             output_block = '<span class="muted">未保存原始输出</span>'
-        return '<tr>' + f'<td>{_h(order)}</td><td>{status}</td><td><code>{_h(command)}</code><br><span class="muted">{_h(capability)}</span></td><td>{_h(reason)}</td><td>{output_block}</td>' + '</tr>'
+        return (
+            '<tr>'
+            f'<td>{_h(order)}</td>'
+            f'<td>{status}</td>'
+            f'<td><code>{_h(command)}</code><br><span class="muted">{_h(capability)}</span></td>'
+            f'<td>{_h(reason)}</td>'
+            f'<td class="raw-output-cell">{output_block}</td>'
+            '</tr>'
+        )
 
-    rows_success = "".join(row(item, False) for item in success) or '<tr><td colspan="5" class="muted">无成功命令</td></tr>'
-    rows_failed = "".join(row(item, True) for item in failed) or '<tr><td colspan="5" class="muted">无失败命令</td></tr>'
-    rows_other = "".join(row(item, True) for item in other)
+    rows_success = "".join(
+        row(item, False, f"raw-output-success-{index}")
+        for index, item in enumerate(success, start=1)
+    ) or '<tr><td colspan="5" class="muted">无成功命令</td></tr>'
+    rows_failed = "".join(
+        row(item, True, f"raw-output-failed-{index}")
+        for index, item in enumerate(failed, start=1)
+    ) or '<tr><td colspan="5" class="muted">无失败命令</td></tr>'
+    rows_other = "".join(
+        row(item, True, f"raw-output-other-{index}")
+        for index, item in enumerate(other, start=1)
+    )
     other_table = ""
     if rows_other:
-        other_table = '<h4>其他状态命令</h4><table class="evidence-table"><thead><tr><th>序号</th><th>状态</th><th>命令</th><th>说明</th><th>原始输出</th></tr></thead><tbody>' + rows_other + '</tbody></table>'
+        other_table = '<h4>其他状态命令</h4>' + _batch138_command_table_shell("说明", rows_other)
     return (
         '<div class="human-note">'
         f'<strong>命令明细：</strong>本次共记录 {len(commands)} 条设备只读命令，成功 {len(success)} 条，失败 {len(failed)} 条。'
         '前端只展示 Evidence Hub 已保存的命令与输出，不会重新连接设备执行命令。'
         '</div>'
-        '<h4>执行成功命令</h4><table class="evidence-table"><thead><tr><th>序号</th><th>状态</th><th>命令</th><th>说明</th><th>设备原始输出</th></tr></thead><tbody>' + rows_success + '</tbody></table>'
-        '<h4>执行失败命令</h4><table class="evidence-table"><thead><tr><th>序号</th><th>状态</th><th>命令</th><th>失败原因</th><th>设备返回/原始输出</th></tr></thead><tbody>' + rows_failed + '</tbody></table>'
+        '<h4>执行成功命令</h4>'
+        + _batch138_command_table_shell("说明", rows_success)
+        + '<h4>执行失败命令</h4>'
+        + _batch138_command_table_shell("失败原因", rows_failed)
         + other_table
     )
-
 
 def _batch136_metric_value(value: Any, unit: str = "") -> str:
     try:
