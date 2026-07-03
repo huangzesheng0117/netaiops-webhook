@@ -99,6 +99,7 @@ def _load_detail_sections(request_id: str, base_dir: Path = DEFAULT_BASE_DIR) ->
         "meta": _read_json(root / "meta.json"),
         "notification_summary": _read_json(root / "notification_summary.json"),
         "alert_context": _read_json(root / "alert_context.json"),
+        "normalized_event": _read_json(root / "normalized_event.json"),
         "classification": _read_json(root / "classification.json"),
         "metrics_evidence": _read_json(root / "metrics_evidence.json"),
         "device_evidence": _read_json(root / "device_evidence.json"),
@@ -227,6 +228,54 @@ def _extract_detail_url(summary_data: Mapping[str, Any], sections: Mapping[str, 
     )
 
 
+
+def _normalize_alert_status(value: Any) -> str:
+    text = _compact_text(value).lower()
+    mapping = {
+        "firing": "firing",
+        "active": "firing",
+        "alerting": "firing",
+        "告警": "firing",
+        "告警中": "firing",
+        "resolved": "resolved",
+        "recovered": "resolved",
+        "recovery": "resolved",
+        "恢复": "resolved",
+        "已恢复": "resolved",
+    }
+    return mapping.get(text, text)
+
+
+def _extract_alert_status(
+    summary_data: Mapping[str, Any],
+    alert_data: Mapping[str, Any],
+    sections: Mapping[str, Any],
+) -> str:
+    normalized_doc = sections.get("normalized_event") or {}
+    normalized_data = _section_data(normalized_doc)
+
+    normalized_status = ""
+    events = normalized_data.get("events")
+    if isinstance(events, list):
+        for event in events:
+            if not isinstance(event, Mapping):
+                continue
+            normalized_status = _first_non_empty(event.get("status"))
+            if normalized_status:
+                break
+
+    if not normalized_status:
+        normalized_status = _first_non_empty(normalized_data.get("status"))
+
+    raw_status = _first_non_empty(
+        summary_data.get("alert_status"),
+        summary_data.get("status"),
+        alert_data.get("status"),
+        normalized_status,
+    )
+    return _normalize_alert_status(raw_status)
+
+
 @dataclass(frozen=True)
 class SlimSummaryLimits:
     judgement_chars: int = 170
@@ -258,6 +307,7 @@ def build_slim_notification_summary(
     review_data = _section_data(sections.get("review") or {})
 
     device = _extract_device(summary_data, alert_data)
+    alert_status = _extract_alert_status(summary_data, alert_data, sections)
     family = _first_non_empty(summary_data.get("family"), class_data.get("family"), "unknown")
     title = _shorten(
         _first_non_empty(summary_data.get("title"), f"NetAIOps告警分析 - {family}"),
@@ -289,6 +339,7 @@ def build_slim_notification_summary(
         "schema_version": SCHEMA_VERSION,
         "request_id": rid,
         "title": title,
+        "alert_status": alert_status,
         "device": device,
         "object": obj,
         "family": family,

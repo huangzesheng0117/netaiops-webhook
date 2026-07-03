@@ -30,6 +30,7 @@ class NotificationSummaryBuilderTest(unittest.TestCase):
                 "hostname": "SW01",
                 "device_ip": "10.0.0.1",
                 "object_name": "Te1/0/1",
+                "status": "firing",
                 "summary": "接口 Te1/0/1 出向利用率超过阈值",
                 "description": "raw payload should not be copied fully",
             },
@@ -92,6 +93,7 @@ class NotificationSummaryBuilderTest(unittest.TestCase):
 
             self.assertEqual(summary["schema_version"], SCHEMA_VERSION)
             self.assertEqual(summary["request_id"], request_id)
+            self.assertEqual(summary["alert_status"], "firing")
             self.assertEqual(summary["device"]["display"], "SW01（10.0.0.1）")
             self.assertEqual(summary["object"], "Te1/0/1")
             self.assertEqual(len(summary["recommendations"]), 2)
@@ -99,6 +101,24 @@ class NotificationSummaryBuilderTest(unittest.TestCase):
             self.assertIn("http://example/evidence-ui/", summary["detail_url"])
             self.assertIn("Prometheus：已生成", summary["evidence_summary"]["text"])
             self.assertIn("设备取证已完成：共 3 条", summary["evidence_summary"]["text"])
+
+
+    def test_resolved_status_is_preserved_for_card_mapping(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            request_id = "20260630_150003_resolved"
+            detail = self._make_detail(base, request_id)
+
+            alert_file = detail / "alert_context.json"
+            alert_doc = json.loads(alert_file.read_text(encoding="utf-8"))
+            alert_doc["data"]["status"] = "resolved"
+            self._write_json(alert_file, alert_doc)
+
+            summary = build_slim_notification_summary(
+                request_id,
+                base_dir=base,
+            )
+            self.assertEqual(summary["alert_status"], "resolved")
 
     def test_render_text_is_slim_and_excludes_full_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as td:
