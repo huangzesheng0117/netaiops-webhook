@@ -1,7 +1,7 @@
+import importlib.util
 import sys
 import types
 import unittest
-import importlib.util
 
 
 def _install_stub_module(name, **attrs):
@@ -15,7 +15,12 @@ def _install_stub_module(name, **attrs):
 
 _install_stub_module(
     "netaiops.dongdong_sender",
-    send_dongdong_message=lambda title, detail: {"ok": True, "sent": True, "title": title, "detail": detail},
+    send_dongdong_message=lambda title, detail: {
+        "ok": True,
+        "sent": True,
+        "title": title,
+        "detail": detail,
+    },
 )
 _install_stub_module(
     "netaiops.request_summary",
@@ -30,7 +35,10 @@ _install_stub_module(
 )
 _install_stub_module(
     "netaiops.notification_payload",
-    generate_notification_payload=lambda request_id: {"request_id": request_id, "title": "Full Title"},
+    generate_notification_payload=lambda request_id: {
+        "request_id": request_id,
+        "title": "Full Title",
+    },
     build_notification_text=lambda payload: "FULL TEXT",
 )
 
@@ -45,6 +53,16 @@ class NotifierSlimModeTests(unittest.TestCase):
         self._orig_should = notifier.should_send_notification
         self._orig_payload = notifier.generate_notification_payload
         self._orig_text = notifier.build_notification_text
+        self._orig_delivery_mode = notifier.get_ai_delivery_mode
+        self._orig_card_sender = notifier.send_ai_analysis_card
+
+        # 这是 Batch 10 的文本内容测试，不测试 Batch 16 卡片传输。
+        notifier.get_ai_delivery_mode = lambda settings: "text"
+
+        def forbid_real_card_sender(*args, **kwargs):
+            self.fail("slim text tests must never call AI card sender")
+
+        notifier.send_ai_analysis_card = forbid_real_card_sender
 
     def tearDown(self):
         notifier.write_slim_notification_summary = self._orig_write_slim
@@ -53,6 +71,8 @@ class NotifierSlimModeTests(unittest.TestCase):
         notifier.should_send_notification = self._orig_should
         notifier.generate_notification_payload = self._orig_payload
         notifier.build_notification_text = self._orig_text
+        notifier.get_ai_delivery_mode = self._orig_delivery_mode
+        notifier.send_ai_analysis_card = self._orig_card_sender
 
     def _patch_common(self, *, mode=None):
         settings = {"enabled": True, "provider": "dongdong"}
@@ -65,7 +85,11 @@ class NotifierSlimModeTests(unittest.TestCase):
             "title": "Full Title",
             "target": {"family": "interface_or_link_utilization_high"},
         }
-        notifier.build_notification_text = lambda payload: "FULL TEXT\n命令清单：show interface x\nPrometheus窗口证据：query_range"
+        notifier.build_notification_text = (
+            lambda payload: "FULL TEXT\n"
+            "命令清单：show interface x\n"
+            "Prometheus窗口证据：query_range"
+        )
 
     def test_default_mode_is_slim(self):
         self.assertEqual(notifier.get_notification_mode({}), "slim")
@@ -83,6 +107,7 @@ class NotifierSlimModeTests(unittest.TestCase):
         result = notifier.send_notification("rid001")
         self.assertTrue(result["sent"])
         self.assertEqual(result["notification_mode"], "full")
+        self.assertEqual(result["delivery_mode"], "text")
         self.assertIn("命令清单", sent["detail"])
         self.assertIn("Prometheus窗口证据", sent["detail"])
 
@@ -97,7 +122,11 @@ class NotifierSlimModeTests(unittest.TestCase):
                 "output_file": f"/tmp/{request_id}/notification_summary_slim.json",
                 "summary": {
                     "title": "Slim Title",
-                    "text": "标题：Slim Title\n判断：一句话判断\n详情：http://x/evidence-ui/rid002",
+                    "text": (
+                        "标题：Slim Title\n"
+                        "判断：一句话判断\n"
+                        "详情：http://x/evidence-ui/rid002"
+                    ),
                     "detail_url": "http://x/evidence-ui/rid002",
                     "safety": {
                         "full_commands_included": False,
@@ -117,11 +146,14 @@ class NotifierSlimModeTests(unittest.TestCase):
         result = notifier.send_notification("rid002")
         self.assertTrue(result["sent"])
         self.assertEqual(result["notification_mode"], "slim")
+        self.assertEqual(result["delivery_mode"], "text")
         self.assertEqual(sent["title"], "Slim Title")
         self.assertIn("详情：http://x/evidence-ui/rid002", sent["detail"])
         self.assertNotIn("命令清单", sent["detail"])
         self.assertNotIn("query_range", sent["detail"])
-        self.assertTrue(result["slim_summary_file"].endswith("notification_summary_slim.json"))
+        self.assertTrue(
+            result["slim_summary_file"].endswith("notification_summary_slim.json")
+        )
 
     def test_slim_failure_falls_back_to_full_text(self):
         self._patch_common()
@@ -140,12 +172,16 @@ class NotifierSlimModeTests(unittest.TestCase):
         result = notifier.send_notification("rid003")
         self.assertTrue(result["sent"])
         self.assertEqual(result["notification_mode"], "full_fallback")
+        self.assertEqual(result["delivery_mode"], "text")
         self.assertIn("summary build failed", result["slim_error"])
         self.assertIn("命令清单", sent["detail"])
 
     def test_disabled_notify_does_not_build_slim(self):
         called = {"slim": False}
-        notifier.get_notify_settings = lambda: {"enabled": False, "provider": "dongdong"}
+        notifier.get_notify_settings = lambda: {
+            "enabled": False,
+            "provider": "dongdong",
+        }
 
         def fake_write(request_id):
             called["slim"] = True

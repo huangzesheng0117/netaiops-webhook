@@ -47,6 +47,9 @@ notify:
   provider: "dingtalk"
   # v10 Batch 10: slim 使用 Evidence Hub 摘要 + 详情链接；full 回退旧长文本。
   notification_mode: "slim"
+  ai_notification_mode: "card"
+  ai_card_config_path: "/opt/netaiops-webhook/config/ai_analysis_dongdong.env"
+  ai_card_fallback_to_text: true
   webhook_url_env: "NETAIOPS_DINGTALK_WEBHOOK"
   secret_env: "NETAIOPS_DINGTALK_SECRET"
 

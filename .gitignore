@@ -56,3 +56,6 @@ data/v8_prometheus_mcp_poc/
 
 # Local DingDong service token config
 config/light_alert_dongdong.env
+
+# Local AI analysis DingDong card token config
+config/ai_analysis_dongdong.env
