@@ -471,18 +471,45 @@ def check_llm_health(
 
                 if chat_smoke:
                     started = time.monotonic()
+                    smoke_max_tokens = max(
+                        1200,
+                        _as_int(llm_cfg.get("max_tokens"), 1200),
+                    )
+                    item["chat_smoke_max_tokens"] = smoke_max_tokens
                     smoke_payload = _build_payload(
                         "请只输出一个 JSON 对象：{\"summary\":\"ok\",\"confidence\":\"high\"}",
                         model,
-                        {**llm_cfg, "max_tokens": 128, "temperature": 0},
+                        {
+                            **llm_cfg,
+                            "max_tokens": smoke_max_tokens,
+                            "temperature": 0,
+                        },
                     )
-                    resp = client.post(_chat_url(endpoint["base_url"]), headers=headers, json=smoke_payload)
-                    item["chat_latency_ms"] = int((time.monotonic() - started) * 1000)
+                    resp = client.post(
+                        _chat_url(endpoint["base_url"]),
+                        headers=headers,
+                        json=smoke_payload,
+                    )
+                    item["chat_latency_ms"] = int(
+                        (time.monotonic() - started) * 1000
+                    )
                     item["chat_status_code"] = resp.status_code
-                    item["chat_channel_name"] = resp.headers.get("X-Channel-Name", "")
+                    item["chat_channel_name"] = resp.headers.get(
+                        "X-Channel-Name",
+                        "",
+                    )
                     resp.raise_for_status()
                     data = resp.json()
-                    content = data["choices"][0]["message"]["content"]
+                    item["chat_reported_model"] = str(data.get("model", ""))
+                    choice = (data.get("choices") or [{}])[0]
+                    item["chat_finish_reason"] = choice.get("finish_reason", "")
+                    message = choice.get("message") or {}
+                    content = message.get("content")
+                    if not isinstance(content, str) or not content.strip():
+                        raise ValueError(
+                            "empty model response content; "
+                            f"finish_reason={item['chat_finish_reason']!r}"
+                        )
                     _extract_json_text(content)
                     item["chat_status"] = "ok"
 
