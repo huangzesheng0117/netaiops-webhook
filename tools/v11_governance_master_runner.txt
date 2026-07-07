@@ -1,0 +1,754 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# NetAIOps Webhook v11 Governance Master Runner v2
+#
+# Usage:
+#   bash tools/v11_governance_master_runner.txt prepare 0
+#   bash tools/v11_governance_master_runner.txt status 0
+#   bash tools/v11_governance_master_runner.txt verify 0
+#   CONFIRM_COMMIT=YES bash tools/v11_governance_master_runner.txt commit 0
+#   CONFIRM_COMMIT=YES CONFIRM_PUSH=YES bash tools/v11_governance_master_runner.txt commit 0
+#   CONFIRM_ROLLBACK=YES bash tools/v11_governance_master_runner.txt rollback 0
+#
+# Safety:
+# - The runner does not generate business implementation code.
+# - The runner does not call real GLM, Prometheus MCP, Netmiko MCP, or DingTalk.
+# - The runner never pushes unless CONFIRM_PUSH=YES.
+# - prepare requires a clean Git worktree and /health status=ok.
+# - rollback is strictly pre-commit. If HEAD changed, use git revert.
+# - No git reset --hard, git clean -fd, git add ., or git add -A.
+
+PROJECT_ROOT="${PROJECT_ROOT:-/opt/netaiops-webhook}"
+SERVICE_NAME="${SERVICE_NAME:-netaiops-webhook.service}"
+BASE_URL="${BASE_URL:-http://127.0.0.1:18080}"
+STATE_ROOT="${STATE_ROOT:-/tmp/netaiops_v11_master_runner}"
+EXPECTED_BRANCH="${EXPECTED_BRANCH:-main}"
+
+RELEASE_BASELINE_REQUEST_ID="${RELEASE_BASELINE_REQUEST_ID:-20260703_154613_796157_3750fbea}"
+GLM52_REQUEST_ID="${GLM52_REQUEST_ID:-20260706_141707_915316_11eef8e7}"
+FULL_SUCCESS_REQUEST_ID="${FULL_SUCCESS_REQUEST_ID:-20260703_145814_955415_6fe18e1f}"
+REAL_FIXTURE_IDS="${REAL_FIXTURE_IDS:-${RELEASE_BASELINE_REQUEST_ID}
+${GLM52_REQUEST_ID}
+${FULL_SUCCESS_REQUEST_ID}}"
+
+ACTION="${1:-}"
+BATCH="${2:-}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  runner prepare <0..11>
+  runner status <0..11>
+  runner verify <0..11>
+  runner commit <0..11>
+  runner rollback <0..11>
+
+Required confirmations:
+  CONFIRM_COMMIT=YES
+  CONFIRM_PUSH=YES       # optional; otherwise push is skipped
+  CONFIRM_ROLLBACK=YES
+  CONFIRM_REPREPARE=YES  # only when replacing stale /tmp state
+EOF
+}
+
+if [[ -z "${ACTION}" || -z "${BATCH}" ]]; then
+  usage
+  exit 2
+fi
+
+if ! [[ "${BATCH}" =~ ^([0-9]|1[01])$ ]]; then
+  echo "[FAIL] batch must be 0..11"
+  exit 2
+fi
+
+cd "${PROJECT_ROOT}"
+# Avoid creating untracked __pycache__ files during verification.
+export PYTHONDONTWRITEBYTECODE=1
+# shellcheck disable=SC1091
+source venv/bin/activate
+
+declare -A BATCH_NAME
+declare -A COMMIT_MESSAGE
+declare -A RESTART_REQUIRED
+declare -A FILES
+declare -A TEST_PATTERN
+declare -A EXTRA_VERIFY
+
+BATCH_NAME[0]="Baseline / Contract Freeze"
+COMMIT_MESSAGE[0]="v11: freeze governance contracts and baseline"
+RESTART_REQUIRED[0]="no"
+FILES[0]="netaiops/governance/__init__.py
+netaiops/governance/contracts.py
+tools/v11_baseline_inventory.py
+tests/test_v11_governance_contracts.py"
+TEST_PATTERN[0]="test_v11_governance_contracts.py"
+EXTRA_VERIFY[0]="batch0"
+
+BATCH_NAME[1]="Governance Schema / Store"
+COMMIT_MESSAGE[1]="v11: add governance schemas and store"
+RESTART_REQUIRED[1]="no"
+FILES[1]="netaiops/governance/schemas.py
+netaiops/governance/store.py
+tests/test_v11_governance_schema_store.py"
+TEST_PATTERN[1]="test_v11_governance_schema_store.py"
+EXTRA_VERIFY[1]="none"
+
+BATCH_NAME[2]="Incident Memory"
+COMMIT_MESSAGE[2]="v11: build incident memory from request artifacts"
+RESTART_REQUIRED[2]="no"
+FILES[2]="netaiops/governance/artifact_reader.py
+netaiops/governance/memory_builder.py
+tools/v11_build_incident_memory.py
+tests/test_v11_incident_memory.py"
+TEST_PATTERN[2]="test_v11_incident_memory.py"
+EXTRA_VERIFY[2]="batch2"
+
+BATCH_NAME[3]="Learning Signal"
+COMMIT_MESSAGE[3]="v11: detect governed learning signals"
+RESTART_REQUIRED[3]="no"
+FILES[3]="netaiops/governance/signal_detector.py
+tests/test_v11_learning_signals.py"
+TEST_PATTERN[3]="test_v11_learning_signals.py"
+EXTRA_VERIFY[3]="none"
+
+BATCH_NAME[4]="Proposal"
+COMMIT_MESSAGE[4]="v11: add governed proposal workflow"
+RESTART_REQUIRED[4]="no"
+FILES[4]="netaiops/governance/proposal_builder.py
+tests/test_v11_proposals.py"
+TEST_PATTERN[4]="test_v11_proposals.py"
+EXTRA_VERIFY[4]="none"
+
+BATCH_NAME[5]="Offline Replay"
+COMMIT_MESSAGE[5]="v11: add offline replay and comparison"
+RESTART_REQUIRED[5]="no"
+FILES[5]="netaiops/governance/replay_engine.py
+netaiops/governance/replay_compare.py
+tools/v11_replay.py
+tests/test_v11_replay.py"
+TEST_PATTERN[5]="test_v11_replay.py"
+EXTRA_VERIFY[5]="batch5"
+
+BATCH_NAME[6]="Learning Report"
+COMMIT_MESSAGE[6]="v11: generate governance learning reports"
+RESTART_REQUIRED[6]="no"
+FILES[6]="netaiops/governance/report_builder.py
+tools/v11_learning_report.py
+tests/test_v11_learning_report.py"
+TEST_PATTERN[6]="test_v11_learning_report.py"
+EXTRA_VERIFY[6]="none"
+
+BATCH_NAME[7]="Release Audit"
+COMMIT_MESSAGE[7]="v11: add governance release audit"
+RESTART_REQUIRED[7]="no"
+FILES[7]="netaiops/governance/release_audit.py
+tools/v11_release_audit.py
+tests/test_v11_release_audit.py"
+TEST_PATTERN[7]="test_v11_release_audit.py"
+EXTRA_VERIFY[7]="batch7"
+
+BATCH_NAME[8]="Governance API"
+COMMIT_MESSAGE[8]="v11: expose read-only governance API"
+RESTART_REQUIRED[8]="yes"
+FILES[8]="netaiops/governance/service.py
+netaiops/governance/api.py
+app.py
+tests/test_v11_governance_api.py"
+TEST_PATTERN[8]="test_v11_governance_api.py"
+EXTRA_VERIFY[8]="batch8"
+
+BATCH_NAME[9]="Governance UI"
+COMMIT_MESSAGE[9]="v11: add read-only governance UI"
+RESTART_REQUIRED[9]="yes"
+FILES[9]="netaiops/governance/ui.py
+app.py
+tests/test_v11_governance_ui.py"
+TEST_PATTERN[9]="test_v11_governance_ui.py"
+EXTRA_VERIFY[9]="batch9"
+
+BATCH_NAME[10]="Integration / Backfill"
+COMMIT_MESSAGE[10]="v11: integrate governance sidecar and backfill"
+RESTART_REQUIRED[10]="yes"
+FILES[10]="netaiops/governance/integration.py
+tools/v11_governance_backfill.py
+tests/test_v11_governance_integration.py
+app.py"
+TEST_PATTERN[10]="test_v11_governance_integration.py"
+EXTRA_VERIFY[10]="batch10"
+
+BATCH_NAME[11]="Release Acceptance"
+COMMIT_MESSAGE[11]="v11: complete learning loop governance"
+RESTART_REQUIRED[11]="yes"
+FILES[11]="tools/v11_release_acceptance.py
+tests/test_v11_release_acceptance.py
+VERSION
+README.md"
+TEST_PATTERN[11]="test_v11_release_acceptance.py"
+EXTRA_VERIFY[11]="batch11"
+
+STATE_DIR="${STATE_ROOT}/batch_${BATCH}"
+BACKUP_DIR="${STATE_DIR}/backup"
+MANIFEST="${STATE_DIR}/manifest.json"
+HEAD_FILE="${STATE_DIR}/baseline_head.txt"
+VERIFY_STAMP="${STATE_DIR}/verified_digest.txt"
+HEALTH_FILE="${STATE_DIR}/health.json"
+
+log() {
+  printf '[%s] %s\n' "$(date '+%F %T')" "$*"
+}
+
+fail() {
+  log "FAIL: $*"
+  exit 1
+}
+
+batch_files_array() {
+  mapfile -t CURRENT_FILES < <(
+    printf '%s\n' "${FILES[${BATCH}]}" |
+      sed '/^[[:space:]]*$/d'
+  )
+}
+
+fixture_ids_array() {
+  mapfile -t CURRENT_FIXTURE_IDS < <(
+    printf '%s\n' "${REAL_FIXTURE_IDS}" |
+      sed '/^[[:space:]]*$/d'
+  )
+}
+
+branch_check() {
+  local branch
+  branch="$(git rev-parse --abbrev-ref HEAD)"
+  [[ "${branch}" == "${EXPECTED_BRANCH}" ]] ||
+    fail "expected branch ${EXPECTED_BRANCH}, got ${branch}"
+}
+
+current_head() {
+  git rev-parse HEAD
+}
+
+changed_paths() {
+  {
+    git diff --name-only
+    git diff --cached --name-only
+    git ls-files --others --exclude-standard
+  } | sed '/^[[:space:]]*$/d' | sort -u
+}
+
+clean_worktree_check() {
+  local status
+  status="$(git status --short --untracked-files=all)"
+  if [[ -n "${status}" ]]; then
+    echo "${status}"
+    fail "worktree must be clean before prepare"
+  fi
+}
+
+health_status_check() {
+  local output_file="${1}"
+  mkdir -p "$(dirname "${output_file}")"
+  curl -fsS --max-time 5 "${BASE_URL}/health" > "${output_file}"
+  python - "${output_file}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+data = json.loads(path.read_text(encoding="utf-8"))
+status = str(data.get("status", "")).strip().lower()
+if status != "ok":
+    raise SystemExit(f"/health status must be ok, got {status!r}")
+print(json.dumps(data, ensure_ascii=False, indent=2))
+PY
+}
+
+wait_health() {
+  local i
+  mkdir -p "${STATE_DIR}"
+  for i in $(seq 1 45); do
+    if curl -fsS --max-time 5 "${BASE_URL}/health" > "${HEALTH_FILE}" 2>/dev/null; then
+      if python - "${HEALTH_FILE}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+raise SystemExit(0 if str(data.get("status", "")).lower() == "ok" else 1)
+PY
+      then
+        log "service ready at attempt ${i}"
+        python -m json.tool "${HEALTH_FILE}"
+        return 0
+      fi
+    fi
+    sleep 2
+  done
+
+  sudo systemctl status "${SERVICE_NAME}" --no-pager || true
+  sudo journalctl -u "${SERVICE_NAME}" -n 160 --no-pager || true
+  return 1
+}
+
+baseline_head_check() {
+  [[ -f "${HEAD_FILE}" ]] ||
+    fail "baseline HEAD is missing; run prepare first"
+
+  local baseline now
+  baseline="$(cat "${HEAD_FILE}")"
+  now="$(current_head)"
+  [[ "${now}" == "${baseline}" ]] ||
+    fail "HEAD changed after prepare: baseline=${baseline}, current=${now}; rollback is not allowed, use git revert for committed changes"
+}
+
+show_status() {
+  batch_files_array
+
+  echo "============================================================"
+  echo "v11 Batch ${BATCH}: ${BATCH_NAME[${BATCH}]}"
+  echo "============================================================"
+  echo "branch=$(git rev-parse --abbrev-ref HEAD)"
+  echo "head=$(git rev-parse --short HEAD)"
+  if [[ -f "${HEAD_FILE}" ]]; then
+    echo "baseline_head=$(cat "${HEAD_FILE}")"
+  else
+    echo "baseline_head=<not prepared>"
+  fi
+  echo
+  git status --short --untracked-files=all
+  echo
+  git diff --stat
+  echo
+  echo "planned files:"
+  printf '%s\n' "${CURRENT_FILES[@]}"
+  echo
+  echo "fixture request IDs:"
+  printf '%s\n' "${REAL_FIXTURE_IDS}"
+  echo
+  echo "state dir: ${STATE_DIR}"
+}
+
+prepare_batch() {
+  branch_check
+  clean_worktree_check
+
+  local health_tmp
+  health_tmp="$(mktemp)"
+  trap 'rm -f "${health_tmp:-}"' RETURN
+  health_status_check "${health_tmp}" >/dev/null
+
+  if [[ -e "${STATE_DIR}" ]]; then
+    if [[ "${CONFIRM_REPREPARE:-}" != "YES" ]]; then
+      fail "state already exists: ${STATE_DIR}; set CONFIRM_REPREPARE=YES only after confirming it is stale"
+    fi
+    rm -rf "${STATE_DIR}"
+  fi
+
+  batch_files_array
+  mkdir -p "${BACKUP_DIR}"
+  current_head > "${HEAD_FILE}"
+
+  python - \
+    "${MANIFEST}" \
+    "${PROJECT_ROOT}" \
+    "${BACKUP_DIR}" \
+    "$(git rev-parse --abbrev-ref HEAD)" \
+    "$(cat "${HEAD_FILE}")" \
+    "${CURRENT_FILES[@]}" <<'PY'
+import hashlib
+import json
+import shutil
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+manifest_path = Path(sys.argv[1])
+root = Path(sys.argv[2])
+backup = Path(sys.argv[3])
+branch = sys.argv[4]
+head = sys.argv[5]
+files = sys.argv[6:]
+
+items = []
+for rel in files:
+    path = root / rel
+    item = {
+        "path": rel,
+        "existed": path.exists(),
+        "is_file": path.is_file(),
+        "is_symlink": path.is_symlink(),
+        "sha256": "",
+    }
+    if path.is_symlink():
+        raise SystemExit(f"planned path must not be a symlink: {rel}")
+    if path.is_file():
+        data = path.read_bytes()
+        item["sha256"] = hashlib.sha256(data).hexdigest()
+        target = backup / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, target)
+    items.append(item)
+
+payload = {
+    "schema_version": 2,
+    "generated_at": datetime.now(timezone.utc).isoformat(),
+    "branch": branch,
+    "head": head,
+    "files": items,
+}
+manifest_path.parent.mkdir(parents=True, exist_ok=True)
+manifest_path.write_text(
+    json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+    encoding="utf-8",
+)
+print(manifest_path)
+PY
+
+  rm -f "${VERIFY_STAMP}"
+  log "prepared batch ${BATCH}"
+  log "baseline head: $(cat "${HEAD_FILE}")"
+  log "manifest: ${MANIFEST}"
+}
+
+compile_files() {
+  batch_files_array
+  local py_files=()
+  local file
+
+  for file in "${CURRENT_FILES[@]}"; do
+    [[ -e "${file}" ]] || fail "planned file missing: ${file}"
+    [[ ! -L "${file}" ]] || fail "planned file must not be a symlink: ${file}"
+    if [[ "${file}" == *.py ]]; then
+      py_files+=("${file}")
+    fi
+  done
+
+  if ((${#py_files[@]})); then
+    python -m py_compile "${py_files[@]}"
+  fi
+}
+
+run_batch_tests() {
+  python -m unittest discover \
+    -s tests \
+    -p "${TEST_PATTERN[${BATCH}]}" \
+    -v
+}
+
+verify_git_scope() {
+  batch_files_array
+
+  local actual expected
+  actual="$(changed_paths)"
+  expected="$(printf '%s\n' "${CURRENT_FILES[@]}" | sort -u)"
+
+  if [[ "${actual}" != "${expected}" ]]; then
+    echo "[EXPECTED]"
+    printf '%s\n' "${expected}"
+    echo "[ACTUAL]"
+    printf '%s\n' "${actual}"
+    fail "worktree scope does not match planned batch files"
+  fi
+
+  git diff --check
+  git diff --cached --check
+}
+
+forbidden_file_check() {
+  local files
+  files="$(changed_paths)"
+
+  if printf '%s\n' "${files}" |
+    egrep -q '(^|/)(config\.yaml|data|logs|backup|venv|__pycache__)(/|$)|(^|/)(\.env|[^/]+\.env)$|\.(zip|tar|tgz|gz|bz2|xz|7z)$'; then
+    printf '%s\n' "${files}"
+    fail "forbidden runtime, secret, environment, or archive path detected"
+  fi
+}
+
+compute_verification_digest() {
+  batch_files_array
+  python - "$(cat "${HEAD_FILE}")" "${PROJECT_ROOT}" "${CURRENT_FILES[@]}" <<'PY'
+import hashlib
+import sys
+from pathlib import Path
+
+head = sys.argv[1]
+root = Path(sys.argv[2])
+files = sys.argv[3:]
+
+digest = hashlib.sha256()
+digest.update(head.encode("utf-8"))
+digest.update(b"\0")
+
+for rel in sorted(files):
+    path = root / rel
+    if not path.is_file():
+        raise SystemExit(f"missing file for verification digest: {rel}")
+    digest.update(rel.encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(hashlib.sha256(path.read_bytes()).digest())
+    digest.update(b"\0")
+
+print(digest.hexdigest())
+PY
+}
+
+write_verification_stamp() {
+  compute_verification_digest > "${VERIFY_STAMP}"
+}
+
+verification_stamp_matches() {
+  [[ -f "${VERIFY_STAMP}" ]] || return 1
+  local expected actual
+  expected="$(cat "${VERIFY_STAMP}")"
+  actual="$(compute_verification_digest)"
+  [[ "${expected}" == "${actual}" ]]
+}
+
+extra_verify() {
+  fixture_ids_array
+
+  case "${EXTRA_VERIFY[${BATCH}]}" in
+    batch0)
+      local rid
+      mkdir -p "${STATE_DIR}/baseline_inventory"
+      for rid in "${CURRENT_FIXTURE_IDS[@]}"; do
+        python tools/v11_baseline_inventory.py \
+          --project-root "${PROJECT_ROOT}" \
+          --request-id "${rid}" \
+          --json-out "${STATE_DIR}/baseline_inventory/${rid}.json"
+        python -m json.tool "${STATE_DIR}/baseline_inventory/${rid}.json"
+      done
+      ;;
+    batch2)
+      local rid
+      rm -rf "${STATE_DIR}/memory_output"
+      for rid in "${CURRENT_FIXTURE_IDS[@]}"; do
+        python tools/v11_build_incident_memory.py \
+          --project-root "${PROJECT_ROOT}" \
+          --request-id "${rid}" \
+          --output-root "${STATE_DIR}/memory_output/${rid}" \
+          --json-only
+      done
+      find "${STATE_DIR}/memory_output" -maxdepth 5 -type f -print | sort
+      ;;
+    batch5)
+      local rid
+      rm -rf "${STATE_DIR}/replay_output"
+      for rid in "${CURRENT_FIXTURE_IDS[@]}"; do
+        python tools/v11_replay.py \
+          --project-root "${PROJECT_ROOT}" \
+          --request-id "${rid}" \
+          --mode offline \
+          --output-root "${STATE_DIR}/replay_output/${rid}" \
+          --no-notify \
+          --no-real-glm \
+          --no-real-prometheus \
+          --no-real-device
+      done
+      ;;
+    batch7)
+      python tools/v11_release_audit.py \
+        --project-root "${PROJECT_ROOT}" \
+        --mode development \
+        --json-out "${STATE_DIR}/development_audit.json"
+      python -m json.tool "${STATE_DIR}/development_audit.json"
+      ;;
+    batch8)
+      sudo systemctl restart "${SERVICE_NAME}"
+      wait_health
+      curl -fsS "${BASE_URL}/governance/health" |
+        python -m json.tool
+      ;;
+    batch9)
+      sudo systemctl restart "${SERVICE_NAME}"
+      wait_health
+      local path code
+      for path in /governance-ui /governance/health /evidence-ui; do
+        code="$(
+          curl -sS -o /dev/null -w '%{http_code}' \
+            "${BASE_URL}${path}" || true
+        )"
+        echo "${code} ${path}"
+        [[ "${code}" == "200" ]] ||
+          fail "HTTP ${code}: ${path}"
+      done
+      ;;
+    batch10)
+      python tools/v11_governance_backfill.py \
+        --project-root "${PROJECT_ROOT}" \
+        --output-root "${STATE_DIR}/backfill" \
+        --limit 20 \
+        --dry-run \
+        --json-report "${STATE_DIR}/backfill_dryrun.json"
+      python -m json.tool "${STATE_DIR}/backfill_dryrun.json"
+      sudo systemctl restart "${SERVICE_NAME}"
+      wait_health
+      ;;
+    batch11)
+      local rid
+      rm -rf "${STATE_DIR}/acceptance_offline"
+      for rid in "${CURRENT_FIXTURE_IDS[@]}"; do
+        python tools/v11_release_acceptance.py \
+          --project-root "${PROJECT_ROOT}" \
+          --mode offline \
+          --baseline-request-id "${rid}" \
+          --output-dir "${STATE_DIR}/acceptance_offline/${rid}" \
+          --no-notify \
+          --no-real-glm \
+          --no-real-prometheus \
+          --no-real-device
+      done
+      python -m unittest discover -s tests -p 'test_v11_*.py' -v
+      python -m unittest discover -s tests -v
+      sudo systemctl restart "${SERVICE_NAME}"
+      wait_health
+      ;;
+    none)
+      ;;
+    *)
+      fail "unknown extra verify mode"
+      ;;
+  esac
+}
+
+verify_batch() {
+  branch_check
+  [[ -f "${MANIFEST}" ]] ||
+    fail "prepare state missing; run prepare first"
+  baseline_head_check
+
+  compile_files
+  run_batch_tests
+  verify_git_scope
+  forbidden_file_check
+  extra_verify
+  write_verification_stamp
+
+  log "batch ${BATCH} verification passed"
+  log "verification digest: $(cat "${VERIFY_STAMP}")"
+}
+
+commit_batch() {
+  [[ "${CONFIRM_COMMIT:-}" == "YES" ]] ||
+    fail "set CONFIRM_COMMIT=YES"
+
+  branch_check
+  [[ -f "${MANIFEST}" ]] ||
+    fail "prepare state missing; run prepare first"
+  baseline_head_check
+
+  if verification_stamp_matches; then
+    log "reusing valid verification stamp; full verify is not repeated"
+  else
+    log "verification stamp missing or stale; running full verify"
+    verify_batch
+  fi
+
+  batch_files_array
+  git add -- "${CURRENT_FILES[@]}"
+
+  git diff --cached --name-only
+  git diff --cached --stat
+  git diff --cached --check
+
+  local staged expected
+  staged="$(git diff --cached --name-only | sort -u)"
+  expected="$(printf '%s\n' "${CURRENT_FILES[@]}" | sort -u)"
+
+  [[ "${staged}" == "${expected}" ]] ||
+    fail "staged scope differs from planned scope"
+
+  [[ -z "$(git diff --name-only)" ]] ||
+    fail "unstaged changes remain after precise staging"
+
+  git commit -m "${COMMIT_MESSAGE[${BATCH}]}"
+
+  if [[ "${CONFIRM_PUSH:-}" == "YES" ]]; then
+    git push origin "${EXPECTED_BRANCH}"
+  else
+    log "push skipped; set CONFIRM_PUSH=YES to push"
+  fi
+
+  git log --oneline -5
+  git status --short --untracked-files=all
+}
+
+rollback_batch() {
+  [[ "${CONFIRM_ROLLBACK:-}" == "YES" ]] ||
+    fail "set CONFIRM_ROLLBACK=YES"
+
+  branch_check
+  [[ -f "${MANIFEST}" ]] ||
+    fail "manifest missing; cannot perform safe rollback"
+  baseline_head_check
+
+  batch_files_array
+  git restore --staged -- "${CURRENT_FILES[@]}" 2>/dev/null || true
+
+  python - "${MANIFEST}" "${PROJECT_ROOT}" "${BACKUP_DIR}" <<'PY'
+import json
+import shutil
+import sys
+from pathlib import Path
+
+manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+root = Path(sys.argv[2])
+backup = Path(sys.argv[3])
+
+for item in manifest["files"]:
+    rel = item["path"]
+    target = root / rel
+    source = backup / rel
+
+    if item["existed"]:
+        if not source.is_file():
+            raise SystemExit(f"backup missing: {source}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        print("restored", rel)
+    else:
+        if target.is_file() or target.is_symlink():
+            target.unlink()
+            print("removed", rel)
+PY
+
+  rm -f "${VERIFY_STAMP}"
+
+  local remaining
+  remaining="$(changed_paths)"
+  if [[ -n "${remaining}" ]]; then
+    echo "${remaining}"
+    fail "rollback left unexpected worktree changes"
+  fi
+
+  if [[ "${RESTART_REQUIRED[${BATCH}]}" == "yes" ]]; then
+    sudo systemctl restart "${SERVICE_NAME}"
+    wait_health
+  fi
+
+  git status --short --untracked-files=all
+  log "batch ${BATCH} pre-commit rollback completed"
+}
+
+case "${ACTION}" in
+  prepare)
+    prepare_batch
+    ;;
+  status)
+    show_status
+    ;;
+  verify)
+    verify_batch
+    ;;
+  commit)
+    commit_batch
+    ;;
+  rollback)
+    rollback_batch
+    ;;
+  *)
+    usage
+    fail "unknown action: ${ACTION}"
+    ;;
+esac
