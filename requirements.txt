@@ -1,0 +1,10 @@
+# Direct application dependencies observed in the v10 production venv.
+# Python runtime: 3.10
+# This is an application dependency list, not a complete transitive lock file.
+fastapi==0.135.1
+httpx==0.28.1
+openpyxl==3.1.5
+pydantic==2.12.5
+PyYAML==6.0.3
+requests==2.33.1
+uvicorn==0.41.0
