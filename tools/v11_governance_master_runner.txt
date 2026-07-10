@@ -586,8 +586,8 @@ extra_verify() {
       wait_health
       ;;
     batch11)
-      local rid
-      rm -rf "${STATE_DIR}/acceptance_offline"
+      local rid path code
+      rm -rf "${STATE_DIR}/acceptance_offline" "${STATE_DIR}/repository_gate"
       for rid in "${CURRENT_FIXTURE_IDS[@]}"; do
         python tools/v11_release_acceptance.py \
           --project-root "${PROJECT_ROOT}" \
@@ -599,10 +599,37 @@ extra_verify() {
           --no-real-prometheus \
           --no-real-device
       done
+
       python -m unittest discover -s tests -p 'test_v11_*.py' -v
-      python -m unittest discover -s tests -v
+
+      python tools/v11_release_acceptance.py \
+        --project-root "${PROJECT_ROOT}" \
+        --mode repository-gate \
+        --output-dir "${STATE_DIR}/repository_gate" \
+        --expected-version "11.0.0-v11-learning-governance" \
+        --known-failure-policy "frozen-historical-regressions-v1"
+
+      python -m json.tool \
+        "${STATE_DIR}/repository_gate/v11_acceptance_report.json"
+      python -m json.tool \
+        "${STATE_DIR}/repository_gate/v11_release_audit.json"
+
       sudo systemctl restart "${SERVICE_NAME}"
       wait_health
+
+      for path in \
+        /governance/health \
+        /governance-ui \
+        /governance-ui/memories \
+        /evidence-ui; do
+        code="$(
+          curl -sS -o /dev/null -w '%{http_code}' \
+            "${BASE_URL}${path}" || true
+        )"
+        echo "${code} ${path}"
+        [[ "${code}" == "200" ]] ||
+          fail "HTTP ${code}: ${path}"
+      done
       ;;
     none)
       ;;

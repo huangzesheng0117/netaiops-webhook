@@ -340,5 +340,46 @@ class GovernanceMasterRunnerV2Tests(unittest.TestCase):
         )
 
 
+class Batch11KnownHistoricalFailureGateTests(unittest.TestCase):
+    def test_batch11_uses_repository_gate_instead_of_raw_full_suite(self) -> None:
+        text = RUNNER_SOURCE.read_text(encoding="utf-8")
+        start = text.index("    batch11)")
+        end = text.index("    none)", start)
+        block = text[start:end]
+
+        self.assertIn("--mode repository-gate", block)
+        self.assertIn(
+            '--known-failure-policy "frozen-historical-regressions-v1"',
+            block,
+        )
+        self.assertIn(
+            '"${STATE_DIR}/repository_gate/v11_release_audit.json"',
+            block,
+        )
+        self.assertNotIn(
+            "python -m unittest discover -s tests -v",
+            block,
+        )
+
+    def test_batch11_still_runs_all_v11_tests(self) -> None:
+        text = RUNNER_SOURCE.read_text(encoding="utf-8")
+        start = text.index("    batch11)")
+        end = text.index("    none)", start)
+        block = text[start:end]
+        self.assertIn(
+            "python -m unittest discover -s tests -p 'test_v11_*.py' -v",
+            block,
+        )
+
+    def test_batch11_checks_governance_and_evidence_ui(self) -> None:
+        text = RUNNER_SOURCE.read_text(encoding="utf-8")
+        start = text.index("    batch11)")
+        end = text.index("    none)", start)
+        block = text[start:end]
+        self.assertIn("/governance/health", block)
+        self.assertIn("/governance-ui", block)
+        self.assertIn("/evidence-ui", block)
+
+
 if __name__ == "__main__":
     unittest.main()
