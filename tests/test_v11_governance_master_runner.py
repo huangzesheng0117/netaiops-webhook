@@ -381,5 +381,14 @@ class Batch11KnownHistoricalFailureGateTests(unittest.TestCase):
         self.assertIn("/evidence-ui", block)
 
 
+    def test_batch11_scope_includes_version_consistency_files(self) -> None:
+        text = RUNNER_SOURCE.read_text(encoding="utf-8")
+        start = text.index('FILES[11]="')
+        end = text.index('"\nTEST_PATTERN[11]', start)
+        block = text[start:end]
+        self.assertIn("README_STATUS.md", block)
+        self.assertIn("tests/test_v10_baseline_hygiene.py", block)
+
+
 if __name__ == "__main__":
     unittest.main()

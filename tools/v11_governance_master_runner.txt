@@ -183,7 +183,9 @@ RESTART_REQUIRED[11]="yes"
 FILES[11]="tools/v11_release_acceptance.py
 tests/test_v11_release_acceptance.py
 VERSION
-README.md"
+README.md
+README_STATUS.md
+tests/test_v10_baseline_hygiene.py"
 TEST_PATTERN[11]="test_v11_release_acceptance.py"
 EXTRA_VERIFY[11]="batch11"
 
