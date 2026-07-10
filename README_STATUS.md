@@ -1,12 +1,12 @@
 # NetAIOps Webhook 当前状态
 
-> 更新时间：2026-07-07
-> 当前阶段：v10 稳定基线，准备进入 v11 Learning Loop / Governance。
+> 更新时间：2026-07-10
+> 当前阶段：v11 Learning Loop / Governance 功能建设完成；Release Audit 暂为 WARNING，等待历史回归清理。
 
 ## 当前版本
 
 ```text
-10.0.0-v10-evidence-hub-card
+11.0.0-v11-learning-governance
 ```
 
 ## 固定信息
@@ -24,6 +24,9 @@
 | 生产 LLM | `glm-5.2` |
 | AI 通知 | universal card |
 | v10 Release Audit | `PASS` |
+| v11 Release Audit | `WARNING` |
+| 已知历史遗留测试失败 | `28` |
+| Batch 11 新增测试失败 | `0` |
 
 ## v10 当前能力
 
@@ -219,7 +222,12 @@ reason = elasticsearch_query_interface_pending
 ## 当前下一步
 
 ```text
-1. 完成 v10 基线卫生修复
-2. 修订并验证 v11 Governance Master Runner
-3. 开始 v11 Batch 0：Baseline / Contract Freeze
+1. 完成 v11 项目文档和项目指令同步
+2. 启动 v11.1 Historical Regression Cleanup
+3. 将全仓库历史失败从 28 降至 0
+4. 将 v11 Release Audit 从 WARNING 升级为 PASS
 ```
+
+## v11 Release Acceptance 说明
+
+当前全仓库仍保留 28 个在 Batch 10 修改前已经存在的历史遗留测试失败。Batch 11 不允许新增失败，因此版本一致性修复后，门禁必须满足 `observed_count=28`、`new_failure_count=0`、`exact_match=true`。这些历史问题将在独立维护批次中修复，不归因于 Batch 9、Batch 10 或 Batch 11。

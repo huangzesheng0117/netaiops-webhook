@@ -7,7 +7,7 @@ import yaml
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "10.0.0-v10-evidence-hub-card"
+EXPECTED_VERSION = "11.0.0-v11-learning-governance"
 EXPECTED_REQUIREMENTS = {
     "fastapi==0.135.1",
     "httpx==0.28.1",
