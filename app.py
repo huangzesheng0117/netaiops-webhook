@@ -165,6 +165,44 @@ def _v10_build_evidence_detail_after_review(request_id: str, stage: str = "pipel
         }
 
 
+def _v11_build_governance_artifacts_safe(request_id: str) -> dict:
+    """Build v11 Governance records as a non-blocking production sidecar."""
+    try:
+        from netaiops.governance.integration import build_governance_artifacts_safe
+
+        return build_governance_artifacts_safe(
+            request_id,
+            project_root=BASE_DIR,
+            governance_root=BASE_DIR / "data" / "governance",
+            include_signals=True,
+            include_proposals=True,
+            write=True,
+            force=False,
+            logger=logger,
+        )
+    except Exception as exc:
+        try:
+            logger.exception(
+                "governance sidecar failed request_id=%s: %r", request_id, exc
+            )
+        except Exception:
+            pass
+        return {
+            "ok": False,
+            "status": "failed",
+            "request_id": request_id,
+            "error": f"{type(exc).__name__}: {exc}",
+            "external_calls": {
+                "glm": False,
+                "prometheus": False,
+                "device": False,
+                "notification": False,
+                "elasticsearch": False,
+                "production_write": False,
+            },
+        }
+
+
 def latest_analysis_file() -> Path:
     files = sorted(ANALYSIS_DIR.glob("*.analysis.json"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not files:
@@ -1129,6 +1167,7 @@ def v4_execution_result(request_id: str, payload: dict):
     )
     summary = get_request_summary(request_id)
     notify_result = send_notification(request_id)
+    governance_result = _v11_build_governance_artifacts_safe(request_id)
 
     investigation_result = {
         "ok": False,
@@ -1191,6 +1230,7 @@ def v4_execution_result(request_id: str, payload: dict):
         "review_result": review_result,
         "summary": summary,
         "notify_result": notify_result,
+        "governance_result": governance_result,
         "investigation_result": investigation_result,
         "interface_error_delta_schedule_result": interface_error_delta_schedule_result,
     }
