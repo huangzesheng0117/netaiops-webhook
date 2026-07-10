@@ -38,6 +38,7 @@ from netaiops.processor import process_event_async
 from netaiops.light_alert_formatter import build_light_notifications
 from netaiops.dongdong_card_sender import send_universal_card
 from netaiops.governance.api import router as governance_router
+from netaiops.governance.ui import router as governance_ui_router
 
 BASE_DIR = Path("/opt/netaiops-webhook")
 DATA_DIR = BASE_DIR / "data"
@@ -64,6 +65,7 @@ LIGHT_ALERT_NOTIFY_DIR.mkdir(parents=True, exist_ok=True)
 logger = setup_logger()
 app = FastAPI(title="NetAIOps Webhook", version="3.0-a")
 app.include_router(governance_router)
+app.include_router(governance_ui_router)
 
 
 def load_config() -> dict:
