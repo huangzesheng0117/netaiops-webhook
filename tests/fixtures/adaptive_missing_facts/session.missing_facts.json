@@ -15,11 +15,11 @@
     "family": "interface_or_link_utilization_high"
   },
   "skill_context": {
-    "stage": "v6.3",
+    "stage": "v9",
     "matched": true,
     "family": "interface_or_link_utilization_high",
     "skill_name": "interface_utilization_high",
-    "skill_version": "v6.3.0",
+    "skill_version": "v9.5.0-cisco-interface-utilization-high",
     "risk_level": "readonly",
     "binding_verdict": "pass",
     "allowed_tools": [
@@ -28,17 +28,19 @@
       "parser_parse_cli_output"
     ],
     "allowed_capabilities": [
-      "show_interface_detail",
       "show_interface_error_counters",
       "show_interface_aggregation",
-      "prometheus_interface_window",
-      "parse_cli_output"
+      "show_interface_detail",
+      "show_interface_counters"
     ],
     "parsers": [
       "cisco_show_interfaces",
       "cisco_show_interfaces_counters_errors",
       "cisco_etherchannel_summary"
     ],
-    "violations": []
+    "violations": [],
+    "schema_generation": "current",
+    "missing_tools": [],
+    "missing_parsers": []
   }
 }

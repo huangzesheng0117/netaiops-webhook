@@ -29,7 +29,9 @@ class TestSkillSessionContext(unittest.TestCase):
         context = build_skill_context_for_session(session, ".")
 
         self.assertTrue(context["matched"])
-        self.assertEqual(context["stage"], "v6.3")
+        self.assertEqual(context["stage"], "v9")
+        self.assertEqual(context["schema_generation"], "current")
+        self.assertEqual(context["skill_version"], "v9.5.0-cisco-interface-utilization-high")
         self.assertEqual(context["family"], "interface_or_link_utilization_high")
         self.assertEqual(context["skill_name"], "interface_utilization_high")
         self.assertEqual(context["risk_level"], "readonly")

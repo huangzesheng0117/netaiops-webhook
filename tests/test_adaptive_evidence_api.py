@@ -62,7 +62,8 @@ class TestAdaptiveEvidenceApi(unittest.TestCase):
         commands = set(result["adaptive_plan"]["commands"])
 
         self.assertIn("show interfaces TenGigabitEthernet1/0/1", commands)
-        self.assertIn("show interfaces TenGigabitEthernet1/0/1 counters errors", commands)
+        self.assertIn("show interfaces counters errors", commands)
+        self.assertNotIn("show interfaces TenGigabitEthernet1/0/1 counters errors", commands)
         self.assertIn("show etherchannel summary", commands)
 
     def test_missing_facts_simulation_policy_passes(self):

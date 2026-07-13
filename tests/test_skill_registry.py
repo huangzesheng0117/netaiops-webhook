@@ -12,7 +12,9 @@ class TestSkillRegistry(unittest.TestCase):
         self.assertEqual(skill["name"], "interface_utilization_high")
         self.assertEqual(skill["family"], "interface_or_link_utilization_high")
         self.assertEqual(skill["risk_level"], "readonly")
-        self.assertEqual(skill["stage"], "v6.3")
+        self.assertEqual(skill["stage"], "v9")
+        self.assertEqual(skill["schema_generation"], "current")
+        self.assertEqual(skill["version"], "v9.5.0-cisco-interface-utilization-high")
         self.assertIn("output_schema", skill)
 
     def test_get_skill_by_family(self):

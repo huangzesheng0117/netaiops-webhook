@@ -38,7 +38,8 @@ class TestAdaptiveMissingFactsSample(unittest.TestCase):
         self.assertEqual(plan["candidate_count"], 3)
 
         self.assertIn("show interfaces TenGigabitEthernet1/0/1", commands)
-        self.assertIn("show interfaces TenGigabitEthernet1/0/1 counters errors", commands)
+        self.assertIn("show interfaces counters errors", commands)
+        self.assertNotIn("show interfaces TenGigabitEthernet1/0/1 counters errors", commands)
         self.assertIn("show etherchannel summary", commands)
 
     def test_candidates_are_readonly_and_not_dispatched(self):

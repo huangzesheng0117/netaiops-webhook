@@ -14,7 +14,8 @@ class TestSkillBindingValidator(unittest.TestCase):
         self.assertEqual(graph["skill_name"], "interface_utilization_high")
         self.assertEqual(graph["family"], "interface_or_link_utilization_high")
         self.assertEqual(graph["risk_level"], "readonly")
-        self.assertEqual(graph["stage"], "v6.3")
+        self.assertEqual(graph["stage"], "v9")
+        self.assertEqual(graph["schema_generation"], "current")
 
         self.assertIn("mcp_netmiko_run_show", graph["allowed_tools"])
         self.assertIn("prometheus_range_query", graph["allowed_tools"])

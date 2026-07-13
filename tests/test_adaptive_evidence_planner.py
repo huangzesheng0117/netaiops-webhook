@@ -72,14 +72,15 @@ class TestAdaptiveEvidencePlanner(unittest.TestCase):
         plan = build_adaptive_evidence_plan(session, execution_data, review_data, ".")
 
         commands = [x["command"] for x in plan["candidates"]]
-        self.assertIn("show interfaces TenGigabitEthernet1/0/1 counters errors", commands)
+        self.assertIn("show interfaces counters errors", commands)
+        self.assertNotIn("show interfaces TenGigabitEthernet1/0/1 counters errors", commands)
 
     def test_complete_facts_need_no_extra_command_when_existing_commands_cover(self):
         session = make_session()
         execution_data = {
             "command_results": [
                 {"command": "show interfaces TenGigabitEthernet1/0/1"},
-                {"command": "show interfaces TenGigabitEthernet1/0/1 counters errors"},
+                {"command": "show interfaces counters errors"},
                 {"command": "show etherchannel summary"},
             ]
         }
