@@ -116,7 +116,7 @@ NET_INTERNET_E2E_CASES = [
         "alertname": "互联网线路流量突降",
         "interface": "Te1/0/1",
         "device_ip": "10.192.251.95",
-        "expected_playbook_id": "cisco_interface_traffic_anomaly",
+        "expected_playbook_id": "cisco_interface_or_link_traffic_drop",
         "expected_family": "interface_traffic_anomaly",
         "command_hint": "show interface",
     },

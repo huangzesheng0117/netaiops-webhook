@@ -20,7 +20,7 @@ VENDOR_CASES = [
         "ping_hint": "show version",
         "duplex_hint": "show interface ethernet1/1",
         "packet_hint": "counters errors",
-        "util_hint": "show interface ethernet1/1",
+        "util_hint": "show interfaces ethernet1/1",
     },
     {
         "vendor": "f5",

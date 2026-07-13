@@ -59,13 +59,17 @@ class TestV711NetInternetLatencyDownAnomalyAssets(unittest.TestCase):
         self.assertIn("show interface te1/0/1", commands)
 
     def test_internet_traffic_anomaly_playbook_matches(self):
-        for alertname in ["互联网线路流量突增", "互联网线路流量突降"]:
+        cases = {
+            "互联网线路流量突增": "cisco_interface_traffic_anomaly",
+            "互联网线路流量突降": "cisco_interface_or_link_traffic_drop",
+        }
+        for alertname, expected_playbook_id in cases.items():
             with self.subTest(alertname=alertname):
                 event = self._event(alertname)
                 classification = classify_event(event)
                 playbook = find_best_playbook(event, classification)
                 self.assertIsNotNone(playbook)
-                self.assertEqual(playbook.get("playbook_id"), "cisco_interface_traffic_anomaly")
+                self.assertEqual(playbook.get("playbook_id"), expected_playbook_id)
 
                 candidates = build_execution_candidates_from_playbook(playbook, event)
                 self.assertTrue(candidates)

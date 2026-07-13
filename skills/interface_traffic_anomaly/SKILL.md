@@ -2,7 +2,7 @@
 name: interface_traffic_anomaly
 version: v9.3.0-cisco-interface-traffic-anomaly
 family: interface_traffic_anomaly
-description: Cisco interface/link traffic spike and drop analysis skill for backbone and internet links.
+description: Cisco interface/link traffic spike and drop analysis skill for backbone, internet, and DCI links.
 risk_level: readonly
 stage: v9
 ---
@@ -17,6 +17,10 @@ This Skill covers Cisco interface or link traffic spike/drop alerts, including:
 - 骨干网流量突降
 - 互联网流量突增
 - 互联网流量突降
+- DCI线路流量突增
+- DCI线路流量突降
+- DCI专线流量突增
+- DCI专线流量突降
 - 接口/链路流量突降
 - 接口/链路流量突增/突降
 
@@ -33,7 +37,9 @@ First confirm whether the traffic change really happened, or whether it is cause
 4. Is it only one interface or multiple links along the same service path?
 5. Does CLI current rate match Prometheus historical/current rate?
 
-## Prometheus evidence requirements
+## Prometheus-first traffic anomaly
+
+Query Prometheus first when the backend is available, then use readonly CLI evidence to confirm interface state, errors, QoS, aggregation, and path conditions.
 
 Prometheus MCP evidence is mandatory when available.
 

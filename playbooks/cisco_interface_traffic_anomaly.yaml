@@ -2,10 +2,10 @@ playbook_id: cisco_interface_traffic_anomaly
 family: interface_traffic_anomaly
 skill_name: interface_traffic_anomaly
 description: Cisco interface/link traffic spike or drop readonly investigation playbook,
-  covering backbone traffic spike/drop and internet traffic spike/drop.
+  covering backbone, internet, and DCI traffic spike/drop.
 match:
   vendor: cisco
-  alertname_regex: (接口.?链路.?流量.?突增|接口.?链路.?流量.?突降|接口.?链路.?流量.?突增.?突降|骨干网.*流量.*突增|骨干网.*流量.*突降|互联网.*流量.*突增|互联网.*流量.*突降|骨干.*利用率.*突增|骨干.*利用率.*突降|互联网.*利用率.*突增|互联网.*利用率.*突降|Traffic.*Spike|Traffic.*Drop|Traffic.*Anomaly)
+  alertname_regex: (接口.?链路.?流量.?突增|接口.?链路.?流量.?突降|接口.?链路.?流量.?突增.?突降|骨干网.*流量.*突增|骨干网.*流量.*突降|互联网.*流量.*突增|互联网.*流量.*突降|DCI.*流量.*突增|DCI.*流量.*突降|骨干.*利用率.*突增|骨干.*利用率.*突降|互联网.*利用率.*突增|互联网.*利用率.*突降|Traffic.*Spike|Traffic.*Drop|Traffic.*Anomaly)
   content_regex: (流量|带宽|利用率|bps|Mbps|Gbps|突增|突降|入向|出向|input|output|inbound|outbound)
 target_fields:
   device_ip:
@@ -77,6 +77,10 @@ analysis_policy:
   - 骨干网流量突降
   - 互联网流量突增
   - 互联网流量突降
+  - DCI线路流量突增
+  - DCI线路流量突降
+  - DCI专线流量突增
+  - DCI专线流量突降
   - 接口/链路流量突降
   - 接口/链路流量突增/突降
   judgement_order:

@@ -1134,7 +1134,7 @@ def _v9_it_should_handle(text):
     if not text:
         return False
     return bool(_v9_it_re.search(
-        r"(接口.?链路.?流量.?突增|接口.?链路.?流量.?突降|接口.?链路.?流量.?突增.?突降|骨干网.*流量.*突增|骨干网.*流量.*突降|互联网.*流量.*突增|互联网.*流量.*突降|骨干.*利用率.*突增|骨干.*利用率.*突降|互联网.*利用率.*突增|互联网.*利用率.*突降|Traffic.*Spike|Traffic.*Drop|Traffic.*Anomaly)",
+        r"(接口.?链路.?流量.?突增|接口.?链路.?流量.?突降|接口.?链路.?流量.?突增.?突降|骨干网.*流量.*突增|骨干网.*流量.*突降|互联网.*流量.*突增|互联网.*流量.*突降|DCI.*流量.*突增|DCI.*流量.*突降|骨干.*利用率.*突增|骨干.*利用率.*突降|互联网.*利用率.*突增|互联网.*利用率.*突降|Traffic.*Spike|Traffic.*Drop|Traffic.*Anomaly)",
         text,
         flags=_v9_it_re.I,
     ))
@@ -1205,7 +1205,7 @@ if _v9_it_original_classify_family is not None:
             "family": "interface_traffic_anomaly",
             "family_confidence": "high",
             "match_source": "v9_interface_traffic_anomaly_classifier",
-            "match_reason": "matched backbone/internet/interface traffic spike/drop wording",
+            "match_reason": "matched backbone/internet/DCI/interface traffic spike/drop wording",
             "legacy_playbook_type": "interface_traffic_anomaly",
             "target_kind": "interface",
             "auto_execute_allowed": True,
