@@ -12,7 +12,7 @@ from netaiops.adaptive_evidence_planner import (
 
 EXPECTED_MISSING_FACTS_COMMANDS = {
     "show interfaces TenGigabitEthernet1/0/1",
-    "show interfaces TenGigabitEthernet1/0/1 counters errors",
+    "show interfaces counters errors",
     "show etherchannel summary",
 }
 

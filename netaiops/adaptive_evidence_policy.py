@@ -25,95 +25,11 @@ def _safe_text(value: Any) -> str:
     return str(value).strip()
 
 
-def _read_text(path: str | Path) -> str:
-    return Path(path).read_text(encoding="utf-8")
-
-
-def _collect_yaml_list(text: str, section_name: str) -> list[str]:
-    result: list[str] = []
-    in_section = False
-
-    for raw_line in text.splitlines():
-        line = raw_line.rstrip()
-        stripped = line.strip()
-
-        if not stripped or stripped.startswith("#"):
-            continue
-
-        if re.match(r"^[A-Za-z0-9_]+:\s*$", stripped):
-            in_section = stripped == f"{section_name}:"
-            continue
-
-        if in_section:
-            m = re.match(r"^\s*-\s+[\"']?(.*?)[\"']?\s*$", line)
-            if m:
-                value = m.group(1).strip().strip('"').strip("'")
-                if value:
-                    result.append(value)
-                continue
-
-            if not line.startswith(" "):
-                in_section = False
-
-    return result
-
-
-def _parse_platform_commands(text: str) -> dict[str, dict[str, dict[str, Any]]]:
-    result: dict[str, dict[str, dict[str, Any]]] = {}
-
-    in_platform_commands = False
-    current_platform = ""
-    current_capability = ""
-
-    for raw_line in text.splitlines():
-        line = raw_line.rstrip()
-        stripped = line.strip()
-
-        if stripped == "platform_commands:":
-            in_platform_commands = True
-            continue
-
-        if not in_platform_commands:
-            continue
-
-        if stripped and not line.startswith(" "):
-            break
-
-        m_platform = re.match(r"^\s{2}([A-Za-z0-9_]+):\s*$", line)
-        if m_platform:
-            current_platform = m_platform.group(1)
-            result.setdefault(current_platform, {})
-            current_capability = ""
-            continue
-
-        m_cap = re.match(r"^\s{4}([A-Za-z0-9_]+):\s*$", line)
-        if m_cap and current_platform:
-            current_capability = m_cap.group(1)
-            result[current_platform].setdefault(current_capability, {})
-            continue
-
-        if current_platform and current_capability:
-            m_template = re.match(r"^\s{6}template:\s*[\"'](.+?)[\"']\s*$", line)
-            if m_template:
-                result[current_platform][current_capability]["template"] = m_template.group(1).strip()
-                continue
-
-            m_parser = re.match(r"^\s{6}parser:\s*[\"']?([A-Za-z0-9_]+)[\"']?\s*$", line)
-            if m_parser:
-                result[current_platform][current_capability]["parser"] = m_parser.group(1).strip()
-                continue
-
-            m_readonly = re.match(r"^\s{6}readonly:\s*(true|false)\s*$", line, re.IGNORECASE)
-            if m_readonly:
-                result[current_platform][current_capability]["readonly"] = m_readonly.group(1).lower() == "true"
-                continue
-
-    return result
-
-
 def _template_to_regex(template: str) -> re.Pattern:
     escaped = re.escape(template.strip())
     escaped = escaped.replace(re.escape("{interface}"), r"\S+")
+    escaped = escaped.replace(re.escape("{interface_each}"), r"\S+")
+    escaped = re.sub(r"\\\{[A-Za-z0-9_]+\\\}", r"\\S+", escaped)
     return re.compile(r"^" + escaped + r"$", re.IGNORECASE)
 
 
@@ -152,27 +68,28 @@ def command_has_forbidden_pattern(command: str, forbidden_patterns: list[str]) -
     return ""
 
 
-def load_adaptive_skill_constraints(skill_name: str, base_dir: str | Path = ".") -> dict[str, Any]:
+def load_adaptive_skill_constraints(
+    skill_name: str,
+    base_dir: str | Path = ".",
+) -> dict[str, Any]:
     contract = load_skill_contract(skill_name, base_dir)
-    skill_path = Path(contract["path"])
-    commands_file = skill_path / "commands.yaml"
-    commands_text = _read_text(commands_file)
 
     tool_by_name = {
         item.get("tool_name"): item
         for item in list_tools(include_disabled=True)
         if item.get("tool_name")
     }
-
     enabled_tool_names = {
         item.get("tool_name")
         for item in list_tools(include_disabled=False)
         if item.get("tool_name")
     }
 
-    constraints = {
+    return {
         "stage": ADAPTIVE_STAGE,
         "mode": ADAPTIVE_MODE,
+        "skill_stage": contract.get("stage"),
+        "schema_generation": contract.get("schema_generation"),
         "skill_name": skill_name,
         "family": contract.get("family"),
         "risk_level": contract.get("risk_level"),
@@ -182,14 +99,12 @@ def load_adaptive_skill_constraints(skill_name: str, base_dir: str | Path = ".")
         "parsers": contract.get("parsers", []),
         "required_facts": contract.get("required_facts", []),
         "preferred_facts": contract.get("preferred_facts", []),
-        "forbidden_patterns": _collect_yaml_list(commands_text, "forbidden_patterns"),
-        "platform_commands": _parse_platform_commands(commands_text),
+        "forbidden_patterns": contract.get("forbidden_patterns", []),
+        "platform_commands": contract.get("platform_commands", {}),
         "limits": dict(DEFAULT_LIMITS),
         "tool_by_name": tool_by_name,
         "enabled_tool_names": sorted(enabled_tool_names),
     }
-
-    return constraints
 
 
 def validate_adaptive_candidate(candidate: dict[str, Any], constraints: dict[str, Any]) -> dict[str, Any]:

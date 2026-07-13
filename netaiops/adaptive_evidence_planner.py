@@ -97,6 +97,40 @@ def _existing_commands(execution_data: dict[str, Any]) -> set[str]:
     return result
 
 
+def _existing_capabilities(execution_data: dict[str, Any]) -> set[str]:
+    capabilities: set[str] = set()
+
+    for item in execution_data.get("command_results", []) or []:
+        if not isinstance(item, dict):
+            continue
+        command = normalize_cli_command(_safe_text(item.get("command")))
+        if not command:
+            continue
+
+        if command in {
+            "show etherchannel summary",
+            "show po summary",
+        } or command.startswith("show port-channel summary"):
+            capabilities.add("show_interface_aggregation")
+
+        if "counters errors" in command and command.startswith(
+            ("show interface", "show interfaces")
+        ):
+            capabilities.add("show_interface_error_counters")
+
+        if command.startswith(("show interface ", "show interfaces ")):
+            excluded = (
+                " counters",
+                " transceiver",
+                " status",
+                " trunk",
+            )
+            if not any(token in command for token in excluded):
+                capabilities.add("show_interface_detail")
+
+    return capabilities
+
+
 def _missing_required_facts(facts: dict[str, Any], constraints: dict[str, Any]) -> list[str]:
     missing = []
 
@@ -122,17 +156,27 @@ def _capabilities_for_gaps(required_missing: list[str], preferred_missing: list[
 
     status_or_rate = {
         "interface",
+        "interfaces",
+        "hostname",
+        "device_ip",
+        "traffic_direction",
         "admin_status",
         "oper_status",
+        "if_oper_status",
         "bandwidth_bps",
+        "capacity_bps",
         "input_rate_bps",
         "output_rate_bps",
+        "aggregate_in_bps",
+        "aggregate_out_bps",
+        "member_interface_rates",
         "input_utilization_percent_estimated",
         "output_utilization_percent_estimated",
     }
 
     counters = {
         "crc",
+        "crc_errors",
         "fcs_err",
         "input_errors",
         "rcv_err",
@@ -142,6 +186,8 @@ def _capabilities_for_gaps(required_missing: list[str], preferred_missing: list[
         "output_errors",
         "output_drops",
         "runts",
+        "qos_policy_drop",
+        "police_exceeded",
     }
 
     aggregation = {
@@ -150,6 +196,9 @@ def _capabilities_for_gaps(required_missing: list[str], preferred_missing: list[
         "etherchannel_member_count",
         "etherchannel_bundled_member_count",
         "etherchannel_down_member_count",
+        "member_interfaces",
+        "port_channel_state",
+        "lacp_state",
     }
 
     gaps = set(required_missing) | set(preferred_missing)
@@ -258,12 +307,19 @@ def build_adaptive_evidence_plan(
         interfaces = [""]
 
     existing = _existing_commands(execution_data)
-    wanted_capabilities = _capabilities_for_gaps(required_missing, preferred_missing)
+    existing_capabilities = _existing_capabilities(execution_data)
+    wanted_capabilities = _capabilities_for_gaps(
+        required_missing,
+        preferred_missing,
+    )
 
     candidates = []
     seen_commands = set()
 
     for capability in wanted_capabilities:
+        if capability in existing_capabilities:
+            continue
+
         if capability == "show_interface_aggregation":
             item = _render_candidate(
                 capability=capability,

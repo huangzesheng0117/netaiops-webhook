@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +12,11 @@ from netaiops.investigation_state import (
     unwrap_review,
 )
 from netaiops.skill_registry import load_skill
+from netaiops.skill_schema_adapter import (
+    load_yaml_mapping,
+    normalize_commands_document,
+    normalize_evidence_document,
+)
 
 
 def _safe_text(value: Any) -> str:
@@ -25,52 +29,13 @@ def _read_text(path: str | Path) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
-def _collect_yaml_list(text: str, section_name: str) -> list[str]:
-    result: list[str] = []
-    in_section = False
+def _template_to_regex(template: str):
+    import re
 
-    for raw_line in text.splitlines():
-        line = raw_line.rstrip()
-        stripped = line.strip()
-
-        if not stripped or stripped.startswith("#"):
-            continue
-
-        if re.match(r"^[A-Za-z0-9_]+:\s*$", stripped):
-            in_section = stripped == f"{section_name}:"
-            continue
-
-        if in_section:
-            m = re.match(r"^\s*-\s+[\"']?(.*?)[\"']?\s*$", line)
-            if m:
-                value = m.group(1).strip()
-                if value:
-                    result.append(value)
-                continue
-
-            if not line.startswith(" "):
-                in_section = False
-
-    return result
-
-
-def _collect_template_lines(text: str) -> list[str]:
-    result = []
-    for m in re.finditer(r"^\s*template:\s*[\"'](.+?)[\"']\s*$", text, re.MULTILINE):
-        result.append(m.group(1).strip())
-    return sorted(set(result))
-
-
-def _collect_parser_names(text: str) -> list[str]:
-    result = []
-    for m in re.finditer(r"^\s*parser:\s*[\"']?([A-Za-z0-9_]+)[\"']?\s*$", text, re.MULTILINE):
-        result.append(m.group(1))
-    return sorted(set(result))
-
-
-def _template_to_regex(template: str) -> re.Pattern:
     escaped = re.escape(template.strip())
     escaped = escaped.replace(re.escape("{interface}"), r"\S+")
+    escaped = escaped.replace(re.escape("{interface_each}"), r"\S+")
+    escaped = re.sub(r"\\\{[A-Za-z0-9_]+\\\}", r"\\S+", escaped)
     return re.compile(r"^" + escaped + r"$", re.IGNORECASE)
 
 
@@ -98,9 +63,24 @@ def load_skill_contract(skill_name: str, base_dir: str | Path = ".") -> dict[str
     skill = load_skill(skill_name, base_dir)
     skill_path = Path(skill["path"])
 
-    commands_text = _read_text(skill_path / "commands.yaml")
-    evidence_text = _read_text(skill_path / "evidence_rules.yaml")
-    output_schema = json.loads((skill_path / "output_schema.json").read_text(encoding="utf-8"))
+    commands = load_yaml_mapping(skill_path / "commands.yaml")
+    evidence = load_yaml_mapping(skill_path / "evidence_rules.yaml")
+    commands_normalized = normalize_commands_document(commands)
+    evidence_normalized = normalize_evidence_document(evidence)
+    output_schema = json.loads(
+        (skill_path / "output_schema.json").read_text(encoding="utf-8")
+    )
+
+    notification = (
+        output_schema.get("notification")
+        if isinstance(output_schema.get("notification"), dict)
+        else {}
+    )
+    required_lines = notification.get("required_lines")
+    if not isinstance(required_lines, list):
+        required_lines = notification.get("required_sections")
+    if not isinstance(required_lines, list):
+        required_lines = []
 
     return {
         "skill_name": skill.get("name"),
@@ -108,14 +88,44 @@ def load_skill_contract(skill_name: str, base_dir: str | Path = ".") -> dict[str
         "family": skill.get("family"),
         "risk_level": skill.get("risk_level"),
         "stage": skill.get("stage"),
+        "schema_generation": skill.get("schema_generation"),
         "path": skill.get("path"),
-        "allowed_tools": _collect_yaml_list(commands_text, "allowed_tools"),
-        "allowed_capabilities": _collect_yaml_list(commands_text, "allowed_capabilities"),
-        "command_templates": _collect_template_lines(commands_text),
-        "parsers": _collect_parser_names(commands_text),
-        "required_facts": _collect_yaml_list(evidence_text, "required_facts"),
-        "preferred_facts": _collect_yaml_list(evidence_text, "preferred_facts"),
-        "notification_required_lines": output_schema.get("notification", {}).get("required_lines", []),
+        "allowed_tools": commands_normalized.get("allowed_tools", []),
+        "allowed_capabilities": commands_normalized.get(
+            "allowed_capabilities",
+            [],
+        ),
+        "explicit_allowed_capabilities": commands_normalized.get(
+            "explicit_allowed_capabilities",
+            [],
+        ),
+        "derived_capabilities": commands_normalized.get(
+            "derived_capabilities",
+            [],
+        ),
+        "command_templates": commands_normalized.get(
+            "command_templates",
+            [],
+        ),
+        "command_entries": commands_normalized.get("entries", []),
+        "platform_commands": commands_normalized.get(
+            "adaptive_platform_commands",
+            {},
+        ),
+        "parsers": commands_normalized.get("parsers", []),
+        "forbidden_patterns": commands_normalized.get(
+            "forbidden_patterns",
+            [],
+        ),
+        "required_facts": evidence_normalized.get("required_facts", []),
+        "preferred_facts": evidence_normalized.get("preferred_facts", []),
+        "manual_review_conditions": evidence_normalized.get(
+            "manual_review_conditions",
+            [],
+        ),
+        "notification_required_lines": [
+            str(item) for item in required_lines if str(item).strip()
+        ],
         "output_schema": output_schema,
     }
 

@@ -84,6 +84,8 @@ def build_skill_context_for_session(session: dict[str, Any], base_dir: str | Pat
     context.update({
         "matched": True,
         "reason": "matched_by_family",
+        "stage": skill.get("stage", ""),
+        "schema_generation": skill.get("schema_generation", ""),
         "skill_name": skill_name,
         "skill_version": skill.get("version", ""),
         "risk_level": skill.get("risk_level", ""),
@@ -116,6 +118,7 @@ def attach_skill_context_to_session(session: dict[str, Any], base_dir: str | Pat
 def compact_skill_context(context: dict[str, Any]) -> dict[str, Any]:
     return {
         "stage": context.get("stage"),
+        "schema_generation": context.get("schema_generation"),
         "matched": context.get("matched"),
         "family": context.get("family"),
         "skill_name": context.get("skill_name"),
