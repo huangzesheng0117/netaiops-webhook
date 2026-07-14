@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NetAIOps Webhook v11 release acceptance and frozen regression gate.
+"""NetAIOps Webhook v11 final release acceptance and strict zero-failure gate.
 
 Modes
 -----
@@ -9,10 +9,8 @@ offline
 
 repository-gate
     Run the Batch 10 focused tests, all v11 tests, and the full repository
-    unittest suite. The full suite is accepted only when its FAIL/ERROR identity
-    set is exactly the 28 frozen historical failures found before Batch 10.
-    The resulting release audit status is WARNING, never PASS, until the
-    historical regression cleanup is completed.
+    unittest suite. The full suite is accepted only when it exits successfully
+    with zero FAIL/ERROR identities. The resulting release audit must be PASS.
 """
 from __future__ import annotations
 
@@ -39,49 +37,12 @@ from netaiops.governance.replay_engine import (  # noqa: E402
 )
 from netaiops.governance.schemas import AuditRecord  # noqa: E402
 
-ACCEPTANCE_VERSION = "11.0.0-release-acceptance-v1"
+ACCEPTANCE_VERSION = "11.1.0-release-acceptance-v2"
 EXPECTED_SERVICE_VERSION = "11.0.0-v11-learning-governance"
-KNOWN_FAILURE_POLICY = "frozen-historical-regressions-v1"
-KNOWN_HISTORICAL_FAILURES: tuple[str, ...] = ('FAIL: test_alertmanager_payload_to_playbook_and_skill_for_each_net_global_alert '
- "(test_v7_11_net_global_end_to_end_dryrun.TestV711NetGlobalEndToEndDryrun) (vendor='cisco', alertname='利用率-入向')",
- 'FAIL: test_alertmanager_payload_to_playbook_and_skill_for_each_net_global_alert '
- "(test_v7_11_net_global_end_to_end_dryrun.TestV711NetGlobalEndToEndDryrun) (vendor='cisco', alertname='利用率-出向')",
- 'FAIL: test_alertmanager_payload_to_playbook_and_skill_for_each_net_internet_alert '
- "(test_v7_11_net_internet_end_to_end_dryrun.TestV711NetInternetEndToEndDryrun) (source_file='net-internet.yml', "
- "alertname='互联网线路流量突降')",
- 'FAIL: test_alertmanager_payload_to_playbook_and_skill_for_each_net_line_alert '
- "(test_v7_11_net_line_end_to_end_dryrun.TestV711NetLineEndToEndDryrun) (alertname='DCI线路流量突增')",
- 'FAIL: test_alertmanager_payload_to_playbook_and_skill_for_each_net_line_alert '
- "(test_v7_11_net_line_end_to_end_dryrun.TestV711NetLineEndToEndDryrun) (alertname='DCI线路流量突降')",
- 'FAIL: test_all_skill_bindings_validation_passes (test_skill_binding_validator.TestSkillBindingValidator)',
- 'FAIL: test_build_skill_context_for_interface_family (test_skill_session_context.TestSkillSessionContext)',
- 'FAIL: test_command_template_match (test_adaptive_evidence_policy.TestAdaptiveEvidencePolicy)',
- 'FAIL: test_context_missing_facts_has_candidate (test_adaptive_session_context.TestAdaptiveSessionContext)',
- 'FAIL: test_dci_traffic_spike_prefers_explicit_playbook (test_v7_12_pipeline_runtime_fix.TestV712PipelineRuntimeFix)',
- 'FAIL: test_execution_against_skill_passes (test_skill_compliance_validator.TestSkillComplianceValidator)',
- 'FAIL: test_interface_skill_binding_graph (test_skill_binding_validator.TestSkillBindingValidator)',
- 'FAIL: test_interface_skill_binding_validation_passes (test_skill_binding_validator.TestSkillBindingValidator)',
- 'FAIL: test_interface_skill_can_be_loaded (test_skill_registry.TestSkillRegistry)',
- 'FAIL: test_internet_traffic_anomaly_playbook_matches '
- '(test_v7_11_net_internet_latency_down_anomaly_assets.TestV711NetInternetLatencyDownAnomalyAssets) '
- "(alertname='互联网线路流量突降')",
- 'FAIL: test_load_constraints (test_adaptive_evidence_policy.TestAdaptiveEvidencePolicy)',
- 'FAIL: test_load_interface_skill_contract (test_skill_compliance_validator.TestSkillComplianceValidator)',
- 'FAIL: test_missing_counter_facts_create_counter_candidate '
- '(test_adaptive_evidence_planner.TestAdaptiveEvidencePlanner)',
- 'FAIL: test_missing_facts_generates_expected_candidates '
- '(test_adaptive_missing_facts_sample.TestAdaptiveMissingFactsSample)',
- 'FAIL: test_missing_facts_simulation_commands (test_adaptive_evidence_api.TestAdaptiveEvidenceApi)',
- 'FAIL: test_missing_facts_simulation_has_three_candidates (test_adaptive_evidence_api.TestAdaptiveEvidenceApi)',
- 'FAIL: test_missing_facts_simulation_response_ok (test_adaptive_evidence_api.TestAdaptiveEvidenceApi)',
- 'FAIL: test_missing_required_facts_creates_detail_candidate '
- '(test_adaptive_evidence_planner.TestAdaptiveEvidencePlanner)',
- 'FAIL: test_review_against_skill_passes (test_skill_compliance_validator.TestSkillComplianceValidator)',
- 'FAIL: test_traffic_anomaly_prometheus_first_rules_exist '
- '(test_v7_12_real_sim_feedback_assets.TestV712RealSimFeedbackAssets)',
- 'FAIL: test_validate_all_skills (test_skill_registry.TestSkillRegistry)',
- 'FAIL: test_validate_allowed_candidate_passes (test_adaptive_evidence_policy.TestAdaptiveEvidencePolicy)',
- 'FAIL: test_validate_interface_skill_package (test_skill_registry.TestSkillRegistry)')
+KNOWN_FAILURE_POLICY = "strict-zero-regressions-v2"
+RESOLVED_HISTORICAL_FAILURE_POLICY = "frozen-historical-regressions-v1"
+RESOLVED_HISTORICAL_FAILURE_COUNT = 28
+KNOWN_HISTORICAL_FAILURES: tuple[str, ...] = ()
 
 _FAILURE_HEADER_RE = re.compile(r"^(FAIL|ERROR):\s+(.+?)\s*$")
 _RAN_RE = re.compile(r"^Ran\s+(\d+)\s+tests?\s+in\s+(.+)$")
@@ -99,7 +60,8 @@ def utc_now() -> datetime:
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(dict(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        json.dumps(dict(payload), ensure_ascii=False, indent=2, sort_keys=True)
+        + "\n",
         encoding="utf-8",
     )
 
@@ -165,6 +127,8 @@ def _run_command(
             "PROJECT_ROOT": str(cwd),
             "PYTHONPATH": str(cwd),
             "PYTHONDONTWRITEBYTECODE": "1",
+            "LC_ALL": "C",
+            "LANG": "C",
         }
     )
     completed = subprocess.run(
@@ -187,7 +151,11 @@ def _run_command(
     }
 
 
-def _assert_zero_external_calls(values: Mapping[str, Any], *, context: str) -> None:
+def _assert_zero_external_calls(
+    values: Mapping[str, Any],
+    *,
+    context: str,
+) -> None:
     enabled = sorted(key for key, value in values.items() if bool(value))
     if enabled:
         raise ReleaseAcceptanceError(
@@ -223,7 +191,9 @@ def run_offline_acceptance(
         force=False,
     )
     if sidecar.get("ok") is not True:
-        raise ReleaseAcceptanceError(f"governance sidecar failed: {sidecar}")
+        raise ReleaseAcceptanceError(
+            f"governance sidecar failed: {sidecar}"
+        )
     _assert_zero_external_calls(
         sidecar.get("external_calls") or {},
         context="governance sidecar",
@@ -232,7 +202,9 @@ def run_offline_acceptance(
     replay = run_offline_replay(str(project_root), request_id)
     replay_safety = replay_safety_summary(replay)
     if replay_safety.get("safe") is not True:
-        raise ReleaseAcceptanceError(f"offline replay safety failed: {replay_safety}")
+        raise ReleaseAcceptanceError(
+            f"offline replay safety failed: {replay_safety}"
+        )
     _assert_zero_external_calls(
         replay.record.external_calls,
         context="offline replay",
@@ -261,14 +233,14 @@ def run_offline_acceptance(
     return report
 
 
-def _warning_audit(
+def _final_pass_audit(
     *,
     project_root: Path,
     test_results: Mapping[str, Any],
     replay_results: Mapping[str, Any],
     smoke_results: Mapping[str, Any],
 ) -> AuditRecord:
-    base = build_release_audit(
+    audit = build_release_audit(
         project_root,
         mode="release",
         target_version=EXPECTED_SERVICE_VERSION,
@@ -276,14 +248,22 @@ def _warning_audit(
         replay_results=replay_results,
         smoke_results=smoke_results,
     )
-    payload = base.to_payload()
-    warnings = set(payload.get("warnings") or [])
-    warnings.add("known_historical_regression_failures:28")
-    warnings.add("release_status_warning_until_v11_1_cleanup")
-    payload["status"] = AuditStatus.WARNING.value
-    payload["warnings"] = sorted(warnings)
-    payload["problems"] = []
-    return AuditRecord.model_validate(payload)
+    if audit.status is not AuditStatus.PASS:
+        raise ReleaseAcceptanceError(
+            "final release audit must be PASS: "
+            f"status={audit.status.value}, "
+            f"problems={audit.problems}, warnings={audit.warnings}"
+        )
+    if audit.problems or audit.warnings:
+        raise ReleaseAcceptanceError(
+            "final release audit must have no problems or warnings: "
+            f"problems={audit.problems}, warnings={audit.warnings}"
+        )
+    _assert_zero_external_calls(
+        audit.external_calls,
+        context="final release audit",
+    )
+    return audit
 
 
 def run_repository_gate(
@@ -293,10 +273,13 @@ def run_repository_gate(
     expected_version: str,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    version = (project_root / "VERSION").read_text(encoding="utf-8").strip()
+    version = (project_root / "VERSION").read_text(
+        encoding="utf-8"
+    ).strip()
     if version != expected_version:
         raise ReleaseAcceptanceError(
-            f"VERSION mismatch: expected {expected_version!r}, got {version!r}"
+            f"VERSION mismatch: expected {expected_version!r}, "
+            f"got {version!r}"
         )
 
     python = sys.executable
@@ -352,15 +335,16 @@ def run_repository_gate(
         log_path=output_dir / "full_repository_tests.log",
     )
     failure_gate = compare_failure_set(full["failures"])
+    if full["returncode"] != 0 or full["failure_count"] != 0:
+        raise ReleaseAcceptanceError(
+            "full repository tests must pass with zero FAIL/ERROR: "
+            f"returncode={full['returncode']}, "
+            f"failure_gate={failure_gate}"
+        )
     if failure_gate["exact_match"] is not True:
         raise ReleaseAcceptanceError(
-            "full repository failure set differs from the frozen historical "
-            f"baseline: {failure_gate}"
-        )
-    if full["returncode"] == 0:
-        raise ReleaseAcceptanceError(
-            "full suite unexpectedly returned success while the frozen "
-            "28 historical failures are still expected"
+            "strict zero-failure gate mismatch: "
+            f"{failure_gate}"
         )
 
     test_results = {
@@ -369,7 +353,7 @@ def run_repository_gate(
         "batch10_integration": focused,
         "full_repository": {
             **full,
-            "accepted_with_known_historical_failures": True,
+            "strict_zero_failure_gate": True,
         },
         "known_failure_gate": failure_gate,
     }
@@ -377,13 +361,19 @@ def run_repository_gate(
         "status": "passed",
         "mode": "offline",
         "safety_regression": False,
-        "reason": "three deterministic offline fixture acceptances are executed by the master runner",
+        "reason": (
+            "three deterministic offline fixture acceptances are "
+            "executed by the master runner"
+        ),
     }
     smoke_results = {
         "status": "not_run",
-        "reason": "no real GLM/MCP/notification smoke in this warning release gate",
+        "reason": (
+            "no real GLM/MCP/notification smoke is required by the "
+            "deterministic final repository gate"
+        ),
     }
-    audit = _warning_audit(
+    audit = _final_pass_audit(
         project_root=project_root,
         test_results=test_results,
         replay_results=replay_results,
@@ -395,20 +385,29 @@ def run_repository_gate(
     report = {
         "acceptance_version": ACCEPTANCE_VERSION,
         "mode": "repository-gate",
-        "overall_status": "WARNING",
-        "release_audit_status": "warning",
+        "overall_status": "PASS",
+        "release_audit_status": "pass",
         "version": version,
         "batch10_integration_validation": focused,
         "v11_test_validation": v11,
         "full_repository_validation": full,
         "known_failure_gate": failure_gate,
-        "known_historical_failure_count": 28,
+        "known_historical_failure_count": 0,
+        "resolved_historical_failure_count": (
+            RESOLVED_HISTORICAL_FAILURE_COUNT
+        ),
         "new_failure_count": 0,
         "problems": [],
-        "warnings": [
-            "28 frozen historical regression failures remain",
-            "v11.1 historical regression cleanup is required before final PASS",
-            "real main-chain smoke was not executed by this gate",
+        "warnings": [],
+        "notes": [
+            (
+                "28 historical regressions were cleared by "
+                "v11.1 Batches B-D"
+            ),
+            (
+                "real external smokes remain outside this deterministic "
+                "release gate"
+            ),
         ],
         "external_calls": {
             "glm": False,
@@ -417,7 +416,9 @@ def run_repository_gate(
             "notification": False,
             "production_write": False,
         },
-        "release_audit_file": str(output_dir / "v11_release_audit.json"),
+        "release_audit_file": str(
+            output_dir / "v11_release_audit.json"
+        ),
         "created_at": utc_now().isoformat(),
     }
     _write_json(output_dir / "v11_acceptance_report.json", report)

@@ -13,24 +13,27 @@ MODULE_PATH = (
     / "tools"
     / "v11_release_acceptance.py"
 )
-SPEC = importlib.util.spec_from_file_location("v11_release_acceptance", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "v11_release_acceptance",
+    MODULE_PATH,
+)
 assert SPEC is not None and SPEC.loader is not None
 acceptance = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(acceptance)
 
 
 class ReleaseAcceptanceParserTests(unittest.TestCase):
-    def test_known_failure_set_is_frozen_and_unique(self) -> None:
-        self.assertEqual(len(acceptance.KNOWN_HISTORICAL_FAILURES), 28)
+    def test_historical_failure_set_is_resolved_and_empty(self) -> None:
+        self.assertEqual(acceptance.KNOWN_HISTORICAL_FAILURES, ())
         self.assertEqual(
-            len(set(acceptance.KNOWN_HISTORICAL_FAILURES)),
+            acceptance.RESOLVED_HISTORICAL_FAILURE_COUNT,
             28,
         )
 
     def test_known_failure_policy_name(self) -> None:
         self.assertEqual(
             acceptance.KNOWN_FAILURE_POLICY,
-            "frozen-historical-regressions-v1",
+            "strict-zero-regressions-v2",
         )
 
     def test_parse_unittest_output_extracts_fail_and_error(self) -> None:
@@ -60,26 +63,29 @@ class ReleaseAcceptanceParserTests(unittest.TestCase):
         self.assertEqual(result["ran"]["count"], 5)
         self.assertEqual(result["failed_summary"], "")
 
-    def test_exact_failure_set_is_accepted(self) -> None:
-        result = acceptance.compare_failure_set(
-            acceptance.KNOWN_HISTORICAL_FAILURES
-        )
+    def test_zero_failure_set_is_accepted(self) -> None:
+        result = acceptance.compare_failure_set([])
         self.assertTrue(result["exact_match"])
+        self.assertEqual(result["expected_count"], 0)
+        self.assertEqual(result["observed_count"], 0)
         self.assertEqual(result["new_failure_count"], 0)
         self.assertEqual(result["missing_failure_count"], 0)
 
-    def test_new_failure_is_blocking(self) -> None:
-        observed = list(acceptance.KNOWN_HISTORICAL_FAILURES)
-        observed.append("FAIL: test_new (test_new.Case)")
-        result = acceptance.compare_failure_set(observed)
+    def test_any_failure_is_blocking(self) -> None:
+        result = acceptance.compare_failure_set(
+            ["FAIL: test_new (test_new.Case)"]
+        )
         self.assertFalse(result["exact_match"])
         self.assertEqual(result["new_failure_count"], 1)
 
-    def test_missing_frozen_failure_is_not_exact(self) -> None:
-        observed = list(acceptance.KNOWN_HISTORICAL_FAILURES[1:])
+    def test_compare_failure_set_reports_observed_count(self) -> None:
+        observed = [
+            "FAIL: test_a (test_mod.Case)",
+            "ERROR: test_b (test_mod.Case)",
+        ]
         result = acceptance.compare_failure_set(observed)
-        self.assertFalse(result["exact_match"])
-        self.assertEqual(result["missing_failure_count"], 1)
+        self.assertEqual(result["observed_count"], 2)
+        self.assertEqual(result["expected_count"], 0)
 
 
 class ReleaseAcceptanceOfflineTests(unittest.TestCase):
@@ -228,26 +234,23 @@ class ReleaseAcceptanceRepositoryGateTests(unittest.TestCase):
             "failed_summary": "",
         }
 
-    @patch.object(acceptance, "_warning_audit")
+    @patch.object(acceptance, "_final_pass_audit")
     @patch.object(acceptance, "_run_command")
-    def test_repository_gate_accepts_exact_frozen_set(
+    def test_repository_gate_accepts_clean_zero_failure_suite(
         self,
         run_command,
-        warning_audit,
+        final_audit,
     ) -> None:
         run_command.side_effect = [
             self.command_result(returncode=0, failures=[], count=20),
-            self.command_result(returncode=0, failures=[], count=200),
-            self.command_result(
-                returncode=1,
-                failures=list(acceptance.KNOWN_HISTORICAL_FAILURES),
-                count=500,
-            ),
+            self.command_result(returncode=0, failures=[], count=269),
+            self.command_result(returncode=0, failures=[], count=549),
         ]
-        warning_audit.return_value = SimpleNamespace(
+        final_audit.return_value = SimpleNamespace(
             to_payload=lambda: {
-                "status": "warning",
-                "warnings": ["known_historical_regression_failures:28"],
+                "status": "pass",
+                "warnings": [],
+                "problems": [],
             }
         )
         report = acceptance.run_repository_gate(
@@ -255,24 +258,28 @@ class ReleaseAcceptanceRepositoryGateTests(unittest.TestCase):
             output_dir=self.output,
             expected_version=acceptance.EXPECTED_SERVICE_VERSION,
         )
-        self.assertEqual(report["overall_status"], "WARNING")
+        self.assertEqual(report["overall_status"], "PASS")
+        self.assertEqual(report["release_audit_status"], "pass")
+        self.assertEqual(report["known_historical_failure_count"], 0)
+        self.assertEqual(report["resolved_historical_failure_count"], 28)
         self.assertEqual(report["new_failure_count"], 0)
-        self.assertEqual(report["known_historical_failure_count"], 28)
         self.assertTrue(
             (self.output / "v11_release_audit.json").is_file()
         )
 
     @patch.object(acceptance, "_run_command")
-    def test_repository_gate_rejects_new_failure(
+    def test_repository_gate_rejects_full_repository_failure(
         self,
         run_command,
     ) -> None:
-        failures = list(acceptance.KNOWN_HISTORICAL_FAILURES)
-        failures.append("FAIL: new (new.Case)")
         run_command.side_effect = [
             self.command_result(returncode=0, failures=[], count=20),
-            self.command_result(returncode=0, failures=[], count=200),
-            self.command_result(returncode=1, failures=failures, count=500),
+            self.command_result(returncode=0, failures=[], count=269),
+            self.command_result(
+                returncode=1,
+                failures=["FAIL: new (new.Case)"],
+                count=549,
+            ),
         ]
         with self.assertRaises(acceptance.ReleaseAcceptanceError):
             acceptance.run_repository_gate(
@@ -291,7 +298,7 @@ class ReleaseAcceptanceRepositoryGateTests(unittest.TestCase):
             self.command_result(
                 returncode=1,
                 failures=["FAIL: v11 (v11.Case)"],
-                count=200,
+                count=269,
             ),
         ]
         with self.assertRaises(acceptance.ReleaseAcceptanceError):
@@ -313,7 +320,7 @@ class ReleaseAcceptanceRepositoryGateTests(unittest.TestCase):
                 expected_version=acceptance.EXPECTED_SERVICE_VERSION,
             )
 
-    def test_parser_supports_both_modes(self) -> None:
+    def test_parser_supports_both_modes_and_strict_policy(self) -> None:
         parser = acceptance.build_parser()
         offline = parser.parse_args(
             [
@@ -341,9 +348,15 @@ class ReleaseAcceptanceRepositoryGateTests(unittest.TestCase):
                 "repository-gate",
                 "--output-dir",
                 str(self.output),
+                "--known-failure-policy",
+                "strict-zero-regressions-v2",
             ]
         )
         self.assertEqual(gate.mode, "repository-gate")
+        self.assertEqual(
+            gate.known_failure_policy,
+            "strict-zero-regressions-v2",
+        )
 
 
 if __name__ == "__main__":

@@ -177,15 +177,15 @@ app.py"
 TEST_PATTERN[10]="test_v11_governance_integration.py"
 EXTRA_VERIFY[10]="batch10"
 
-BATCH_NAME[11]="Release Acceptance"
-COMMIT_MESSAGE[11]="v11: complete learning loop governance"
-RESTART_REQUIRED[11]="yes"
+BATCH_NAME[11]="Final Release Acceptance"
+COMMIT_MESSAGE[11]="v11.1: pass final release acceptance"
+RESTART_REQUIRED[11]="no"
 FILES[11]="tools/v11_release_acceptance.py
 tests/test_v11_release_acceptance.py
-VERSION
+tools/v11_governance_master_runner.txt
+tests/test_v11_governance_master_runner.py
 README.md
-README_STATUS.md
-tests/test_v10_baseline_hygiene.py"
+README_STATUS.md"
 TEST_PATTERN[11]="test_v11_release_acceptance.py"
 EXTRA_VERIFY[11]="batch11"
 
@@ -235,7 +235,7 @@ changed_paths() {
     git diff --name-only
     git diff --cached --name-only
     git ls-files --others --exclude-standard
-  } | sed '/^[[:space:]]*$/d' | sort -u
+  } | sed '/^[[:space:]]*$/d' | LC_ALL=C sort -u
 }
 
 clean_worktree_check() {
@@ -442,7 +442,7 @@ verify_git_scope() {
 
   local actual expected
   actual="$(changed_paths)"
-  expected="$(printf '%s\n' "${CURRENT_FILES[@]}" | sort -u)"
+  expected="$(printf '%s\n' "${CURRENT_FILES[@]}" | LC_ALL=C sort -u)"
 
   if [[ "${actual}" != "${expected}" ]]; then
     echo "[EXPECTED]"
@@ -609,15 +609,48 @@ extra_verify() {
         --mode repository-gate \
         --output-dir "${STATE_DIR}/repository_gate" \
         --expected-version "11.0.0-v11-learning-governance" \
-        --known-failure-policy "frozen-historical-regressions-v1"
+        --known-failure-policy "strict-zero-regressions-v2"
 
       python -m json.tool \
         "${STATE_DIR}/repository_gate/v11_acceptance_report.json"
       python -m json.tool \
         "${STATE_DIR}/repository_gate/v11_release_audit.json"
 
-      sudo systemctl restart "${SERVICE_NAME}"
-      wait_health
+      python - \
+        "${STATE_DIR}/repository_gate/v11_acceptance_report.json" \
+        "${STATE_DIR}/repository_gate/v11_release_audit.json" <<'PY_FINAL_GATE'
+import json
+import sys
+from pathlib import Path
+
+report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+audit = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+gate = report.get("known_failure_gate") or {}
+checks = {
+    "overall_status": str(report.get("overall_status", "")).lower() == "pass",
+    "release_audit_status": (
+        str(report.get("release_audit_status", "")).lower() == "pass"
+    ),
+    "audit_status": str(audit.get("status", "")).lower() == "pass",
+    "expected_count": gate.get("expected_count") == 0,
+    "observed_count": gate.get("observed_count") == 0,
+    "new_failure_count": gate.get("new_failure_count") == 0,
+    "missing_failure_count": gate.get("missing_failure_count") == 0,
+    "exact_match": gate.get("exact_match") is True,
+    "historical_failure_count": (
+        report.get("known_historical_failure_count") == 0
+    ),
+    "resolved_historical_failure_count": (
+        report.get("resolved_historical_failure_count") == 28
+    ),
+    "problems": not report.get("problems") and not audit.get("problems"),
+    "warnings": not report.get("warnings") and not audit.get("warnings"),
+}
+failed = [name for name, passed in checks.items() if not passed]
+if failed:
+    raise SystemExit(f"final release gate checks failed: {failed}")
+print("PASS: strict zero-failure release gate and audit")
+PY_FINAL_GATE
 
       for path in \
         /governance/health \
@@ -682,8 +715,8 @@ commit_batch() {
   git diff --cached --check
 
   local staged expected
-  staged="$(git diff --cached --name-only | sort -u)"
-  expected="$(printf '%s\n' "${CURRENT_FILES[@]}" | sort -u)"
+  staged="$(git diff --cached --name-only | LC_ALL=C sort -u)"
+  expected="$(printf '%s\n' "${CURRENT_FILES[@]}" | LC_ALL=C sort -u)"
 
   [[ "${staged}" == "${expected}" ]] ||
     fail "staged scope differs from planned scope"

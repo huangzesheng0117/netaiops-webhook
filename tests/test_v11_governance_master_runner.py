@@ -340,20 +340,23 @@ class GovernanceMasterRunnerV2Tests(unittest.TestCase):
         )
 
 
-class Batch11KnownHistoricalFailureGateTests(unittest.TestCase):
-    def test_batch11_uses_repository_gate_instead_of_raw_full_suite(self) -> None:
+class Batch11StrictZeroReleaseGateTests(unittest.TestCase):
+    def test_batch11_uses_strict_zero_repository_gate(self) -> None:
         text = RUNNER_SOURCE.read_text(encoding="utf-8")
         start = text.index("    batch11)")
         end = text.index("    none)", start)
         block = text[start:end]
-
         self.assertIn("--mode repository-gate", block)
         self.assertIn(
-            '--known-failure-policy "frozen-historical-regressions-v1"',
+            '--known-failure-policy "strict-zero-regressions-v2"',
             block,
         )
         self.assertIn(
             '"${STATE_DIR}/repository_gate/v11_release_audit.json"',
+            block,
+        )
+        self.assertIn(
+            "PASS: strict zero-failure release gate and audit",
             block,
         )
         self.assertNotIn(
@@ -380,14 +383,23 @@ class Batch11KnownHistoricalFailureGateTests(unittest.TestCase):
         self.assertIn("/governance-ui", block)
         self.assertIn("/evidence-ui", block)
 
-
-    def test_batch11_scope_includes_version_consistency_files(self) -> None:
+    def test_batch11_scope_is_final_release_scope(self) -> None:
         text = RUNNER_SOURCE.read_text(encoding="utf-8")
         start = text.index('FILES[11]="')
         end = text.index('"\nTEST_PATTERN[11]', start)
         block = text[start:end]
-        self.assertIn("README_STATUS.md", block)
-        self.assertIn("tests/test_v10_baseline_hygiene.py", block)
+        expected = {
+            "tools/v11_release_acceptance.py",
+            "tests/test_v11_release_acceptance.py",
+            "tools/v11_governance_master_runner.txt",
+            "tests/test_v11_governance_master_runner.py",
+            "README.md",
+            "README_STATUS.md",
+        }
+        for path in expected:
+            self.assertIn(path, block)
+        self.assertNotIn("VERSION", block)
+        self.assertNotIn("tests/test_v10_baseline_hygiene.py", block)
 
 
 if __name__ == "__main__":
