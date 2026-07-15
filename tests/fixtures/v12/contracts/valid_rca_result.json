@@ -1,0 +1,39 @@
+{
+  "bundle_ref": "artifact://req-20260715-0001/bundle/main",
+  "candidates": [
+    {
+      "confidence": 0.78,
+      "contradicting_evidence_refs": [],
+      "missing_evidence": [
+        "logs",
+        "knowledge"
+      ],
+      "scope": {
+        "device": "SW01",
+        "interface": "TenGigabitEthernet1/0/1"
+      },
+      "statement": "The interface is experiencing sustained high utilization.",
+      "supporting_evidence_refs": [
+        "evidence://req-20260715-0001/metrics/sample-1",
+        "evidence://req-20260715-0001/device/sample-1"
+      ],
+      "uncertainties": [
+        "Application traffic breakdown is unavailable."
+      ]
+    }
+  ],
+  "event_ref": "event://req-20260715-0001/normalized/main",
+  "generated_at": "2026-07-15T01:00:02+00:00",
+  "judge_ref": "artifact://req-20260715-0001/judge/main",
+  "missing_evidence": [
+    "logs",
+    "knowledge"
+  ],
+  "provider": "fixture",
+  "request_id": "req-20260715-0001",
+  "schema_version": "v12.1",
+  "status": "success",
+  "uncertainties": [
+    "No logs or local knowledge context."
+  ]
+}

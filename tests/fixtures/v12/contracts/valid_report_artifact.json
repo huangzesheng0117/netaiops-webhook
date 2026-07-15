@@ -1,0 +1,27 @@
+{
+  "artifact_refs": [
+    "report://req-20260715-0001/notification/main"
+  ],
+  "evidence_refs": [
+    "evidence://req-20260715-0001/metrics/sample-1",
+    "evidence://req-20260715-0001/device/sample-1"
+  ],
+  "generated_at": "2026-07-15T01:00:02+00:00",
+  "notification_compatible": true,
+  "request_id": "req-20260715-0001",
+  "schema_version": "v12.1",
+  "sections": [
+    {
+      "body": "The interface is congested.",
+      "evidence_refs": [
+        "evidence://req-20260715-0001/metrics/sample-1",
+        "evidence://req-20260715-0001/device/sample-1"
+      ],
+      "key": "current_judgement",
+      "title": "Current judgement"
+    }
+  ],
+  "status": "success",
+  "summary": "Evidence supports sustained high utilization without interface errors.",
+  "title": "Interface utilization alert"
+}

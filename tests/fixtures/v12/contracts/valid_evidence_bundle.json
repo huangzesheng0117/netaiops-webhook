@@ -1,0 +1,83 @@
+{
+  "built_at": "2026-07-15T01:00:02+00:00",
+  "bundle_status": "partial",
+  "event_ref": "event://req-20260715-0001/normalized/main",
+  "evidence": {
+    "device": {
+      "collected_at": "2026-07-15T01:00:02+00:00",
+      "errors": [],
+      "evidence_kind": "evidence",
+      "evidence_refs": [
+        "evidence://req-20260715-0001/device/sample-1"
+      ],
+      "facts": {
+        "error_count": 0,
+        "oper_status": "up"
+      },
+      "reason": null,
+      "request_id": "req-20260715-0001",
+      "schema_version": "v12.1",
+      "scope": {
+        "device": "SW01",
+        "interface": "TenGigabitEthernet1/0/1"
+      },
+      "source": "device",
+      "status": "success",
+      "summary": "Interface is up with no recent errors.",
+      "warnings": []
+    },
+    "knowledge": {
+      "as_of": null,
+      "collected_at": "2026-07-15T01:00:02+00:00",
+      "context_facts": [],
+      "evidence_kind": "context",
+      "reason": "local_knowledge_base_not_built",
+      "request_id": "req-20260715-0001",
+      "schema_version": "v12.1",
+      "source": "knowledge",
+      "source_refs": [],
+      "status": "not_available"
+    },
+    "logs": {
+      "collected_at": "2026-07-15T01:00:02+00:00",
+      "errors": [],
+      "evidence_kind": "evidence",
+      "evidence_refs": [],
+      "facts": {},
+      "reason": "logs_evidence_not_approved",
+      "request_id": "req-20260715-0001",
+      "schema_version": "v12.1",
+      "scope": {},
+      "source": "logs",
+      "status": "not_available",
+      "summary": "",
+      "warnings": []
+    },
+    "metrics": {
+      "collected_at": "2026-07-15T01:00:02+00:00",
+      "errors": [],
+      "evidence_kind": "evidence",
+      "evidence_refs": [
+        "evidence://req-20260715-0001/metrics/sample-1"
+      ],
+      "facts": {
+        "peak_percent": 92.3,
+        "window": "1m"
+      },
+      "reason": null,
+      "request_id": "req-20260715-0001",
+      "schema_version": "v12.1",
+      "scope": {
+        "device": "SW01",
+        "interface": "TenGigabitEthernet1/0/1"
+      },
+      "source": "metrics",
+      "status": "success",
+      "summary": "Metrics show sustained input utilization.",
+      "warnings": []
+    }
+  },
+  "plan_ref": "plan://req-20260715-0001/evidence/main",
+  "request_id": "req-20260715-0001",
+  "schema_version": "v12.1"
+}

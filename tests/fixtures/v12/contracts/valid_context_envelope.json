@@ -1,0 +1,12 @@
+{
+  "as_of": null,
+  "collected_at": "2026-07-15T01:00:02+00:00",
+  "context_facts": [],
+  "evidence_kind": "context",
+  "reason": "local_knowledge_base_not_built",
+  "request_id": "req-20260715-0001",
+  "schema_version": "v12.1",
+  "source": "knowledge",
+  "source_refs": [],
+  "status": "not_available"
+}

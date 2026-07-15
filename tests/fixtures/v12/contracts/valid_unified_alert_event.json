@@ -1,0 +1,38 @@
+{
+  "alert_name": "Interface utilization high",
+  "alert_object": {
+    "attributes": {
+      "direction": "in"
+    },
+    "identifier": "if-1",
+    "kind": "interface",
+    "name": "TenGigabitEthernet1/0/1"
+  },
+  "alert_status": "firing",
+  "annotations": {
+    "summary": "high utilization"
+  },
+  "correlation_hints": [
+    "same_device",
+    "same_interface"
+  ],
+  "device": {
+    "ip": "10.0.0.1",
+    "name": "SW01",
+    "platform": "iosxe",
+    "site": "sh8",
+    "vendor": "cisco"
+  },
+  "event_id": "event-1",
+  "event_key": "SW01|TenGigabitEthernet1/0/1|utilization",
+  "family": "interface_or_link_utilization_high",
+  "labels": {
+    "severity": "warning"
+  },
+  "occurred_at": "2026-07-15T01:00:00+00:00",
+  "raw_payload_ref": "artifact://req-20260715-0001/raw/alertmanager-1",
+  "received_at": "2026-07-15T01:00:01+00:00",
+  "request_id": "req-20260715-0001",
+  "schema_version": "v12.1",
+  "source": "alertmanager"
+}

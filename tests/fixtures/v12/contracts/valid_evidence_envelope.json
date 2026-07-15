@@ -1,0 +1,23 @@
+{
+  "collected_at": "2026-07-15T01:00:02+00:00",
+  "errors": [],
+  "evidence_kind": "evidence",
+  "evidence_refs": [
+    "evidence://req-20260715-0001/metrics/sample-1"
+  ],
+  "facts": {
+    "peak_percent": 92.3,
+    "window": "1m"
+  },
+  "reason": null,
+  "request_id": "req-20260715-0001",
+  "schema_version": "v12.1",
+  "scope": {
+    "device": "SW01",
+    "interface": "TenGigabitEthernet1/0/1"
+  },
+  "source": "metrics",
+  "status": "success",
+  "summary": "Metrics show sustained input utilization.",
+  "warnings": []
+}

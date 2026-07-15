@@ -1,0 +1,22 @@
+{
+  "confidence_cap": 0.8,
+  "conflicts": [],
+  "evidence_refs": [
+    "evidence://req-20260715-0001/metrics/sample-1",
+    "evidence://req-20260715-0001/device/sample-1"
+  ],
+  "judged_at": "2026-07-15T01:00:02+00:00",
+  "missing_optional_sources": [
+    "logs",
+    "knowledge"
+  ],
+  "missing_required_sources": [],
+  "rca_allowed": true,
+  "request_id": "req-20260715-0001",
+  "required_sources": [
+    "metrics",
+    "device"
+  ],
+  "schema_version": "v12.1",
+  "status": "partial"
+}
