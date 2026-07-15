@@ -1,0 +1,338 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# NetAIOps Webhook v12 master runner scaffold
+#
+# Batch A is implemented in this version. B-Q are reserved and will be added
+# only by their own reviewed batches.
+#
+# Usage:
+#   bash tools/v12_master_runner.txt status A
+#   bash tools/v12_master_runner.txt verify A
+#   RUN_FULL_REPOSITORY=YES bash tools/v12_master_runner.txt verify A
+#   CONFIRM_COMMIT=YES bash tools/v12_master_runner.txt commit A
+#   CONFIRM_COMMIT=YES CONFIRM_PUSH=YES bash tools/v12_master_runner.txt commit A
+#   CONFIRM_ROLLBACK=YES bash tools/v12_master_runner.txt rollback A
+
+PROJECT_ROOT="${PROJECT_ROOT:-/opt/netaiops-webhook}"
+EXPECTED_BRANCH="${EXPECTED_BRANCH:-main}"
+EXPECTED_BASE_HEAD="${EXPECTED_BASE_HEAD:-e83dcc526389a420df435e2d6e8a671e81ee5f30}"
+EXPECTED_BASE_VERSION="${EXPECTED_BASE_VERSION:-11.0.0-v11-learning-governance}"
+EXPECTED_MIN_BASELINE_TESTS="${EXPECTED_MIN_BASELINE_TESTS:-549}"
+STATE_POINTER="${STATE_POINTER:-/tmp/netaiops_v12_batch_a_latest_path}"
+SUPPORTED_BATCHES="A"
+PLANNED_BATCHES="A B C D E F G H I J K L M N O P Q"
+
+ACTION="${1:-}"
+BATCH="${2:-}"
+
+BATCH_A_FILES=(
+  "config.example.yaml"
+  "docs/v12/V12_BASELINE_2026-07-14.md"
+  "netaiops/v12/__init__.py"
+  "tests/test_v12_baseline.py"
+  "tools/v12_master_runner.txt"
+)
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  runner status A
+  runner verify A
+  runner commit A
+  runner rollback A
+
+Required confirmations:
+  CONFIRM_COMMIT=YES
+  CONFIRM_PUSH=YES       optional
+  CONFIRM_ROLLBACK=YES
+
+Optional verification:
+  RUN_FULL_REPOSITORY=YES
+USAGE
+}
+
+fail() {
+  echo "[FAIL] $*" >&2
+  exit 1
+}
+
+if [[ -z "$ACTION" || -z "$BATCH" ]]; then
+  usage
+  exit 2
+fi
+
+[[ "$BATCH" == "$SUPPORTED_BATCHES" ]] || \
+  fail "only Batch A is implemented; planned batches are: $PLANNED_BATCHES"
+
+case "$ACTION" in
+  status|verify|commit|rollback)
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
+
+cd "$PROJECT_ROOT"
+# shellcheck disable=SC1091
+source venv/bin/activate
+
+RUN_TS="$(date '+%Y%m%d_%H%M%S')"
+RUN_DIR="/tmp/netaiops_v12_master_runner_${RUN_TS}"
+mkdir -p "$RUN_DIR/tmp" "$RUN_DIR/pycache"
+export PYTHONDONTWRITEBYTECODE=1
+export PYTHONPYCACHEPREFIX="$RUN_DIR/pycache"
+export TMPDIR="$RUN_DIR/tmp"
+export TEMP="$RUN_DIR/tmp"
+export TMP="$RUN_DIR/tmp"
+
+sorted_expected_files() {
+  printf '%s\n' "${BATCH_A_FILES[@]}" | LC_ALL=C sort -u
+}
+
+changed_files() {
+  {
+    git diff --name-only
+    git diff --cached --name-only
+    git ls-files --others --exclude-standard
+  } | sed '/^$/d' | LC_ALL=C sort -u
+}
+
+assert_precommit_scope() {
+  local expected actual
+  expected="$(sorted_expected_files)"
+  actual="$(changed_files)"
+  [[ "$actual" == "$expected" ]] || {
+    echo "[expected]"
+    printf '%s\n' "$expected"
+    echo "[actual]"
+    printf '%s\n' "$actual"
+    fail "pre-commit file scope mismatch"
+  }
+}
+
+verify_files_exist() {
+  local path
+  for path in "${BATCH_A_FILES[@]}"; do
+    [[ -f "$path" ]] || fail "missing Batch A file: $path"
+  done
+}
+
+verify_config_and_import() {
+  python - <<'PY'
+from pathlib import Path
+import yaml
+
+from netaiops.v12 import (
+    V12_BATCH_ORDER,
+    V12_CONFIG_SECTION,
+    V12_DEFAULT_MODE,
+    V12_TARGET_VERSION,
+)
+
+config = yaml.safe_load(Path("config.example.yaml").read_text(encoding="utf-8"))
+assert isinstance(config, dict)
+assert V12_CONFIG_SECTION == "v12_multi_agent"
+assert V12_DEFAULT_MODE == "shadow"
+assert V12_TARGET_VERSION == "12.0.0-v12-controlled-multi-agent"
+assert V12_BATCH_ORDER == tuple("ABCDEFGHIJKLMNOPQ")
+
+v12 = config["v12_multi_agent"]
+assert v12["enabled"] is False
+assert v12["notifications_use_v12"] is False
+assert v12["rca"]["enabled"] is False
+assert config["logs_evidence"]["enabled"] is False
+assert config["knowledge_context"]["enabled"] is False
+print("v12_config_and_import=PASS")
+PY
+}
+
+run_tests() {
+  python -m unittest tests.test_v12_baseline -v \
+    2>&1 | tee "$RUN_DIR/test_v12_baseline.log"
+
+  python -m unittest tests.test_v10_baseline_hygiene -v \
+    2>&1 | tee "$RUN_DIR/test_affected_baseline.log"
+
+  python -m unittest discover -s tests -p 'test_v12_*.py' -v \
+    2>&1 | tee "$RUN_DIR/test_all_v12.log"
+
+  if [[ "${RUN_FULL_REPOSITORY:-NO}" == "YES" ]]; then
+    set +e
+    env \
+      -u CONFIRM_COMMIT \
+      -u CONFIRM_PUSH \
+      -u CONFIRM_ROLLBACK \
+      -u CONFIRM_REPREPARE \
+      python -m unittest discover -s tests -p 'test*.py' -v \
+      > "$RUN_DIR/test_full_repository.log" 2>&1
+    local rc=$?
+    set -e
+    tail -n 120 "$RUN_DIR/test_full_repository.log"
+    [[ "$rc" -eq 0 ]] || fail "full repository tests failed"
+
+    local summary count
+    summary="$(
+      grep -E '^Ran [0-9]+ tests? in ' "$RUN_DIR/test_full_repository.log" |
+      tail -n 1
+    )"
+    count="$(
+      printf '%s\n' "$summary" |
+      sed -nE 's/^Ran ([0-9]+) tests?.*/\1/p'
+    )"
+    [[ -n "$count" ]] || fail "could not parse full repository test count"
+    (( count > EXPECTED_MIN_BASELINE_TESTS )) || \
+      fail "post-Batch A test count must be greater than baseline"
+    grep -qx 'OK' "$RUN_DIR/test_full_repository.log" || \
+      fail "full repository result is not OK"
+    echo "full_repository_test_count=$count"
+  fi
+}
+
+verify_hygiene() {
+  git diff --check
+
+  python - <<'PY'
+from pathlib import Path
+
+paths = [
+    Path("config.example.yaml"),
+    Path("docs/v12/V12_BASELINE_2026-07-14.md"),
+    Path("netaiops/v12/__init__.py"),
+    Path("tests/test_v12_baseline.py"),
+    Path("tools/v12_master_runner.txt"),
+]
+for path in paths:
+    text = path.read_text(encoding="utf-8")
+    if "\r" in text:
+        raise SystemExit(f"CR character found: {path}")
+    for number, line in enumerate(text.splitlines(), start=1):
+        if line.rstrip() != line:
+            raise SystemExit(f"trailing whitespace: {path}:{number}")
+print("text_hygiene=PASS")
+PY
+
+  python -m py_compile netaiops/v12/__init__.py tests/test_v12_baseline.py
+
+  if grep -RInE \
+    '(api[_-]?key|token|secret|password)[[:space:]]*:[[:space:]]*[^[:space:]#]{8,}' \
+    docs/v12 netaiops/v12 tests/test_v12_baseline.py tools/v12_master_runner.txt
+  then
+    fail "possible embedded secret detected"
+  fi
+}
+
+do_status() {
+  echo "branch=$(git rev-parse --abbrev-ref HEAD)"
+  echo "head=$(git rev-parse HEAD)"
+  echo "version=$(tr -d '\r\n' < VERSION)"
+  echo "supported_batches=$SUPPORTED_BATCHES"
+  echo "planned_batches=$PLANNED_BATCHES"
+  echo
+  git status --short --untracked-files=all
+  echo
+  sorted_expected_files
+}
+
+do_verify() {
+  verify_files_exist
+  verify_config_and_import
+  verify_hygiene
+  run_tests
+  echo "service_restart=false"
+  echo "glm=false"
+  echo "prometheus_mcp=false"
+  echo "netmiko_mcp=false"
+  echo "ops_es_api=false"
+  echo "fastmcp=false"
+  echo "notification=false"
+  echo "verify=PASS"
+  echo "run_dir=$RUN_DIR"
+}
+
+do_commit() {
+  [[ "${CONFIRM_COMMIT:-NO}" == "YES" ]] || \
+    fail "set CONFIRM_COMMIT=YES"
+  [[ "$(git rev-parse --abbrev-ref HEAD)" == "$EXPECTED_BRANCH" ]] || \
+    fail "branch mismatch"
+  [[ "$(git rev-parse HEAD)" == "$EXPECTED_BASE_HEAD" ]] || \
+    fail "HEAD changed; review before committing"
+  [[ "$(tr -d '\r\n' < VERSION)" == "$EXPECTED_BASE_VERSION" ]] || \
+    fail "VERSION changed"
+
+  assert_precommit_scope
+  RUN_FULL_REPOSITORY=YES do_verify
+  assert_precommit_scope
+
+  git add -- \
+    config.example.yaml \
+    docs/v12/V12_BASELINE_2026-07-14.md \
+    netaiops/v12/__init__.py \
+    tests/test_v12_baseline.py \
+    tools/v12_master_runner.txt
+
+  git diff --cached --check
+
+  local expected staged
+  expected="$(sorted_expected_files)"
+  staged="$(git diff --cached --name-only | LC_ALL=C sort -u)"
+  [[ "$staged" == "$expected" ]] || fail "staged file scope mismatch"
+
+  git commit -m "v12: freeze baseline and add controlled multi-agent flags"
+
+  if [[ "${CONFIRM_PUSH:-NO}" == "YES" ]]; then
+    git push origin "$EXPECTED_BRANCH"
+  else
+    echo "push=SKIPPED"
+  fi
+
+  echo "commit=PASS"
+  git log -1 --oneline
+}
+
+do_rollback() {
+  [[ "${CONFIRM_ROLLBACK:-NO}" == "YES" ]] || \
+    fail "set CONFIRM_ROLLBACK=YES"
+  [[ "$(git rev-parse HEAD)" == "$EXPECTED_BASE_HEAD" ]] || \
+    fail "HEAD changed; use git revert for a committed change"
+  [[ -f "$STATE_POINTER" ]] || fail "state pointer missing"
+
+  local state_dir
+  state_dir="$(cat "$STATE_POINTER")"
+  [[ -d "$state_dir" ]] || fail "state directory missing"
+  [[ -f "$state_dir/backup/config.example.yaml" ]] || \
+    fail "config backup missing"
+
+  cp -p "$state_dir/backup/config.example.yaml" config.example.yaml
+  rm -f \
+    docs/v12/V12_BASELINE_2026-07-14.md \
+    netaiops/v12/__init__.py \
+    tests/test_v12_baseline.py \
+    tools/v12_master_runner.txt
+  rmdir docs/v12 2>/dev/null || true
+  rmdir netaiops/v12 2>/dev/null || true
+
+  git diff --check
+  [[ -z "$(git status --short --untracked-files=all)" ]] || {
+    git status --short --untracked-files=all
+    fail "rollback did not restore a clean worktree"
+  }
+
+  echo "rollback=PASS"
+}
+
+case "$ACTION" in
+  status)
+    do_status
+    ;;
+  verify)
+    do_verify
+    ;;
+  commit)
+    do_commit
+    ;;
+  rollback)
+    do_rollback
+    ;;
+esac

@@ -229,3 +229,40 @@ evidence_hub:
   enabled: true
   base_url: "http://127.0.0.1:18080"
   default_to_local: true
+
+v12_multi_agent:
+  enabled: false
+  mode: "shadow"
+  fail_open_to_legacy: true
+  reuse_existing_evidence: true
+  notifications_use_v12: false
+
+  budgets:
+    total_timeout_seconds: 90
+    triage_timeout_seconds: 5
+    planner_timeout_seconds: 5
+    metrics_timeout_seconds: 30
+    device_timeout_seconds: 45
+    logs_timeout_seconds: 5
+    knowledge_timeout_seconds: 5
+    judge_timeout_seconds: 5
+    rca_timeout_seconds: 30
+    report_timeout_seconds: 5
+
+  rca:
+    enabled: false
+    provider: "glm-5.2"
+    max_candidates: 3
+    require_evidence_refs: true
+
+  traces:
+    enabled: true
+    redact_sensitive_fields: true
+
+logs_evidence:
+  enabled: false
+  reason: "logs_evidence_not_approved"
+
+knowledge_context:
+  enabled: false
+  reason: "local_knowledge_base_not_built"
