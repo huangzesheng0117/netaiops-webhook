@@ -1,0 +1,23 @@
+{
+  "alerts": [
+    {
+      "annotations": {
+        "description": "Cisco fan Fan1 is abnormal",
+        "summary": "风扇 Fan1 状态异常"
+      },
+      "fingerprint": "cisco-fan-1",
+      "labels": {
+        "alertname": "Cisco 风扇状态异常",
+        "hostname": "SW-DC-01",
+        "instance": "10.0.0.12",
+        "job": "snmp",
+        "name": "Fan1",
+        "severity": "critical",
+        "vendor": "cisco"
+      },
+      "startsAt": "2026-07-15T08:01:00+00:00",
+      "status": "firing"
+    }
+  ],
+  "status": "firing"
+}

@@ -1,0 +1,22 @@
+{
+  "alerts": [
+    {
+      "annotations": {
+        "description": "interface Ethernet1/2 down",
+        "summary": "Interface Ethernet1/2 is down"
+      },
+      "fingerprint": "no-device-ip-1",
+      "labels": {
+        "alertname": "Cisco Interface Down",
+        "hostname": "SW-NO-IP",
+        "instance": "SW-NO-IP",
+        "interface": "Ethernet1/2",
+        "severity": "critical",
+        "vendor": "cisco"
+      },
+      "startsAt": "2026-07-15T08:08:00+00:00",
+      "status": "firing"
+    }
+  ],
+  "status": "firing"
+}

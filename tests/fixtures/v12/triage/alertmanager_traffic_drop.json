@@ -1,0 +1,24 @@
+{
+  "alerts": [
+    {
+      "annotations": {
+        "description": "internet outbound traffic drop on TenGigabitEthernet1/0/1",
+        "summary": "互联网出向流量突降"
+      },
+      "fingerprint": "traffic-drop-1",
+      "labels": {
+        "alertname": "互联网出向流量突降",
+        "direction": "out",
+        "hostname": "INT-EDGE-01",
+        "instance": "10.0.0.14",
+        "interface": "TenGigabitEthernet1/0/1",
+        "job": "snmp",
+        "severity": "critical",
+        "vendor": "cisco"
+      },
+      "startsAt": "2026-07-15T08:03:00+00:00",
+      "status": "firing"
+    }
+  ],
+  "status": "firing"
+}

@@ -1,0 +1,22 @@
+{
+  "alerts": [
+    {
+      "annotations": {
+        "description": "device CPU usage high",
+        "summary": "FortiGate CPU usage high"
+      },
+      "fingerprint": "fortigate-cpu-1",
+      "labels": {
+        "alertname": "FortiGate CPU usage high",
+        "hostname": "FGT-EDGE-01",
+        "instance": "10.0.0.16",
+        "job": "snmp",
+        "severity": "critical",
+        "vendor": "fortigate"
+      },
+      "startsAt": "2026-07-15T08:05:00+00:00",
+      "status": "firing"
+    }
+  ],
+  "status": "firing"
+}

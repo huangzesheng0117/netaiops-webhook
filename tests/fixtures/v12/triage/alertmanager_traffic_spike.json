@@ -1,0 +1,24 @@
+{
+  "alerts": [
+    {
+      "annotations": {
+        "description": "interface Ethernet1/49 inbound traffic spike",
+        "summary": "骨干网入向流量突增"
+      },
+      "fingerprint": "traffic-spike-1",
+      "labels": {
+        "alertname": "骨干网入向流量突增",
+        "direction": "in",
+        "hostname": "DCI-BN-01",
+        "instance": "10.0.0.13",
+        "interface": "Ethernet1/49",
+        "job": "snmp",
+        "severity": "warning",
+        "vendor": "cisco"
+      },
+      "startsAt": "2026-07-15T08:02:00+00:00",
+      "status": "firing"
+    }
+  ],
+  "status": "firing"
+}

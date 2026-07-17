@@ -1,0 +1,23 @@
+{
+  "alerts": [
+    {
+      "annotations": {
+        "description": "pool member 10.10.10.10:443 down",
+        "summary": "F5 pool member down"
+      },
+      "fingerprint": "f5-pool-member-1",
+      "labels": {
+        "alertname": "F5 Pool Member Down",
+        "hostname": "F5-LTM-01",
+        "instance": "10.0.0.15",
+        "job": "f5",
+        "name": "pool_web/member_10.10.10.10_443",
+        "severity": "critical",
+        "vendor": "F5"
+      },
+      "startsAt": "2026-07-15T08:04:00+00:00",
+      "status": "firing"
+    }
+  ],
+  "status": "firing"
+}

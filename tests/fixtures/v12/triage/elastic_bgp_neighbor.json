@@ -1,0 +1,31 @@
+{
+  "hits": {
+    "hits": [
+      {
+        "_id": "elastic-doc-1",
+        "_source": {
+          "@timestamp": "2026-07-15T08:06:00+00:00",
+          "event": {
+            "category": "network",
+            "kind": "alert",
+            "outcome": "failure"
+          },
+          "host": {
+            "name": "RTR-EDGE-01"
+          },
+          "ip": "10.0.0.17",
+          "log": {
+            "level": "error"
+          },
+          "message": "BGP neighbor 10.0.0.254 down on router",
+          "observer": {
+            "vendor": "cisco"
+          },
+          "rule": {
+            "name": "BGP Neighbor Down"
+          }
+        }
+      }
+    ]
+  }
+}

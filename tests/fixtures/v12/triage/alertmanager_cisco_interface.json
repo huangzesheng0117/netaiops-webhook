@@ -1,0 +1,23 @@
+{
+  "alerts": [
+    {
+      "annotations": {
+        "description": "Cisco interface Ethernet1/1 status down",
+        "summary": "Interface Ethernet1/1 is down"
+      },
+      "fingerprint": "cisco-interface-1",
+      "labels": {
+        "alertname": "Cisco Interface Down",
+        "hostname": "SW-CORE-01",
+        "instance": "10.0.0.11",
+        "interface": "Ethernet1/1",
+        "job": "snmp",
+        "severity": "critical",
+        "vendor": "cisco"
+      },
+      "startsAt": "2026-07-15T08:00:00+00:00",
+      "status": "firing"
+    }
+  ],
+  "status": "firing"
+}

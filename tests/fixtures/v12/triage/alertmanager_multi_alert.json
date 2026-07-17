@@ -1,0 +1,37 @@
+{
+  "alerts": [
+    {
+      "annotations": {
+        "description": "CPU usage high",
+        "summary": "CPU high"
+      },
+      "fingerprint": "multi-cpu",
+      "labels": {
+        "alertname": "Cisco CPU usage high",
+        "hostname": "SW-MULTI-01",
+        "instance": "10.0.0.19",
+        "severity": "warning",
+        "vendor": "cisco"
+      },
+      "startsAt": "2026-07-15T08:09:00+00:00",
+      "status": "firing"
+    },
+    {
+      "annotations": {
+        "description": "Memory usage high",
+        "summary": "Memory high"
+      },
+      "fingerprint": "multi-memory",
+      "labels": {
+        "alertname": "Cisco Memory usage high",
+        "hostname": "SW-MULTI-01",
+        "instance": "10.0.0.19",
+        "severity": "warning",
+        "vendor": "cisco"
+      },
+      "startsAt": "2026-07-15T08:10:00+00:00",
+      "status": "firing"
+    }
+  ],
+  "status": "firing"
+}

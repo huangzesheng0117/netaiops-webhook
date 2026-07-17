@@ -1,0 +1,23 @@
+{
+  "alerts": [
+    {
+      "annotations": {
+        "description": "Cisco interface Ethernet1/3 status restored",
+        "summary": "Interface Ethernet1/3 recovered"
+      },
+      "endsAt": "2026-07-15T08:05:00+00:00",
+      "fingerprint": "resolved-interface-1",
+      "labels": {
+        "alertname": "Cisco Interface Down",
+        "hostname": "SW-CORE-02",
+        "instance": "10.0.0.18",
+        "interface": "Ethernet1/3",
+        "severity": "critical",
+        "vendor": "cisco"
+      },
+      "startsAt": "2026-07-15T08:00:00+00:00",
+      "status": "resolved"
+    }
+  ],
+  "status": "resolved"
+}
