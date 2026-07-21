@@ -1,0 +1,60 @@
+{
+  "case_id": "cisco_interface_status",
+  "unified_event": {
+    "schema_version": "v12.1",
+    "request_id": "plan-interface-status",
+    "event_id": "evt-interface-status",
+    "source": "alertmanager",
+    "alert_status": "firing",
+    "alert_name": "接口状态异常",
+    "occurred_at": "2026-07-17T08:00:00+00:00",
+    "received_at": "2026-07-17T08:00:05+00:00",
+    "ends_at": null,
+    "device": {
+      "name": "CISCO-DEVICE-01",
+      "ip": "10.0.0.1",
+      "vendor": "cisco",
+      "platform": null,
+      "site": "SH8"
+    },
+    "alert_object": {
+      "kind": "interface",
+      "name": "Ethernet1/1",
+      "identifier": "Ethernet1/1",
+      "attributes": {
+        "family_confidence": "high",
+        "match_source": "fixture",
+        "match_reason": "fixture",
+        "auto_execute_allowed": true,
+        "target_scope": {
+          "device_ip": "10.0.0.1",
+          "hostname": "CISCO-DEVICE-01",
+          "interface": "Ethernet1/1",
+          "peer_ip": "",
+          "pool_member": ""
+        },
+        "aggregation_performed": false
+      }
+    },
+    "labels": {
+      "severity": "critical"
+    },
+    "annotations": {
+      "summary": "接口状态异常",
+      "description": "接口状态异常"
+    },
+    "family": "interface_status_or_flap",
+    "event_key": "event:alertmanager:interface_status_or_flap:evt-interface-status",
+    "correlation_hints": [
+      "family:interface_status_or_flap",
+      "device_ip:10.0.0.1"
+    ],
+    "raw_payload_ref": null
+  },
+  "expect": {
+    "family": "interface_status_or_flap",
+    "must_require": [
+      "device"
+    ]
+  }
+}

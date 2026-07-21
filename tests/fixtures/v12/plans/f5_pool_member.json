@@ -1,0 +1,60 @@
+{
+  "case_id": "f5_pool_member",
+  "unified_event": {
+    "schema_version": "v12.1",
+    "request_id": "plan-f5",
+    "event_id": "evt-f5",
+    "source": "alertmanager",
+    "alert_status": "firing",
+    "alert_name": "F5 Pool Member Down",
+    "occurred_at": "2026-07-17T08:00:00+00:00",
+    "received_at": "2026-07-17T08:00:05+00:00",
+    "ends_at": null,
+    "device": {
+      "name": "F5-DEVICE-01",
+      "ip": "10.0.0.1",
+      "vendor": "f5",
+      "platform": null,
+      "site": "SH8"
+    },
+    "alert_object": {
+      "kind": "pool_member",
+      "name": "10.1.1.10:443",
+      "identifier": "10.1.1.10:443",
+      "attributes": {
+        "family_confidence": "high",
+        "match_source": "fixture",
+        "match_reason": "fixture",
+        "auto_execute_allowed": true,
+        "target_scope": {
+          "device_ip": "10.0.0.1",
+          "hostname": "F5-DEVICE-01",
+          "interface": "",
+          "peer_ip": "",
+          "pool_member": "10.1.1.10:443"
+        },
+        "aggregation_performed": false
+      }
+    },
+    "labels": {
+      "severity": "critical"
+    },
+    "annotations": {
+      "summary": "F5 Pool Member Down",
+      "description": "F5 Pool Member Down"
+    },
+    "family": "f5_pool_member_down",
+    "event_key": "event:alertmanager:f5_pool_member_down:evt-f5",
+    "correlation_hints": [
+      "family:f5_pool_member_down",
+      "device_ip:10.0.0.1"
+    ],
+    "raw_payload_ref": null
+  },
+  "expect": {
+    "family": "f5_pool_member_down",
+    "must_require": [
+      "device"
+    ]
+  }
+}

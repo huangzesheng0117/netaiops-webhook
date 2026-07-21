@@ -1,0 +1,61 @@
+{
+  "case_id": "dci_traffic_drop",
+  "unified_event": {
+    "schema_version": "v12.1",
+    "request_id": "plan-dci-drop",
+    "event_id": "evt-dci-drop",
+    "source": "alertmanager",
+    "alert_status": "firing",
+    "alert_name": "DCI线路流量突降",
+    "occurred_at": "2026-07-17T08:00:00+00:00",
+    "received_at": "2026-07-17T08:00:05+00:00",
+    "ends_at": null,
+    "device": {
+      "name": "CISCO-DEVICE-01",
+      "ip": "10.0.0.1",
+      "vendor": "cisco",
+      "platform": null,
+      "site": "SH8"
+    },
+    "alert_object": {
+      "kind": "interface",
+      "name": "Ethernet1/49",
+      "identifier": "Ethernet1/49",
+      "attributes": {
+        "family_confidence": "high",
+        "match_source": "fixture",
+        "match_reason": "fixture",
+        "auto_execute_allowed": true,
+        "target_scope": {
+          "device_ip": "10.0.0.1",
+          "hostname": "CISCO-DEVICE-01",
+          "interface": "Ethernet1/49",
+          "peer_ip": "",
+          "pool_member": ""
+        },
+        "aggregation_performed": false
+      }
+    },
+    "labels": {
+      "severity": "critical"
+    },
+    "annotations": {
+      "summary": "DCI线路流量突降",
+      "description": "DCI专线出向流量突降"
+    },
+    "family": "interface_traffic_anomaly",
+    "event_key": "event:alertmanager:interface_traffic_anomaly:evt-dci-drop",
+    "correlation_hints": [
+      "family:interface_traffic_anomaly",
+      "device_ip:10.0.0.1"
+    ],
+    "raw_payload_ref": null
+  },
+  "expect": {
+    "family": "interface_traffic_anomaly",
+    "must_require": [
+      "metrics",
+      "device"
+    ]
+  }
+}

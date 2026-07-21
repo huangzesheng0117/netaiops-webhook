@@ -1,0 +1,60 @@
+{
+  "case_id": "cisco_bgp_neighbor",
+  "unified_event": {
+    "schema_version": "v12.1",
+    "request_id": "plan-bgp",
+    "event_id": "evt-bgp",
+    "source": "alertmanager",
+    "alert_status": "firing",
+    "alert_name": "BGP邻居Down",
+    "occurred_at": "2026-07-17T08:00:00+00:00",
+    "received_at": "2026-07-17T08:00:05+00:00",
+    "ends_at": null,
+    "device": {
+      "name": "CISCO-DEVICE-01",
+      "ip": "10.0.0.1",
+      "vendor": "cisco",
+      "platform": null,
+      "site": "SH8"
+    },
+    "alert_object": {
+      "kind": "neighbor",
+      "name": "10.10.10.2",
+      "identifier": "10.10.10.2",
+      "attributes": {
+        "family_confidence": "high",
+        "match_source": "fixture",
+        "match_reason": "fixture",
+        "auto_execute_allowed": true,
+        "target_scope": {
+          "device_ip": "10.0.0.1",
+          "hostname": "CISCO-DEVICE-01",
+          "interface": "",
+          "peer_ip": "10.10.10.2",
+          "pool_member": ""
+        },
+        "aggregation_performed": false
+      }
+    },
+    "labels": {
+      "severity": "critical"
+    },
+    "annotations": {
+      "summary": "BGP邻居Down",
+      "description": "BGP邻居Down"
+    },
+    "family": "bgp_neighbor_down",
+    "event_key": "event:alertmanager:bgp_neighbor_down:evt-bgp",
+    "correlation_hints": [
+      "family:bgp_neighbor_down",
+      "device_ip:10.0.0.1"
+    ],
+    "raw_payload_ref": null
+  },
+  "expect": {
+    "family": "bgp_neighbor_down",
+    "must_require": [
+      "device"
+    ]
+  }
+}

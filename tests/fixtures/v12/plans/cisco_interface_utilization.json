@@ -1,0 +1,62 @@
+{
+  "case_id": "cisco_interface_utilization",
+  "unified_event": {
+    "schema_version": "v12.1",
+    "request_id": "plan-interface-utilization",
+    "event_id": "evt-interface-utilization",
+    "source": "alertmanager",
+    "alert_status": "firing",
+    "alert_name": "WG88互联网线路_电信_100M_利用率-出向",
+    "occurred_at": "2026-07-17T08:00:00+00:00",
+    "received_at": "2026-07-17T08:00:05+00:00",
+    "ends_at": null,
+    "device": {
+      "name": "CISCO-DEVICE-01",
+      "ip": "10.0.0.1",
+      "vendor": "cisco",
+      "platform": null,
+      "site": "SH8"
+    },
+    "alert_object": {
+      "kind": "interface",
+      "name": "Te1/0/1|Te2/0/1",
+      "identifier": "Te1/0/1|Te2/0/1",
+      "attributes": {
+        "family_confidence": "high",
+        "match_source": "fixture",
+        "match_reason": "fixture",
+        "auto_execute_allowed": true,
+        "target_scope": {
+          "device_ip": "10.0.0.1",
+          "hostname": "CISCO-DEVICE-01",
+          "interface": "Te1/0/1|Te2/0/1",
+          "peer_ip": "",
+          "pool_member": ""
+        },
+        "aggregation_performed": false
+      }
+    },
+    "labels": {
+      "severity": "warning",
+      "ifName": "Te1/0/1|Te2/0/1"
+    },
+    "annotations": {
+      "summary": "接口链路利用率高",
+      "description": "ifHCOutOctets irate 1m 利用率高 出向"
+    },
+    "family": "interface_or_link_utilization_high",
+    "event_key": "event:alertmanager:interface_or_link_utilization_high:evt-interface-utilization",
+    "correlation_hints": [
+      "family:interface_or_link_utilization_high",
+      "device_ip:10.0.0.1"
+    ],
+    "raw_payload_ref": null
+  },
+  "expect": {
+    "family": "interface_or_link_utilization_high",
+    "must_require": [
+      "metrics",
+      "device"
+    ]
+  }
+}

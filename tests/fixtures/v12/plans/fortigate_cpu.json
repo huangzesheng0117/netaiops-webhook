@@ -1,0 +1,60 @@
+{
+  "case_id": "fortigate_cpu",
+  "unified_event": {
+    "schema_version": "v12.1",
+    "request_id": "plan-fortigate",
+    "event_id": "evt-fortigate",
+    "source": "alertmanager",
+    "alert_status": "firing",
+    "alert_name": "FortiGate CPU高",
+    "occurred_at": "2026-07-17T08:00:00+00:00",
+    "received_at": "2026-07-17T08:00:05+00:00",
+    "ends_at": null,
+    "device": {
+      "name": "FORTIGATE-DEVICE-01",
+      "ip": "10.0.0.1",
+      "vendor": "fortigate",
+      "platform": null,
+      "site": "SH8"
+    },
+    "alert_object": {
+      "kind": "device",
+      "name": "FORTIGATE-01",
+      "identifier": "FORTIGATE-01",
+      "attributes": {
+        "family_confidence": "high",
+        "match_source": "fixture",
+        "match_reason": "fixture",
+        "auto_execute_allowed": true,
+        "target_scope": {
+          "device_ip": "10.0.0.1",
+          "hostname": "FORTIGATE-DEVICE-01",
+          "interface": "",
+          "peer_ip": "",
+          "pool_member": ""
+        },
+        "aggregation_performed": false
+      }
+    },
+    "labels": {
+      "severity": "critical"
+    },
+    "annotations": {
+      "summary": "FortiGate CPU高",
+      "description": "FortiGate CPU高"
+    },
+    "family": "device_cpu_high",
+    "event_key": "event:alertmanager:device_cpu_high:evt-fortigate",
+    "correlation_hints": [
+      "family:device_cpu_high",
+      "device_ip:10.0.0.1"
+    ],
+    "raw_payload_ref": null
+  },
+  "expect": {
+    "family": "device_cpu_high",
+    "must_require": [
+      "device"
+    ]
+  }
+}

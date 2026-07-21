@@ -1,0 +1,58 @@
+{
+  "case_id": "generic_no_assets",
+  "unified_event": {
+    "schema_version": "v12.1",
+    "request_id": "plan-generic",
+    "event_id": "evt-generic",
+    "source": "alertmanager",
+    "alert_status": "firing",
+    "alert_name": "未知网络告警",
+    "occurred_at": "2026-07-17T08:00:00+00:00",
+    "received_at": "2026-07-17T08:00:05+00:00",
+    "ends_at": null,
+    "device": {
+      "name": "CISCO-DEVICE-01",
+      "ip": "10.0.0.1",
+      "vendor": "cisco",
+      "platform": null,
+      "site": "SH8"
+    },
+    "alert_object": {
+      "kind": "generic",
+      "name": "unknown",
+      "identifier": "unknown",
+      "attributes": {
+        "family_confidence": "high",
+        "match_source": "fixture",
+        "match_reason": "fixture",
+        "auto_execute_allowed": true,
+        "target_scope": {
+          "device_ip": "10.0.0.1",
+          "hostname": "CISCO-DEVICE-01",
+          "interface": "",
+          "peer_ip": "",
+          "pool_member": ""
+        },
+        "aggregation_performed": false
+      }
+    },
+    "labels": {
+      "severity": "critical"
+    },
+    "annotations": {
+      "summary": "未知网络告警",
+      "description": "未知网络告警"
+    },
+    "family": "generic_network_readonly",
+    "event_key": "event:alertmanager:generic_network_readonly:evt-generic",
+    "correlation_hints": [
+      "family:generic_network_readonly",
+      "device_ip:10.0.0.1"
+    ],
+    "raw_payload_ref": null
+  },
+  "expect": {
+    "family": "generic_network_readonly",
+    "must_require": []
+  }
+}
