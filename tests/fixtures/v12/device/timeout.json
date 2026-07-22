@@ -1,0 +1,19 @@
+{
+  "command_results": [
+    {
+      "capability": "show_interface_detail",
+      "command": "show interface",
+      "dispatch_status": "failed",
+      "error": "wrapper timeout: timed out after 30 seconds",
+      "order": 1,
+      "output": ""
+    }
+  ],
+  "completed_at": "2026-07-22T01:00:32+00:00",
+  "request_id": "req-batch-g-001",
+  "runner_mode": "mcp",
+  "target_scope": {
+    "device_ip": "10.0.0.1",
+    "vendor": "cisco"
+  }
+}

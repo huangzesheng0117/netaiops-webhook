@@ -1,0 +1,28 @@
+{
+  "command_results": [
+    {
+      "capability": "show_clock",
+      "command": "show clock",
+      "dispatch_status": "completed",
+      "error": "",
+      "order": 1,
+      "output": "01:00:00 UTC"
+    },
+    {
+      "capability": "show_interface_detail",
+      "command": "show bad",
+      "dispatch_status": "failed",
+      "error": "",
+      "order": 2,
+      "output": "% Invalid input detected at '^' marker."
+    }
+  ],
+  "completed_at": "2026-07-22T01:00:02+00:00",
+  "request_id": "req-batch-g-001",
+  "runner_mode": "mcp",
+  "target_scope": {
+    "device_ip": "10.0.0.1",
+    "hostname": "SW01",
+    "vendor": "cisco"
+  }
+}

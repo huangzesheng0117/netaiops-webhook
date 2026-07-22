@@ -1,0 +1,9 @@
+{
+  "command_results": [],
+  "completed_at": "2026-07-22T01:00:02+00:00",
+  "request_id": "req-other-999",
+  "runner_mode": "mcp",
+  "target_scope": {
+    "device_ip": "10.0.0.1"
+  }
+}

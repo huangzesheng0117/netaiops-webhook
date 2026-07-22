@@ -1,0 +1,43 @@
+{
+  "command_results": [
+    {
+      "capability": "show_interface_detail",
+      "command": "show interface Ethernet1/1",
+      "dispatch_status": "completed",
+      "error": "",
+      "finished_at": "2026-07-22T01:00:01+00:00",
+      "judge_profile": "network_cli_generic",
+      "order": 1,
+      "output": "Ethernet1/1 is up\n5 minute input rate 1000 bits/sec",
+      "parsed_facts": {
+        "input_bps": 1000,
+        "oper_status": "up"
+      },
+      "parser_status": "success",
+      "started_at": "2026-07-22T01:00:00+00:00"
+    },
+    {
+      "capability": "show_interface_error_counters",
+      "command": "show interface counters errors",
+      "dispatch_status": "completed",
+      "error": "",
+      "judge_profile": "network_cli_generic",
+      "order": 2,
+      "output": "Eth1/1 0 0 0 0",
+      "parsed_facts": {
+        "input_errors": 0,
+        "output_errors": 0
+      },
+      "parser_status": "success"
+    }
+  ],
+  "completed_at": "2026-07-22T01:00:02+00:00",
+  "request_id": "req-batch-g-001",
+  "runner_mode": "mcp",
+  "target_scope": {
+    "device_ip": "10.0.0.1",
+    "hostname": "SW01",
+    "interface": "Ethernet1/1",
+    "vendor": "cisco"
+  }
+}
