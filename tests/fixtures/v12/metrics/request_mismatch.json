@@ -1,0 +1,66 @@
+{
+  "ok": true,
+  "request_id": "req-other-999",
+  "status": "success",
+  "created_at": "2026-07-17T00:16:00+00:00",
+  "profile": "interface_traffic",
+  "query_names": [
+    "in_bps"
+  ],
+  "target_context": {
+    "hostname": "SH8-TEST-SW01",
+    "device_ip": "10.0.0.1",
+    "if_name": "Ethernet1/1"
+  },
+  "evidences": [
+    {
+      "ok": true,
+      "status": "success",
+      "query_name": "in_bps",
+      "unit": "bps",
+      "direction": "in",
+      "target": {
+        "hostname": "SH8-TEST-SW01",
+        "device_ip": "10.0.0.1",
+        "if_name": "Ethernet1/1"
+      },
+      "query_window": {
+        "lookback_minutes": 15,
+        "compare_offset_minutes": 5,
+        "step": "60s",
+        "start_iso_utc": "2026-07-17T00:00:00+00:00",
+        "end_iso_utc": "2026-07-17T00:15:00+00:00"
+      },
+      "selected_query": "rate(ifHCInOctets{ip=\"10.0.0.1\"}[1m])*8",
+      "analysis": {
+        "ok": true,
+        "series_count": 1,
+        "analyses": [
+          {
+            "metric": {
+              "ip": "10.0.0.1",
+              "ifName": "Ethernet1/1"
+            },
+            "current": 1200000.0,
+            "offset": 900000.0,
+            "delta": 300000.0,
+            "change_ratio": 0.333333,
+            "window_max": 1300000.0,
+            "window_min": 800000.0,
+            "window_avg": 1050000.0,
+            "trend_verdict": "increase",
+            "sample_count": 16
+          }
+        ]
+      },
+      "attempts": [
+        {
+          "promql": "rate(ifHCInOctets{ip=\"10.0.0.1\"}[1m])*8",
+          "bridge_ok": true,
+          "analysis_ok": true,
+          "series_count": 1
+        }
+      ]
+    }
+  ]
+}

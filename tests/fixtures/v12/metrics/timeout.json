@@ -1,0 +1,20 @@
+{
+  "ok": false,
+  "request_id": "req-metrics-001",
+  "status": "no_successful_evidence",
+  "created_at": "2026-07-17T00:16:00+00:00",
+  "profile": "interface_traffic",
+  "evidences": [
+    {
+      "ok": false,
+      "status": "sidecar_overall_timeout",
+      "query_name": "in_bps",
+      "error": "sidecar overall timeout reached: 30s",
+      "query_window": {
+        "lookback_minutes": 15,
+        "step": "60s"
+      },
+      "attempts": []
+    }
+  ]
+}

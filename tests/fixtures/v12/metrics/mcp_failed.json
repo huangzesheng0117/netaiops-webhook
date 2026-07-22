@@ -1,0 +1,31 @@
+{
+  "ok": false,
+  "request_id": "req-metrics-001",
+  "status": "no_successful_evidence",
+  "created_at": "2026-07-17T00:16:00+00:00",
+  "profile": "interface_traffic",
+  "evidences": [
+    {
+      "ok": false,
+      "status": "no_data_or_query_failed",
+      "query_name": "in_bps",
+      "query_window": {
+        "lookback_minutes": 15,
+        "step": "60s"
+      },
+      "analysis": {
+        "ok": false,
+        "series_count": 0,
+        "analyses": []
+      },
+      "attempts": [
+        {
+          "bridge_ok": false,
+          "analysis_ok": false,
+          "bridge_error": "ConnectionError: unavailable",
+          "mcp_error": "MCP request failed"
+        }
+      ]
+    }
+  ]
+}

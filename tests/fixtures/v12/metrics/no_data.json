@@ -1,0 +1,46 @@
+{
+  "ok": false,
+  "request_id": "req-metrics-001",
+  "status": "no_successful_evidence",
+  "created_at": "2026-07-17T00:16:00+00:00",
+  "profile": "interface_traffic",
+  "query_names": [
+    "out_bps"
+  ],
+  "target_context": {
+    "device_ip": "10.0.0.1",
+    "if_name": "Ethernet1/1"
+  },
+  "evidences": [
+    {
+      "ok": false,
+      "status": "no_data_or_query_failed",
+      "query_name": "out_bps",
+      "unit": "bps",
+      "direction": "out",
+      "target": {
+        "device_ip": "10.0.0.1",
+        "if_name": "Ethernet1/1"
+      },
+      "query_window": {
+        "lookback_minutes": 15,
+        "compare_offset_minutes": 5,
+        "step": "1m"
+      },
+      "analysis": {
+        "ok": false,
+        "series_count": 0,
+        "analyses": []
+      },
+      "attempts": [
+        {
+          "bridge_ok": true,
+          "analysis_ok": false,
+          "series_count": 0,
+          "bridge_error": null,
+          "mcp_error": null
+        }
+      ]
+    }
+  ]
+}
