@@ -1,0 +1,15 @@
+{
+  "expected_confidence_cap": 1.0,
+  "expected_rca_allowed": true,
+  "expected_status": "ready",
+  "required": [
+    "metrics",
+    "device"
+  ],
+  "statuses": {
+    "device": "success",
+    "knowledge": "success",
+    "logs": "success",
+    "metrics": "success"
+  }
+}

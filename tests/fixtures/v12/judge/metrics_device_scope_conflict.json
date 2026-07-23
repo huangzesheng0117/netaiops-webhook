@@ -1,0 +1,28 @@
+{
+  "expected_confidence_cap": 0.0,
+  "expected_conflicts": 1,
+  "expected_missing_optional": [
+    "logs",
+    "knowledge"
+  ],
+  "expected_rca_allowed": false,
+  "expected_status": "blocked",
+  "required": [
+    "metrics",
+    "device"
+  ],
+  "scopes": {
+    "device": {
+      "device_ip": "10.0.0.2"
+    },
+    "metrics": {
+      "device_ip": "10.0.0.1"
+    }
+  },
+  "statuses": {
+    "device": "success",
+    "knowledge": "not_available",
+    "logs": "not_available",
+    "metrics": "success"
+  }
+}

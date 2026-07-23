@@ -1,0 +1,25 @@
+{
+  "collected_offset_minutes": {
+    "metrics": -120
+  },
+  "expected_confidence_cap": 0.0,
+  "expected_missing_optional": [
+    "logs",
+    "knowledge"
+  ],
+  "expected_missing_required": [
+    "metrics"
+  ],
+  "expected_rca_allowed": false,
+  "expected_status": "insufficient",
+  "required": [
+    "metrics",
+    "device"
+  ],
+  "statuses": {
+    "device": "success",
+    "knowledge": "not_available",
+    "logs": "not_available",
+    "metrics": "success"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "expected_confidence_cap": 0.0,
+  "expected_missing_optional": [
+    "logs",
+    "knowledge"
+  ],
+  "expected_missing_required": [
+    "metrics",
+    "device"
+  ],
+  "expected_rca_allowed": false,
+  "expected_status": "insufficient",
+  "required": [
+    "metrics",
+    "device"
+  ],
+  "statuses": {
+    "device": "not_available",
+    "knowledge": "not_available",
+    "logs": "not_available",
+    "metrics": "not_available"
+  }
+}
