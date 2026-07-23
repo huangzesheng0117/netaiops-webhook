@@ -1,0 +1,31 @@
+{
+  "candidates": [
+    {
+      "confidence": 0.8,
+      "contradicting_evidence_refs": [],
+      "missing_evidence": [
+        "logs",
+        "knowledge"
+      ],
+      "scope": {
+        "device_ip": "10.0.0.1",
+        "interface": "Ethernet1/1"
+      },
+      "statement": "The interface is likely down because both metrics and device state indicate loss of connectivity.",
+      "supporting_evidence_refs": [
+        "evidence://req-batch-k-001/metrics/metrics-k-1",
+        "evidence://req-batch-k-001/device/device-k-1"
+      ],
+      "uncertainties": [
+        "The initiating physical event is not directly observed."
+      ]
+    }
+  ],
+  "missing_evidence": [
+    "logs",
+    "knowledge"
+  ],
+  "uncertainties": [
+    "Logs and local knowledge context are unavailable."
+  ]
+}

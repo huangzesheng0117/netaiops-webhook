@@ -1,0 +1,27 @@
+{
+  "candidates": [
+    {
+      "confidence": 0.95,
+      "contradicting_evidence_refs": [],
+      "missing_evidence": [
+        "logs",
+        "knowledge"
+      ],
+      "scope": {},
+      "statement": "The interface is down.",
+      "supporting_evidence_refs": [
+        "evidence://req-batch-k-001/device/device-k-1"
+      ],
+      "uncertainties": [
+        "Cause is not directly observed."
+      ]
+    }
+  ],
+  "missing_evidence": [
+    "logs",
+    "knowledge"
+  ],
+  "uncertainties": [
+    "Some evidence is unavailable."
+  ]
+}

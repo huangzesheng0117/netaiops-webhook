@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "confidence": 0.9,
+      "contradicting_evidence_refs": [],
+      "missing_evidence": [],
+      "scope": {
+        "device_ip": "10.0.0.1",
+        "interface": "Ethernet1/1"
+      },
+      "statement": "The interface outage is supported by matching metrics and device evidence.",
+      "supporting_evidence_refs": [
+        "evidence://req-batch-k-001/metrics/metrics-k-1",
+        "evidence://req-batch-k-001/device/device-k-1"
+      ],
+      "uncertainties": [
+        "The evidence supports correlation rather than proof of the initiating physical cause."
+      ]
+    }
+  ],
+  "missing_evidence": [],
+  "uncertainties": [
+    "Root cause remains an evidence-grounded hypothesis."
+  ]
+}
