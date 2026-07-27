@@ -1,0 +1,24 @@
+{
+  "compatibility_card": {
+    "title": "[network][告警] InterfaceDown",
+    "alert_status": "告警",
+    "device": "SW01 (10.0.0.1)",
+    "alert_object": "interface: Ethernet1/1",
+    "alert_content": "interface down",
+    "current_judgment": "当前证据仅支持保守判断；缺失项已在 Evidence Hub 标记。",
+    "recommendations": "1. 继续沿用现有生产处置流程。\n2. 在 Evidence Hub 查看完整证据与缺失项。\n3. 日志或知识上下文未启用，不得据此判断为正常。",
+    "evidence_summary": "指标：可用；设备：可用；日志：未启用/不可用；知识：未启用/不可用。",
+    "evidence_url": "/evidence-ui/req-batch-l-001"
+  },
+  "evidence_hub_summary": {
+    "request_id": "req-batch-l-001",
+    "alert_name": "InterfaceDown",
+    "alert_status": "告警",
+    "device": "SW01 (10.0.0.1)",
+    "alert_object": "interface: Ethernet1/1",
+    "current_judgment": "当前证据仅支持保守判断；缺失项已在 Evidence Hub 标记。",
+    "recommendations": "1. 继续沿用现有生产处置流程。\n2. 在 Evidence Hub 查看完整证据与缺失项。\n3. 日志或知识上下文未启用，不得据此判断为正常。",
+    "evidence_summary": "指标：可用；设备：可用；日志：未启用/不可用；知识：未启用/不可用。",
+    "details_url": "/evidence-ui/req-batch-l-001"
+  }
+}

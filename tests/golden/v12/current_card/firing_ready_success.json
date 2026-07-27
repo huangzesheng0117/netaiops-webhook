@@ -1,0 +1,24 @@
+{
+  "compatibility_card": {
+    "title": "[network][告警] InterfaceDown",
+    "alert_status": "告警",
+    "device": "SW01 (10.0.0.1)",
+    "alert_object": "interface: Ethernet1/1",
+    "alert_content": "interface down",
+    "current_judgment": "候选根因：The interface is likely down because metrics and device evidence agree.（置信度 80%）",
+    "recommendations": "1. 按现有生产流程核实候选原因，不自动执行任何操作。\n2. 在 Evidence Hub 查看完整证据与引用。",
+    "evidence_summary": "指标：可用；设备：可用；日志：可用；知识：可用。",
+    "evidence_url": "/evidence-ui/req-batch-l-001"
+  },
+  "evidence_hub_summary": {
+    "request_id": "req-batch-l-001",
+    "alert_name": "InterfaceDown",
+    "alert_status": "告警",
+    "device": "SW01 (10.0.0.1)",
+    "alert_object": "interface: Ethernet1/1",
+    "current_judgment": "候选根因：The interface is likely down because metrics and device evidence agree.（置信度 80%）",
+    "recommendations": "1. 按现有生产流程核实候选原因，不自动执行任何操作。\n2. 在 Evidence Hub 查看完整证据与引用。",
+    "evidence_summary": "指标：可用；设备：可用；日志：可用；知识：可用。",
+    "details_url": "/evidence-ui/req-batch-l-001"
+  }
+}
