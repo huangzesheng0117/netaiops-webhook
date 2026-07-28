@@ -40,6 +40,8 @@ from netaiops.dongdong_card_sender import send_universal_card
 from netaiops.governance.api import router as governance_router
 from netaiops.governance.ui import router as governance_ui_router
 from netaiops.ui_portal import router as ui_portal_router
+from netaiops.v12.api import router as agent_trace_api_router
+from netaiops.v12.ui import router as agent_trace_ui_router
 
 BASE_DIR = Path("/opt/netaiops-webhook")
 DATA_DIR = BASE_DIR / "data"
@@ -68,6 +70,8 @@ app = FastAPI(title="NetAIOps Webhook", version="3.0-a")
 app.include_router(governance_router)
 app.include_router(governance_ui_router)
 app.include_router(ui_portal_router)
+app.include_router(agent_trace_api_router)
+app.include_router(agent_trace_ui_router)
 
 
 def load_config() -> dict:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
-PORTAL_VERSION = "11.1-ui-navigation-v1"
+PORTAL_VERSION = "12.0-agent-trace-navigation-v1"
 
 _PORTAL_HTML = """<!doctype html>
 <html lang="zh-CN">
@@ -23,6 +23,7 @@ _PORTAL_HTML = """<!doctype html>
       --muted: #667085;
       --blue: #2563eb;
       --violet: #7c3aed;
+      --emerald: #047857;
     }
     * { box-sizing: border-box; }
     body {
@@ -80,6 +81,7 @@ _PORTAL_HTML = """<!doctype html>
     }
     .card.evidence:hover { border-color: var(--blue); }
     .card.governance:hover { border-color: var(--violet); }
+    .card.agent:hover { border-color: var(--emerald); }
     .tag {
       display: inline-block;
       margin-bottom: 36px;
@@ -95,6 +97,10 @@ _PORTAL_HTML = """<!doctype html>
     .governance .tag {
       color: #6d28d9;
       background: #ede9fe;
+    }
+    .agent .tag {
+      color: #047857;
+      background: #d1fae5;
     }
     h2 {
       margin: 0 0 10px;
@@ -112,6 +118,7 @@ _PORTAL_HTML = """<!doctype html>
     }
     .evidence .enter { color: var(--blue); }
     .governance .enter { color: var(--violet); }
+    .agent .enter { color: var(--emerald); }
     footer {
       margin-top: 20px;
       text-align: center;
@@ -138,6 +145,12 @@ _PORTAL_HTML = """<!doctype html>
         <h2>Governance</h2>
         <p>查看 Incident Memory、Learning Signals、Proposals、Replay 和 Audit。</p>
         <span class="enter">进入 Governance →</span>
+      </a>
+      <a class="card agent" href="/agent-ui">
+        <span class="tag">v12</span>
+        <h2>Agent Trace</h2>
+        <p>查看 Agent 执行顺序、Evidence 状态、Judge、RCA、引用和 fallback。</p>
+        <span class="enter">进入 Agent Trace →</span>
       </a>
     </section>
     <footer>只读导航 · 不触发 GLM、MCP、设备命令或通知</footer>
