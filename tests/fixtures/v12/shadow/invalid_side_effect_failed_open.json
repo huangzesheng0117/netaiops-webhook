@@ -1,0 +1,10 @@
+{
+  "error_code": "shadow_validation_or_store_failed",
+  "legacy_preserved": true,
+  "notification_count_delta": 0,
+  "production_card_replaced": false,
+  "reason": "legacy_result_preserved_after_shadow_failure",
+  "second_card_sent": false,
+  "shadow_notification_count": 0,
+  "status": "failed_open"
+}
