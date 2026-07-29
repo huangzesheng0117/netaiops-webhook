@@ -1,0 +1,103 @@
+{
+  "category": "interface_status",
+  "event": {
+    "alert_name": "InterfaceDown",
+    "alert_status": "firing",
+    "device_ip": "10.0.1.1",
+    "device_name": "REPLAY-SW-01",
+    "event_id": "event-o-01",
+    "labels": {
+      "severity": "warning"
+    },
+    "object_kind": "interface",
+    "object_name": "Ethernet1/1",
+    "platform": "offline-fixture",
+    "site": "REPLAY",
+    "summary": "Interface down confirmed by existing metrics and device evidence.",
+    "vendor": "cisco"
+  },
+  "evidence": {
+    "device": {
+      "facts": {
+        "line_protocol": "down",
+        "observed_state": "down"
+      },
+      "scope": {
+        "device_ip": "10.0.1.1",
+        "hostname": "REPLAY-SW-01",
+        "interface": "Ethernet1/1"
+      },
+      "status": "success",
+      "summary": "interface_status device summary"
+    },
+    "knowledge": {
+      "reason": "local_knowledge_base_not_built",
+      "status": "not_available"
+    },
+    "logs": {
+      "facts": {},
+      "reason": "logs_evidence_not_approved",
+      "scope": {
+        "device_ip": "10.0.1.1",
+        "hostname": "REPLAY-SW-01",
+        "interface": "Ethernet1/1"
+      },
+      "status": "not_available",
+      "summary": "logs placeholder"
+    },
+    "metrics": {
+      "facts": {
+        "observed_state": "down",
+        "up_value": 0
+      },
+      "scope": {
+        "device_ip": "10.0.1.1",
+        "hostname": "REPLAY-SW-01",
+        "interface": "Ethernet1/1"
+      },
+      "status": "success",
+      "summary": "interface_status metrics summary"
+    }
+  },
+  "expected": {
+    "judge_status": "partial",
+    "rca_status": "partial"
+  },
+  "legacy": {
+    "conclusion": "Interface down confirmed by existing metrics and device evidence.",
+    "match_token": "interface down"
+  },
+  "occurred_at": "2026-07-01T02:00:00+00:00",
+  "plan": {
+    "family": "interface_status_or_flap",
+    "required_sources": [
+      "metrics",
+      "device"
+    ],
+    "selected_playbook": "cisco_interface_status"
+  },
+  "rca": {
+    "confidence": 0.75,
+    "contradicting_sources": [],
+    "missing_evidence": [
+      "logs",
+      "knowledge"
+    ],
+    "scope": {
+      "category": "interface_status",
+      "family": "interface_status_or_flap"
+    },
+    "statement": "Interface down is supported by metrics and device evidence.",
+    "supporting_sources": [
+      "metrics",
+      "device"
+    ],
+    "uncertainties": [
+      "Logs and knowledge are unavailable in v12 replay."
+    ]
+  },
+  "request_id": "replay-o-01-interface-status",
+  "scenario_id": "interface-status",
+  "schema_version": "v12-historical-fixture-1",
+  "source_kind": "sanitized_historical_request_fixture"
+}

@@ -1,0 +1,103 @@
+{
+  "category": "dci",
+  "event": {
+    "alert_name": "DCILinkAnomaly",
+    "alert_status": "firing",
+    "device_ip": "10.0.5.1",
+    "device_name": "REPLAY-SW-05",
+    "event_id": "event-o-05",
+    "labels": {
+      "severity": "warning"
+    },
+    "object_kind": "interface",
+    "object_name": "port-channel10",
+    "platform": "offline-fixture",
+    "site": "REPLAY",
+    "summary": "DCI link degradation is present.",
+    "vendor": "cisco"
+  },
+  "evidence": {
+    "device": {
+      "facts": {
+        "bundle_members_total": 2,
+        "bundle_members_up": 1
+      },
+      "scope": {
+        "device_ip": "10.0.5.1",
+        "hostname": "REPLAY-SW-05",
+        "interface": "port-channel10"
+      },
+      "status": "success",
+      "summary": "dci device summary"
+    },
+    "knowledge": {
+      "reason": "local_knowledge_base_not_built",
+      "status": "not_available"
+    },
+    "logs": {
+      "facts": {},
+      "reason": "logs_evidence_not_approved",
+      "scope": {
+        "device_ip": "10.0.5.1",
+        "hostname": "REPLAY-SW-05",
+        "interface": "port-channel10"
+      },
+      "status": "not_available",
+      "summary": "logs placeholder"
+    },
+    "metrics": {
+      "facts": {
+        "latency_ms": 42,
+        "packet_loss_pct": 8.5
+      },
+      "scope": {
+        "device_ip": "10.0.5.1",
+        "hostname": "REPLAY-SW-05",
+        "interface": "port-channel10"
+      },
+      "status": "success",
+      "summary": "dci metrics summary"
+    }
+  },
+  "expected": {
+    "judge_status": "partial",
+    "rca_status": "partial"
+  },
+  "legacy": {
+    "conclusion": "DCI link degradation is present.",
+    "match_token": "dci link degradation"
+  },
+  "occurred_at": "2026-07-01T02:00:00+00:00",
+  "plan": {
+    "family": "dci_link",
+    "required_sources": [
+      "metrics",
+      "device"
+    ],
+    "selected_playbook": "cisco_dci_link"
+  },
+  "rca": {
+    "confidence": 0.75,
+    "contradicting_sources": [],
+    "missing_evidence": [
+      "logs",
+      "knowledge"
+    ],
+    "scope": {
+      "category": "dci",
+      "family": "dci_link"
+    },
+    "statement": "DCI link degradation is supported by metrics and device evidence.",
+    "supporting_sources": [
+      "metrics",
+      "device"
+    ],
+    "uncertainties": [
+      "Logs and knowledge are unavailable in v12 replay."
+    ]
+  },
+  "request_id": "replay-o-05-dci-link",
+  "scenario_id": "dci-link",
+  "schema_version": "v12-historical-fixture-1",
+  "source_kind": "sanitized_historical_request_fixture"
+}

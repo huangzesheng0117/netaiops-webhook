@@ -1,0 +1,103 @@
+{
+  "category": "interface_utilization",
+  "event": {
+    "alert_name": "InterfaceUtilizationHigh",
+    "alert_status": "firing",
+    "device_ip": "10.0.2.1",
+    "device_name": "REPLAY-SW-02",
+    "event_id": "event-o-02",
+    "labels": {
+      "severity": "warning"
+    },
+    "object_kind": "interface",
+    "object_name": "Ethernet1/2",
+    "platform": "offline-fixture",
+    "site": "REPLAY",
+    "summary": "High interface utilization is present.",
+    "vendor": "cisco"
+  },
+  "evidence": {
+    "device": {
+      "facts": {
+        "observed_state": "active",
+        "utilization_band": "high"
+      },
+      "scope": {
+        "device_ip": "10.0.2.1",
+        "hostname": "REPLAY-SW-02",
+        "interface": "Ethernet1/2"
+      },
+      "status": "success",
+      "summary": "interface_utilization device summary"
+    },
+    "knowledge": {
+      "reason": "local_knowledge_base_not_built",
+      "status": "not_available"
+    },
+    "logs": {
+      "facts": {},
+      "reason": "logs_evidence_not_approved",
+      "scope": {
+        "device_ip": "10.0.2.1",
+        "hostname": "REPLAY-SW-02",
+        "interface": "Ethernet1/2"
+      },
+      "status": "not_available",
+      "summary": "logs placeholder"
+    },
+    "metrics": {
+      "facts": {
+        "threshold_pct": 80,
+        "utilization_pct": 92.5
+      },
+      "scope": {
+        "device_ip": "10.0.2.1",
+        "hostname": "REPLAY-SW-02",
+        "interface": "Ethernet1/2"
+      },
+      "status": "success",
+      "summary": "interface_utilization metrics summary"
+    }
+  },
+  "expected": {
+    "judge_status": "partial",
+    "rca_status": "partial"
+  },
+  "legacy": {
+    "conclusion": "High interface utilization is present.",
+    "match_token": "high interface utilization"
+  },
+  "occurred_at": "2026-07-01T02:00:00+00:00",
+  "plan": {
+    "family": "interface_or_link_utilization_high",
+    "required_sources": [
+      "metrics",
+      "device"
+    ],
+    "selected_playbook": "cisco_interface_utilization"
+  },
+  "rca": {
+    "confidence": 0.75,
+    "contradicting_sources": [],
+    "missing_evidence": [
+      "logs",
+      "knowledge"
+    ],
+    "scope": {
+      "category": "interface_utilization",
+      "family": "interface_or_link_utilization_high"
+    },
+    "statement": "High interface utilization is supported by metrics and device evidence.",
+    "supporting_sources": [
+      "metrics",
+      "device"
+    ],
+    "uncertainties": [
+      "Logs and knowledge are unavailable in v12 replay."
+    ]
+  },
+  "request_id": "replay-o-02-interface-utilization",
+  "scenario_id": "interface-utilization",
+  "schema_version": "v12-historical-fixture-1",
+  "source_kind": "sanitized_historical_request_fixture"
+}

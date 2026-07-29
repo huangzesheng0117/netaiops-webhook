@@ -1,0 +1,82 @@
+{
+  "category": "evidence_conflict",
+  "event": {
+    "alert_name": "EvidenceConflict",
+    "alert_status": "firing",
+    "device_ip": "10.0.16.1",
+    "device_name": "REPLAY-SW-16",
+    "event_id": "event-o-16",
+    "labels": {
+      "severity": "warning"
+    },
+    "object_kind": "interface",
+    "object_name": "Ethernet1/16",
+    "platform": "offline-fixture",
+    "site": "REPLAY",
+    "summary": "Existing judgment is disputed by conflicting evidence.",
+    "vendor": "cisco"
+  },
+  "evidence": {
+    "device": {
+      "facts": {
+        "observed_state": "down"
+      },
+      "scope": {
+        "device_ip": "10.0.16.1",
+        "hostname": "REPLAY-SW-16",
+        "interface": "Ethernet1/16"
+      },
+      "status": "success",
+      "summary": "evidence_conflict device summary"
+    },
+    "knowledge": {
+      "reason": "local_knowledge_base_not_built",
+      "status": "not_available"
+    },
+    "logs": {
+      "facts": {},
+      "reason": "logs_evidence_not_approved",
+      "scope": {
+        "device_ip": "10.0.16.1",
+        "hostname": "REPLAY-SW-16",
+        "interface": "Ethernet1/16"
+      },
+      "status": "not_available",
+      "summary": "logs placeholder"
+    },
+    "metrics": {
+      "facts": {
+        "observed_state": "up"
+      },
+      "scope": {
+        "device_ip": "10.0.16.1",
+        "hostname": "REPLAY-SW-16",
+        "interface": "Ethernet1/16"
+      },
+      "status": "success",
+      "summary": "evidence_conflict metrics summary"
+    }
+  },
+  "expected": {
+    "judge_status": "blocked",
+    "rca_status": "skipped"
+  },
+  "legacy": {
+    "conclusion": "Existing judgment is disputed by conflicting evidence.",
+    "match_token": "conflicting evidence"
+  },
+  "occurred_at": "2026-07-01T02:00:00+00:00",
+  "plan": {
+    "family": "interface_status_or_flap",
+    "required_sources": [
+      "metrics",
+      "device"
+    ],
+    "selected_playbook": "cisco_interface_status"
+  },
+  "rca": null,
+  "request_id": "replay-o-16-evidence-conflict",
+  "scenario_id": "evidence-conflict",
+  "schema_version": "v12-historical-fixture-1",
+  "source_kind": "sanitized_historical_request_fixture"
+}
