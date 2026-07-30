@@ -42,6 +42,7 @@ from netaiops.governance.ui import router as governance_ui_router
 from netaiops.ui_portal import router as ui_portal_router
 from netaiops.v12.api import router as agent_trace_api_router
 from netaiops.v12.ui import router as agent_trace_ui_router
+from netaiops.v12.p1_shadow_canary import run_p1_after_legacy_safe
 
 BASE_DIR = Path("/opt/netaiops-webhook")
 DATA_DIR = BASE_DIR / "data"
@@ -1142,7 +1143,11 @@ def v4_pipeline_run(request_id: str):
 
 
 @app.post("/v4/execution/result/{request_id}")
-def v4_execution_result(request_id: str, payload: dict):
+def v4_execution_result(
+    request_id: str,
+    payload: dict,
+    background_tasks: BackgroundTasks,
+):
     from netaiops.execution_callback import handle_execution_result_callback
     from netaiops.review_builder import generate_review_for_request_id
     from netaiops.request_summary import get_request_summary
@@ -1174,6 +1179,16 @@ def v4_execution_result(request_id: str, payload: dict):
     summary = get_request_summary(request_id)
     notify_result = send_notification(request_id)
     governance_result = _v11_build_governance_artifacts_safe(request_id)
+
+    # v12 Batch P1: non-blocking artifact-reuse Shadow Canary.
+    # The legacy notification has already completed. P1 cannot send
+    # another notification and any P1 error is fail-open.
+    background_tasks.add_task(
+        run_p1_after_legacy_safe,
+        request_id=request_id,
+        notify_result=notify_result,
+        logger=logger,
+    )
 
     investigation_result = {
         "ok": False,

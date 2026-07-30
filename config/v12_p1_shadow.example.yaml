@@ -1,0 +1,21 @@
+schema_version: "v12-p1-shadow-canary-1"
+activation_id: "replace-at-activation"
+enabled: false
+mode: "shadow"
+fail_open_to_legacy: true
+reuse_existing_evidence: true
+notifications_use_v12: false
+rca_enabled: false
+logs_enabled: false
+knowledge_enabled: false
+activated_at: "2026-07-30T00:00:00+00:00"
+canary_window_minutes: 1440
+max_canary_requests: 20
+allowed_families:
+  - "interface_status_or_flap"
+  - "interface_or_link_utilization_high"
+  - "interface_traffic_anomaly"
+  - "interface_or_link_traffic_drop"
+total_timeout_seconds: 45
+agent_timeout_seconds: 15
+minimum_completed_for_gate: 3

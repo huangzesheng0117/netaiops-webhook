@@ -110,6 +110,23 @@ def _aware_datetime(
     return parsed, None
 
 
+def _is_open_ended_timestamp(value: Any) -> bool:
+    # Alertmanager uses year 0001 for an open firing-alert endsAt.
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = _text(value)
+        if not text:
+            return False
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            return False
+    return parsed.year <= 1
+
+
 def _lifecycle_status(value: Any) -> tuple[AlertLifecycleStatus, str | None]:
     status = _text(value).lower()
     if status in _RESOLVED_VALUES:
@@ -262,12 +279,19 @@ class TriageAgent:
         ends_at: datetime | None = None
         raw_ends_at = _pick(event, "_v12_ends_at", "ends_at", "endsAt")
         if raw_ends_at:
-            ends_at, ends_warning = _aware_datetime(
-                raw_ends_at,
-                fallback=received_at,
-            )
-            if ends_warning:
-                warnings.append(self._warning(f"ends_at_{ends_warning}"))
+            if _is_open_ended_timestamp(raw_ends_at):
+                warnings.append(
+                    self._warning("ends_at_open_sentinel_ignored")
+                )
+            else:
+                ends_at, ends_warning = _aware_datetime(
+                    raw_ends_at,
+                    fallback=received_at,
+                )
+                if ends_warning:
+                    warnings.append(
+                        self._warning(f"ends_at_{ends_warning}")
+                    )
 
         alert_name = _pick(event, "alarm_type", "event_type", "alertname")
         if not alert_name:
@@ -410,6 +434,9 @@ class TriageAgent:
             "timestamp_missing": "Alert timestamp was missing and received_at was used",
             "timestamp_timezone_assumed": (
                 "Alert timestamp had no timezone and UTC was assumed"
+            ),
+            "ends_at_open_sentinel_ignored": (
+                "Alertmanager open firing-alert endsAt sentinel was ignored"
             ),
         }
         return ContractNotice(

@@ -22,6 +22,7 @@ input/
 # Local configs and secrets
 config.yaml
 config.real-llm.yaml
+config/v12_p1_shadow.yaml
 .env
 .env.*
 *.secret
