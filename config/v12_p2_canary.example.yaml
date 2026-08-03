@@ -1,0 +1,40 @@
+schema_version: "v12-p2-controlled-canary-1"
+activation_id: "replace-at-activation"
+enabled: false
+mode: "shadow"
+fail_open_to_legacy: true
+notifications_use_v12: false
+logs_enabled: false
+knowledge_enabled: false
+
+metrics_real_calls_enabled: false
+device_real_calls_enabled: false
+rca_real_calls_enabled: false
+reuse_existing_evidence_before_real_call: true
+
+activated_at: "2026-07-30T00:00:00+00:00"
+canary_window_minutes: 60
+max_canary_requests: 3
+minimum_completed_for_gate: 3
+
+allowed_families:
+  - "interface_status_or_flap"
+  - "interface_or_link_utilization_high"
+  - "interface_traffic_anomaly"
+
+total_timeout_seconds: 60
+metrics_timeout_seconds: 15
+device_timeout_seconds: 20
+rca_timeout_seconds: 25
+
+max_metrics_calls_per_request: 0
+max_device_calls_per_request: 0
+max_rca_calls_per_request: 0
+max_total_external_calls_per_request: 3
+
+promql_generation_allowed: false
+command_generation_allowed: false
+dsl_generation_allowed: false
+write_commands_allowed: false
+arbitrary_tool_selection_allowed: false
+automatic_followup_queries_allowed: false

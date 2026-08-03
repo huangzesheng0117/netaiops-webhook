@@ -23,6 +23,7 @@ input/
 config.yaml
 config.real-llm.yaml
 config/v12_p1_shadow.yaml
+config/v12_p2_canary.yaml
 .env
 .env.*
 *.secret
