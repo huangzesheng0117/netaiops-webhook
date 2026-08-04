@@ -42,7 +42,7 @@ from netaiops.governance.ui import router as governance_ui_router
 from netaiops.ui_portal import router as ui_portal_router
 from netaiops.v12.api import router as agent_trace_api_router
 from netaiops.v12.ui import router as agent_trace_ui_router
-from netaiops.v12.p1_shadow_canary import run_p1_after_legacy_safe
+from netaiops.v12.primary_release import run_v12_primary_after_legacy_safe
 
 BASE_DIR = Path("/opt/netaiops-webhook")
 DATA_DIR = BASE_DIR / "data"
@@ -1180,11 +1180,11 @@ def v4_execution_result(
     notify_result = send_notification(request_id)
     governance_result = _v11_build_governance_artifacts_safe(request_id)
 
-    # v12 Batch P1: non-blocking artifact-reuse Shadow Canary.
-    # The legacy notification has already completed. P1 cannot send
-    # another notification and any P1 error is fail-open.
+    # v12 Batch Q: controlled primary RCA after legacy-compatible delivery.
+    # Approved families use v12 primary artifacts. The existing card is
+    # preserved, no second notification is sent, and errors fail open.
     background_tasks.add_task(
-        run_p1_after_legacy_safe,
+        run_v12_primary_after_legacy_safe,
         request_id=request_id,
         notify_result=notify_result,
         logger=logger,

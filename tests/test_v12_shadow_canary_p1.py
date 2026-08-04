@@ -402,7 +402,7 @@ class P1BoundaryTests(unittest.TestCase):
         self.assertNotIn("collect_log_evidence", text)
         self.assertNotIn("search_logs(", text)
 
-    def test_app_schedules_p1_after_legacy_notification(self):
+    def test_app_schedules_v12_primary_after_legacy_notification(self):
         text = (
             PROJECT_ROOT / "app.py"
         ).read_text(encoding="utf-8")
@@ -417,12 +417,13 @@ class P1BoundaryTests(unittest.TestCase):
         notify = text.find(
             "notify_result = send_notification(request_id)"
         )
-        p1 = text.find(
+        primary = text.find(
             "background_tasks.add_task(\n"
-            "        run_p1_after_legacy_safe,"
+            "        run_v12_primary_after_legacy_safe,"
         )
         self.assertGreater(notify, 0)
-        self.assertGreater(p1, notify)
+        self.assertGreater(primary, notify)
+        self.assertNotIn("run_p1_after_legacy_safe,", text)
 
     def test_app_does_not_replace_notify_result(self):
         text = (

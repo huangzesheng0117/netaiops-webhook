@@ -52,6 +52,58 @@ Optional verification:
 USAGE
 }
 
+
+# BEGIN BATCH Q RELEASE DISPATCH
+# Batch A remains frozen below. Batch Q is an additive release dispatch that
+# preserves all historical safety controls and uses old-Git-compatible commands.
+batch_q_dispatch() {
+  cd "$PROJECT_ROOT"
+  # shellcheck disable=SC1091
+  source venv/bin/activate
+
+  local q_runtime="${V12_PRIMARY_RUNTIME_CONFIG:-$PROJECT_ROOT/config/v12_primary.yaml}"
+  local q_output="${V12_Q_OUTPUT_DIR:-/tmp/netaiops_v12_master_runner_q_$(date '+%Y%m%d_%H%M%S')}"
+
+  case "$ACTION" in
+    status)
+      echo "branch=$(git rev-parse --abbrev-ref HEAD)"
+      echo "head=$(git rev-parse HEAD)"
+      echo "origin_main=$(git rev-parse origin/main)"
+      echo "origin_url=$(git config --get remote.origin.url)"
+      echo "version=$(tr -d '\r\n' < VERSION)"
+      python scripts/run_v12_primary_release.py \
+        status \
+        --runtime-config "$q_runtime"
+      ;;
+    repository-gate)
+      python tools/v12_release_acceptance.py \
+        --project-root "$PROJECT_ROOT" \
+        --runtime-config "$q_runtime" \
+        --output-dir "$q_output" \
+        --base-url "${BASE_URL:-http://127.0.0.1:18080}" \
+        --skip-health
+      ;;
+    post-commit)
+      python tools/v12_release_acceptance.py \
+        --project-root "$PROJECT_ROOT" \
+        --runtime-config "$q_runtime" \
+        --output-dir "$q_output" \
+        --base-url "${BASE_URL:-http://127.0.0.1:18080}" \
+        --post-commit
+      ;;
+    *)
+      echo "Batch Q usage: runner status|repository-gate|post-commit Q" >&2
+      return 2
+      ;;
+  esac
+}
+
+if [[ "$BATCH" == "Q" ]]; then
+  batch_q_dispatch
+  exit $?
+fi
+# END BATCH Q RELEASE DISPATCH
+
 fail() {
   echo "[FAIL] $*" >&2
   exit 1

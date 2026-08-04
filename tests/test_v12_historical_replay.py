@@ -547,10 +547,10 @@ class BatchOBoundaryTests(unittest.TestCase):
         )
         self.assertIn("tests/fixtures/v12/replay", text)
 
-    def test_version_is_not_modified(self) -> None:
+    def test_version_is_promoted_by_batch_q_release(self) -> None:
         self.assertEqual(
             (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip(),
-            "11.0.0-v11-learning-governance",
+            "12.0.0-v12-controlled-multi-agent",
         )
 
 

@@ -15,7 +15,7 @@ NetAIOps Webhook 是面向网络运维告警场景的 AI 分析与治理平台�
 | v11.1 Schema 兼容 commit | `9dfe1d76e7091912d1e21daca24a22122af7746b` |
 | v11.1 测试契约对齐 commit | `16924700d873c01136da9b6e37579f806d0bdd98` |
 | v11.1 流量 / DCI 修复 commit | `2aa7b77169c0150c2f32bd2652152cd3d756ede0` |
-| 服务版本 | `11.0.0-v11-learning-governance` |
+| 服务版本 | `12.0.0-v12-controlled-multi-agent` |
 | 生产 LLM | `glm-5.2` |
 | Netmiko MCP | 已接入，地址由生产配置管理 |
 | Prometheus MCP | 已接入，地址由生产配置管理 |
@@ -25,7 +25,7 @@ NetAIOps Webhook 是面向网络运维告警场景的 AI 分析与治理平台�
 | v11 专项测试 | `269 tests OK` |
 | 全仓库测试 | `549 tests OK` |
 | 历史遗留失败 | `0` |
-| 下一阶段 | `v12 Controlled Multi-Agent / RCA` |
+| 当前阶段 | `v12 Controlled Multi-Agent / RCA 已正式发布` |
 
 ## 当前两条链路
 
@@ -210,4 +210,40 @@ backup/
 venv/
 config.yaml
 config/*.env
+```
+
+## v12 Controlled Multi-Agent / RCA 正式发布
+
+v12 使用确定性 Orchestrator 和固定 Agent 顺序。正式发布仅允许以下 Family 进入 v12 primary：
+
+```text
+interface_status_or_flap
+interface_or_link_utilization_high
+interface_traffic_anomaly
+```
+
+其他 Family 固定 fallback legacy。初始 v12 发布继续保留：
+
+```text
+fail_open_to_legacy=true
+notifications_use_v12=false
+Logs Agent=not_available
+Knowledge Agent=not_available
+动态 Planner=disabled
+任意 PromQL/CLI/DSL=forbidden
+```
+
+v12 primary 在现有兼容卡片发送完成后运行，不发送第二张卡片。对批准 Family，每个 request 最多调用一次 Prometheus MCP、一次只读 Netmiko MCP 和一次 GLM RCA。RCA 只能读取结构化 Evidence Bundle 与 Judge 结果并引用 evidence_ref。
+
+Batch P2 验收提交：
+
+```text
+6a7c5779be83ac6e0276821eb1d7a70c78ded101
+v12: complete P2 real canary and production RCA
+```
+
+最终测试数量、UI/API Health 和 Release Audit 见：
+
+```text
+docs/V12_RELEASE_AUDIT_2026-08-04.md
 ```

@@ -1,0 +1,23 @@
+schema_version: "v12-primary-release-1"
+activation_id: "replace-at-activation"
+enabled: false
+mode: "primary"
+fail_open_to_legacy: true
+notifications_use_v12: false
+logs_enabled: false
+knowledge_enabled: false
+
+metrics_real_calls_enabled: true
+device_real_calls_enabled: true
+rca_real_calls_enabled: true
+reuse_existing_evidence_before_real_call: true
+
+allowed_families:
+  - "interface_status_or_flap"
+  - "interface_or_link_utilization_high"
+  - "interface_traffic_anomaly"
+
+max_metrics_calls_per_request: 1
+max_device_calls_per_request: 1
+max_rca_calls_per_request: 1
+max_total_external_calls_per_request: 3

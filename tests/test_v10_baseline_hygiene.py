@@ -7,7 +7,7 @@ import yaml
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "11.0.0-v11-learning-governance"
+EXPECTED_VERSION = "12.0.0-v12-controlled-multi-agent"
 EXPECTED_REQUIREMENTS = {
     "fastapi==0.135.1",
     "httpx==0.28.1",
@@ -58,7 +58,7 @@ class V10BaselineHygieneTests(unittest.TestCase):
         for text in (readme, status):
             self.assertIn(EXPECTED_VERSION, text)
             self.assertIn("glm-5.2", text)
-            self.assertIn("v11", text.lower())
+            self.assertIn("v12", text.lower())
 
         self.assertNotIn("当前主线已经演进到 V7", readme)
         self.assertNotIn("5.0.0-v5-batch1", status)

@@ -1,12 +1,12 @@
 # NetAIOps Webhook 当前状态
 
-> 更新时间：2026-07-13
-> 当前阶段：v11.1 Historical Regression Cleanup 已完成；v11 Final Release Audit 已升级为 PASS。
+> 更新时间：2026-08-04
+> 当前阶段：v12 Controlled Multi-Agent / RCA 正式发布与 Release Audit。
 
 ## 当前版本
 
 ```text
-11.0.0-v11-learning-governance
+12.0.0-v12-controlled-multi-agent
 ```
 
 ## 固定信息
@@ -248,3 +248,40 @@ status = not_available
 ## 历史失败说明
 
 已清理的 28 个失败是在 Batch 10 全量测试中发现、并在 Batch 10 修改前已经存在的历史遗留问题。不得表述为“Batch 9 导致的失败”。Batch 9 commit 只是最近对照基线。
+
+## v12 正式发布状态
+
+```text
+VERSION=12.0.0-v12-controlled-multi-agent
+mode=primary
+fail_open_to_legacy=true
+notifications_use_v12=false
+```
+
+批准进入 v12 primary 的 Family：
+
+```text
+interface_status_or_flap
+interface_or_link_utilization_high
+interface_traffic_anomaly
+```
+
+其他 Family 固定 fallback legacy。正式组件状态：
+
+```text
+Controlled Orchestrator=enabled
+Triage Agent=enabled
+Static Planner Agent=enabled
+Metrics Evidence Agent=enabled
+Device Evidence Agent=enabled
+Logs Evidence Agent=not_available
+Knowledge Context Agent=not_available
+Evidence Judge Agent=enabled
+RCA Agent=enabled
+Notification / Report Agent=legacy-compatible
+Dynamic Planner=disabled
+Multi-alert automatic aggregation=disabled
+New notification content=disabled
+```
+
+Release Audit 必须满足 problems=[]、warnings=[]、全仓库 return code=0、历史失败=0、新失败=0、所有 UI/API Health=200。最终结果见 `docs/V12_RELEASE_AUDIT_2026-08-04.md`。
