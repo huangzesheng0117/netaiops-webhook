@@ -110,6 +110,11 @@ def build_execution_record_from_callback(request_id: str, payload: Dict[str, Any
         "readonly_only": plan_data.get("readonly_only"),
         "policy_result": plan_data.get("policy_result", {}),
         "guard_result": plan_data.get("guard_result", {}),
+        "interface_target_guard": payload.get(
+            "interface_target_guard",
+            plan_data.get("interface_target_guard", {}),
+        ),
+        "blocked_safe": payload.get("blocked_safe", {}),
         "command_results": command_results,
         "stats": summary,
         "received_at": now_utc_str(),

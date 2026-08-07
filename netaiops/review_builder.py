@@ -156,6 +156,20 @@ def build_conclusion(execution_data: Dict[str, Any], stats: Dict[str, int], fami
     failed_count = stats.get("failed", 0)
     completed_count = stats.get("completed", 0)
     total = stats.get("total", 0)
+    blocked_safe = execution_data.get("blocked_safe", {}) or {}
+
+    if blocked_safe.get("active"):
+        reasons = blocked_safe.get("reason_codes", []) or []
+        reason_text = "、".join(str(item) for item in reasons) or "安全门禁"
+        return {
+            "review_status": "needs_attention",
+            "conclusion": (
+                "设备取证因安全门禁未执行（"
+                + reason_text
+                + "）。当前分析仅基于已有告警和指标证据，"
+                "结论需保留不确定性。"
+            ),
+        }
 
     if total == 0:
         return {
@@ -250,6 +264,15 @@ def extract_key_findings(command_results: List[Dict[str, Any]]) -> List[str]:
 
 def build_recommendations(execution_data: Dict[str, Any], stats: Dict[str, int], family: str) -> List[str]:
     recommendations: List[str] = []
+    blocked_safe = execution_data.get("blocked_safe", {}) or {}
+
+    if blocked_safe.get("active"):
+        recommendations.append(
+            "补齐或校正设备厂商、平台、管理地址和接口对象后，再执行设备只读取证。"
+        )
+        recommendations.append(
+            "在设备信息未通过安全校验前，不要手工放宽命令执行门禁。"
+        )
 
     if stats.get("hard_error", 0) > 0:
         recommendations.append("优先核对 capability 与平台命令映射是否正确，并确认当前设备平台类型识别是否准确。")
@@ -320,6 +343,10 @@ def build_review_from_execution_data(execution_data: Dict[str, Any]) -> Dict[str
         "review_status": conclusion_bundle["review_status"],
         "conclusion": evidence_summary.get("conclusion") or conclusion_bundle["conclusion"],
         "execution_status": execution_status,
+        "blocked_safe": execution_data.get("blocked_safe", {}),
+        "interface_target_guard": execution_data.get(
+            "interface_target_guard", {}
+        ),
         "family": family,
         "evidence_summary": evidence_summary,
         "target_scope": execution_data.get("target_scope", {}),

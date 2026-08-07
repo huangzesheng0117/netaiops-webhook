@@ -75,6 +75,70 @@ def maybe_run_v4_pipeline(request_id: str, config: dict | None = None) -> dict |
         }
 
 
+def extract_notify_result_from_pipeline_result(
+    pipeline_result: dict | None,
+) -> dict | None:
+    payload = pipeline_result if isinstance(pipeline_result, dict) else {}
+    result = payload.get("result")
+    result = result if isinstance(result, dict) else {}
+    for key in ("degraded_delivery_result", "local_execution_result"):
+        container = result.get(key)
+        container = container if isinstance(container, dict) else {}
+        callback_result = container.get("callback_result")
+        callback_result = callback_result if isinstance(callback_result, dict) else {}
+        response_text = callback_result.get("response_text")
+        if not response_text:
+            continue
+        try:
+            response = json.loads(str(response_text))
+        except Exception:
+            continue
+        notify_result = response.get("notify_result") if isinstance(response, dict) else None
+        if isinstance(notify_result, dict):
+            return notify_result
+    return None
+
+
+def maybe_run_v12_primary_independent(
+    request_id: str,
+    pipeline_result: dict | None,
+    *,
+    primary_runner=None,
+) -> dict:
+    try:
+        runner = primary_runner
+        if runner is None:
+            from netaiops.v12.primary_release import (
+                run_v12_primary_after_legacy_safe,
+            )
+            runner = run_v12_primary_after_legacy_safe
+        result = runner(
+            request_id=request_id,
+            notify_result=extract_notify_result_from_pipeline_result(
+                pipeline_result
+            ),
+            logger=logger,
+        )
+        logger.info(
+            "v12 independent primary entry completed request_id=%s status=%s reason=%s",
+            request_id,
+            result.get("status"),
+            result.get("reason"),
+        )
+        return result
+    except Exception as exc:
+        logger.exception(
+            "v12 independent primary entry failed request_id=%s",
+            request_id,
+        )
+        return {
+            "request_id": request_id,
+            "status": "failed_open",
+            "reason": "independent_primary_entry_exception",
+            "error": str(exc),
+        }
+
+
 def process_event_async(source: str, request_id: str, event: dict, config: dict | None = None) -> None:
     config = config or {}
     llm_cfg = config.get("llm", {}) or {}
@@ -150,3 +214,28 @@ def process_event_async(source: str, request_id: str, event: dict, config: dict 
             )
 
         logger.info("pipeline metadata saved path=%s", pipeline_meta_path)
+
+        v12_primary_result = maybe_run_v12_primary_independent(
+            request_id,
+            pipeline_result,
+        )
+        v12_entry_path = os.path.join(
+            analysis_dir,
+            f"{source}_{request_id}.v12_primary_entry.json",
+        )
+        with open(v12_entry_path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "request_id": request_id,
+                    "source": source,
+                    "v12_primary_entry_result": v12_primary_result,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                },
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
+        logger.info(
+            "v12 independent primary entry metadata saved path=%s",
+            v12_entry_path,
+        )

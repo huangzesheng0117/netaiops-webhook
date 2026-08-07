@@ -14,6 +14,10 @@ from netaiops.playbook_loader import (
     find_best_playbook,
 )
 from netaiops.policy_engine import evaluate_auto_confirm_policy
+from netaiops.interface_target_guard import (
+    apply_interface_guard_to_policy,
+    apply_interface_target_guard,
+)
 
 
 BASE_DIR = Path("/opt/netaiops-webhook")
@@ -338,8 +342,16 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
             "mode": "analysis_fallback",
         }
 
-    guard_result = build_guard_result(execution_candidates)
     target_scope = _build_target_scope(event_for_plan, family_result)
+    target_scope, execution_candidates, interface_target_guard = (
+        apply_interface_target_guard(
+            event=event_for_plan,
+            family_result=family_result,
+            target_scope=target_scope,
+            execution_candidates=execution_candidates,
+        )
+    )
+    guard_result = build_guard_result(execution_candidates)
 
     plan = {
         "request_id": request_id,
@@ -355,6 +367,7 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
         "target_scope": target_scope,
         "execution_candidates": execution_candidates,
         "guard_result": guard_result,
+        "interface_target_guard": interface_target_guard,
         "analysis_file": "",
         "generated_at": now_utc_str(),
         "confirmed_at": None,
@@ -376,7 +389,14 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
     if policy_playbook:
         policy_result = evaluate_auto_confirm_policy(plan, classification, policy_playbook)
         plan["policy_result"] = policy_result
-        plan["auto_confirm_recommended"] = policy_result.get("auto_confirm_allowed", False)
+
+    plan["policy_result"] = apply_interface_guard_to_policy(
+        plan.get("policy_result", {}),
+        interface_target_guard,
+    )
+    plan["auto_confirm_recommended"] = bool(
+        plan["policy_result"].get("auto_confirm_allowed", False)
+    )
 
     return plan
 

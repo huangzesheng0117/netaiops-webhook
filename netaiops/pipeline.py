@@ -8,6 +8,7 @@ from agent_runner.callback_client import post_execution_result
 from netaiops.dispatcher import dispatch_request_id
 from netaiops.plan_builder import confirm_plan_for_request_id, generate_plan_for_request_id
 from netaiops.request_summary import get_request_summary
+from netaiops.degraded_delivery import run_blocked_safe_delivery
 
 BASE_DIR = Path("/opt/netaiops-webhook")
 CALLBACK_DIR = BASE_DIR / "data" / "callback"
@@ -153,10 +154,16 @@ def run_pipeline_for_request_id(
     confirm_result = None
     dispatch_result = None
     local_execution_result = None
+    degraded_delivery_result = None
 
     if auto_confirm and auto_confirm_allowed:
         confirm_result = confirm_plan_for_request_id(request_id)
         plan_data = confirm_result["plan_data"]
+    elif auto_confirm and not auto_confirm_allowed:
+        degraded_delivery_result = run_blocked_safe_delivery(
+            request_id,
+            plan_data,
+        )
 
     if auto_dispatch and plan_data.get("plan_status") == "confirmed":
         dispatch_result = dispatch_request_id(request_id)
@@ -176,6 +183,7 @@ def run_pipeline_for_request_id(
         "confirm_result": confirm_result,
         "dispatch_result": dispatch_result,
         "local_execution_result": local_execution_result,
+        "degraded_delivery_result": degraded_delivery_result,
         "summary": summary,
     }
 
