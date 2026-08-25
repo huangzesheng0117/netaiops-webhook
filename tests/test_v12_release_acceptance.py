@@ -15,10 +15,15 @@ SPEC.loader.exec_module(acceptance)
 
 
 class V12ReleaseAcceptanceTests(unittest.TestCase):
-    def test_expected_version_is_frozen(self):
+    def test_initial_release_contract_is_preserved_and_current_version_is_dynamic(self):
         self.assertEqual(
-            acceptance.EXPECTED_SERVICE_VERSION,
+            acceptance.INITIAL_RELEASE_VERSION,
             "12.0.0-v12-controlled-multi-agent",
+        )
+        current = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(
+            acceptance.expected_service_version(PROJECT_ROOT),
+            current,
         )
 
     def test_unittest_output_parser_records_count_and_failures(self):
@@ -45,7 +50,7 @@ class V12ReleaseAcceptanceTests(unittest.TestCase):
                 "created_at": "2026-08-03T00:00:00+00:00",
                 "release_audit_status": "pass",
                 "runtime": {
-                    "version": acceptance.EXPECTED_SERVICE_VERSION,
+                    "version": acceptance.expected_service_version(PROJECT_ROOT),
                     "mode": "primary",
                     "fail_open_to_legacy": True,
                     "notifications_use_v12": False,
@@ -83,14 +88,34 @@ class V12ReleaseAcceptanceTests(unittest.TestCase):
                 "--output-dir",
                 "/tmp/v12-q-test",
                 "--skip-health",
+                "--expected-service-version",
+                acceptance.expected_service_version(PROJECT_ROOT),
+                "--expected-commit-subject",
+                "synthetic-subject",
+                "--markdown-path",
+                "/tmp/synthetic-audit.md",
             ]
         )
         self.assertTrue(args.skip_health)
+        self.assertEqual(
+            args.expected_service_version,
+            acceptance.expected_service_version(PROJECT_ROOT),
+        )
+        self.assertEqual(args.expected_commit_subject, "synthetic-subject")
+        self.assertEqual(args.markdown_path, "/tmp/synthetic-audit.md")
 
     def test_release_audit_filename_uses_actual_release_date(self):
-        text = MODULE_PATH.read_text(encoding="utf-8")
-        self.assertIn("V12_RELEASE_AUDIT_2026-08-04.md", text)
-        self.assertNotIn("V12_RELEASE_AUDIT_2026-08-03.md", text)
+        moment = acceptance.datetime(
+            2026,
+            8,
+            18,
+            tzinfo=acceptance.timezone.utc,
+        )
+        path = acceptance.release_audit_markdown_path(
+            Path("/tmp/synthetic-project"),
+            created_at=moment,
+        )
+        self.assertEqual(path.name, "V12_RELEASE_AUDIT_2026-08-18.md")
 
     def test_acceptance_source_has_no_real_external_clients(self):
         text = MODULE_PATH.read_text(encoding="utf-8").lower()

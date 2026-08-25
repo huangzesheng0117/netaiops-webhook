@@ -15,7 +15,7 @@ NetAIOps Webhook 是面向网络运维告警场景的 AI 分析与治理平台�
 | v11.1 Schema 兼容 commit | `9dfe1d76e7091912d1e21daca24a22122af7746b` |
 | v11.1 测试契约对齐 commit | `16924700d873c01136da9b6e37579f806d0bdd98` |
 | v11.1 流量 / DCI 修复 commit | `2aa7b77169c0150c2f32bd2652152cd3d756ede0` |
-| 服务版本 | `12.0.0-v12-controlled-multi-agent` |
+| 服务版本 | `12.0.1-v12-pipeline-resilience-hotfix` |
 | 生产 LLM | `glm-5.2` |
 | Netmiko MCP | 已接入，地址由生产配置管理 |
 | Prometheus MCP | 已接入，地址由生产配置管理 |
@@ -23,9 +23,10 @@ NetAIOps Webhook 是面向网络运维告警场景的 AI 分析与治理平台�
 | v10 Release Audit | `PASS` |
 | v11 Release Audit | `PASS` |
 | v11 专项测试 | `269 tests OK` |
-| 全仓库测试 | `549 tests OK` |
+| v12 全量测试 | `827 tests OK` |
+| 全仓库测试 | `1376 tests OK` |
 | 历史遗留失败 | `0` |
-| 当前阶段 | `v12 Controlled Multi-Agent / RCA 已正式发布` |
+| 当前阶段 | `v12.0.1 Pipeline Resilience Hotfix 已部署；W0 Production Canary 待验收` |
 
 ## 当前两条链路
 

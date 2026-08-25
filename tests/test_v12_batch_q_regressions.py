@@ -32,11 +32,11 @@ class BatchQRegressionTests(unittest.TestCase):
         self.assertTrue(raw["fail_open_to_legacy"])
         self.assertFalse(raw["notifications_use_v12"])
 
-    def test_version_is_batch_q_target(self):
-        self.assertEqual(
-            (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip(),
-            TARGET_VERSION,
-        )
+    def test_batch_q_release_version_is_preserved_in_historical_audit(self):
+        text = (
+            PROJECT_ROOT / "docs" / "V12_RELEASE_AUDIT_2026-08-04.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn(f"version={TARGET_VERSION}", text)
 
     def test_runtime_config_is_gitignored(self):
         text = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
@@ -52,17 +52,15 @@ class BatchQRegressionTests(unittest.TestCase):
         text = (
             PROJECT_ROOT / "tests" / "test_v10_baseline_hygiene.py"
         ).read_text(encoding="utf-8")
-        self.assertIn(
-            'EXPECTED_VERSION = "12.0.0-v12-controlled-multi-agent"',
-            text,
-        )
+        self.assertIn('PROJECT_ROOT / "VERSION"', text)
+        self.assertIn("EXPECTED_VERSION", text)
         self.assertIn('self.assertIn("v12", text.lower())', text)
 
     def test_historical_replay_boundary_is_migrated_to_batch_q(self):
         text = (
             PROJECT_ROOT / "tests" / "test_v12_historical_replay.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("test_version_is_promoted_by_batch_q_release", text)
+        self.assertIn("test_batch_q_release_history_is_preserved", text)
         self.assertIn(TARGET_VERSION, text)
         self.assertNotIn(
             'def test_version_is_not_modified(self)',

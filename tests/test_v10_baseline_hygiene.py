@@ -7,7 +7,9 @@ import yaml
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "12.0.0-v12-controlled-multi-agent"
+EXPECTED_VERSION = (
+    PROJECT_ROOT / "VERSION"
+).read_text(encoding="utf-8").strip()
 EXPECTED_REQUIREMENTS = {
     "fastapi==0.135.1",
     "httpx==0.28.1",

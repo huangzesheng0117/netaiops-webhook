@@ -26,9 +26,9 @@ from netaiops.v12.primary_release import (  # noqa: E402
     load_primary_settings,
 )
 
-ACCEPTANCE_VERSION = "12.0.0-release-acceptance-2"
-EXPECTED_SERVICE_VERSION = "12.0.0-v12-controlled-multi-agent"
-EXPECTED_COMMIT_MESSAGE = "v12: release controlled multi-agent RCA"
+ACCEPTANCE_VERSION = "12.0.1-release-acceptance-3"
+INITIAL_RELEASE_VERSION = "12.0.0-v12-controlled-multi-agent"
+INITIAL_RELEASE_COMMIT_MESSAGE = "v12: release controlled multi-agent RCA"
 _FAILURE_HEADER_RE = re.compile(r"^(FAIL|ERROR):\s+(.+?)\s*$")
 _RAN_RE = re.compile(r"^Ran\s+(\d+)\s+tests?\s+in\s+(.+)$")
 
@@ -39,6 +39,23 @@ class V12ReleaseAcceptanceError(RuntimeError):
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def expected_service_version(project_root: Path) -> str:
+    return (project_root / "VERSION").read_text(encoding="utf-8").strip()
+
+
+def release_audit_markdown_path(
+    project_root: Path,
+    *,
+    created_at: datetime | None = None,
+) -> Path:
+    moment = created_at or utc_now()
+    return (
+        project_root
+        / "docs"
+        / f"V12_RELEASE_AUDIT_{moment.date().isoformat()}.md"
+    )
 
 
 def write_json(path: Path, payload: Mapping[str, Any]) -> None:
@@ -158,12 +175,21 @@ def http_probe(base_url: str, path: str) -> dict[str, Any]:
 def runtime_contract(
     project_root: Path,
     runtime_config: Path,
+    *,
+    expected_version: str | None = None,
 ) -> dict[str, Any]:
     version = (project_root / "VERSION").read_text(encoding="utf-8").strip()
-    if version != EXPECTED_SERVICE_VERSION:
+    expected = expected_version or expected_service_version(project_root)
+    if version != expected:
         raise V12ReleaseAcceptanceError(
-            f"VERSION mismatch: expected {EXPECTED_SERVICE_VERSION}, got {version}"
+            f"VERSION mismatch: expected {expected}, got {version}"
         )
+    for relative in ("README.md", "README_STATUS.md"):
+        text = (project_root / relative).read_text(encoding="utf-8")
+        if version not in text:
+            raise V12ReleaseAcceptanceError(
+                f"{relative} does not advertise current VERSION {version}"
+            )
     settings = load_primary_settings(runtime_config)
     if settings is None:
         raise V12ReleaseAcceptanceError("v12 primary runtime config is missing")
@@ -322,9 +348,16 @@ def run_acceptance(
     post_commit: bool,
     write_markdown: bool,
     skip_health: bool,
+    expected_version: str | None = None,
+    expected_commit_subject: str | None = None,
+    markdown_path: Path | None = None,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    runtime = runtime_contract(project_root, runtime_config)
+    runtime = runtime_contract(
+        project_root,
+        runtime_config,
+        expected_version=expected_version,
+    )
     python = sys.executable
 
     all_v12 = run_command(
@@ -419,12 +452,18 @@ def run_acceptance(
             raise V12ReleaseAcceptanceError(
                 "post-commit Release Audit requires HEAD=origin/main"
             )
-        subject = git_output(project_root, "log", "-1", "--pretty=%s")
-        if subject != EXPECTED_COMMIT_MESSAGE:
+        if not expected_commit_subject:
             raise V12ReleaseAcceptanceError(
-                f"release commit subject mismatch: {subject}"
+                "post-commit Release Audit requires expected commit subject"
+            )
+        subject = git_output(project_root, "log", "-1", "--pretty=%s")
+        if subject != expected_commit_subject:
+            raise V12ReleaseAcceptanceError(
+                "release commit subject mismatch: "
+                f"expected {expected_commit_subject}, got {subject}"
             )
         git_state["subject"] = subject
+        git_state["expected_subject"] = expected_commit_subject
 
     report: dict[str, Any] = {
         "acceptance_version": ACCEPTANCE_VERSION,
@@ -461,10 +500,11 @@ def run_acceptance(
     write_json(output_dir / "v12_release_acceptance.json", report)
     write_json(output_dir / "v12_release_audit.json", report)
     if write_markdown:
-        write_release_markdown(
-            project_root / "docs" / "V12_RELEASE_AUDIT_2026-08-04.md",
-            report=report,
-        )
+        target = markdown_path or release_audit_markdown_path(project_root)
+        write_release_markdown(target, report=report)
+        report["release_markdown"] = str(target)
+        write_json(output_dir / "v12_release_acceptance.json", report)
+        write_json(output_dir / "v12_release_audit.json", report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return report
 
@@ -481,6 +521,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--post-commit", action="store_true")
     parser.add_argument("--write-markdown", action="store_true")
     parser.add_argument("--skip-health", action="store_true")
+    parser.add_argument("--expected-service-version", default="")
+    parser.add_argument("--expected-commit-subject", default="")
+    parser.add_argument("--markdown-path", default="")
     return parser
 
 
@@ -494,6 +537,13 @@ def main(argv: list[str] | None = None) -> int:
         post_commit=args.post_commit,
         write_markdown=args.write_markdown,
         skip_health=args.skip_health,
+        expected_version=args.expected_service_version or None,
+        expected_commit_subject=args.expected_commit_subject or None,
+        markdown_path=(
+            Path(args.markdown_path).resolve(strict=False)
+            if args.markdown_path
+            else None
+        ),
     )
     return 0
 

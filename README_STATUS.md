@@ -1,12 +1,12 @@
 # NetAIOps Webhook 当前状态
 
-> 更新时间：2026-08-04
-> 当前阶段：v12 Controlled Multi-Agent / RCA 正式发布与 Release Audit。
+> 更新时间：2026-08-19
+> 当前阶段：v12.0.1 Pipeline Resilience Hotfix 已部署；W0 Production Notification Canary 前置基线修复。
 
 ## 当前版本
 
 ```text
-12.0.0-v12-controlled-multi-agent
+12.0.1-v12-pipeline-resilience-hotfix
 ```
 
 ## 固定信息
@@ -18,6 +18,7 @@
 | systemd 服务 | `netaiops-webhook.service` |
 | 端口 | `18080` |
 | 分支 | `main` |
+| v12.0.1 hotfix commit | `3ad848f051041923ece2718da9b243d42a42b3f9` |
 | v10 发布 commit | `339e857` |
 | v11 功能收口 commit | `0f60c91da69b732aec23032809715b9d5dfd762c` |
 | v11.1 Batch B commit | `9dfe1d76e7091912d1e21daca24a22122af7746b` |
@@ -28,10 +29,11 @@
 | v10 Release Audit | `PASS` |
 | v11 Release Audit | `PASS` |
 | v11 专项测试 | `269 tests OK` |
-| 全仓库测试 | `549 tests OK` |
+| v12 全量测试 | `827 tests OK` |
+| 全仓库测试 | `1376 tests OK` |
 | 历史遗留测试失败 | `0` |
 | 新增测试失败 | `0` |
-| 下一主版本 | `v12 Controlled Multi-Agent / RCA` |
+| 下一主版本 | `v13 Evidence Capability & Primary Entry Decoupling` |
 
 ## 当前主链路
 
@@ -239,17 +241,17 @@ status = not_available
 ## 当前下一步
 
 ```text
-1. 提交并推送 v11.1 Batch E
-2. 在干净 main 上执行最终 post-commit Release Acceptance
-3. 同步 ChatGPT 项目文档和项目指令
-4. 进入 v12 Controlled Multi-Agent / RCA
+1. 完成 v12.0.1 Release Baseline 一致性修复
+2. 完成 v12.0.1 真实生产通知 Canary（W0）
+3. 进入 v13 Evidence Capability & Primary Entry Decoupling
+4. 阶段收口后增量同步项目 Markdown
 ```
 
 ## 历史失败说明
 
 已清理的 28 个失败是在 Batch 10 全量测试中发现、并在 Batch 10 修改前已经存在的历史遗留问题。不得表述为“Batch 9 导致的失败”。Batch 9 commit 只是最近对照基线。
 
-## v12 正式发布状态
+## v12 初始正式发布状态（2026-08-04，历史冻结）
 
 ```text
 VERSION=12.0.0-v12-controlled-multi-agent
