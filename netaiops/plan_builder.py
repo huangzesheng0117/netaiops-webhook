@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
-from netaiops.classifier import classify_event
+from netaiops.classifier import classify_event_from_family_result
 from netaiops.family_registry import classify_family
 from netaiops.capability_registry import build_capability_plan
 from netaiops.capability_planner import refine_capability_plan
@@ -286,8 +286,20 @@ def build_plan_from_analysis_data(analysis_data: dict) -> dict:
         "source": source,
     }
 
-    family_result = classify_family(event_for_plan)
-    classification = classify_event(event_for_plan)
+    # V13 production Triage, when mounted, is the sole upper Family Registry
+    # owner.  The canonical result is persisted before legacy analysis begins.
+    # If no V13 record exists (disabled/multi-event/non-mounted), the legacy
+    # path remains deterministic and calls Family Registry exactly once here.
+    family_result = None
+    try:
+        from netaiops.v13.production_integration import load_canonical_family_result
+        family_result = load_canonical_family_result(request_id)
+    except Exception:
+        family_result = None
+    if not isinstance(family_result, dict) or not family_result.get("family"):
+        family_result = classify_family(event_for_plan)
+
+    classification = classify_event_from_family_result(event_for_plan, family_result)
 
     capability_plan = build_capability_plan(event_for_plan, family_result)
     capability_plan = refine_capability_plan(event_for_plan, family_result, capability_plan)

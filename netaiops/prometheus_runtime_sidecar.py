@@ -282,6 +282,7 @@ def run_prometheus_evidence_sidecar_for_plan_result(
     write_record: bool = True,
     update_plan: bool = True,
     force: bool = False,
+    v13_owner_call: bool = False,
 ) -> Dict[str, Any]:
     """
     pipeline 调用入口。
@@ -297,6 +298,33 @@ def run_prometheus_evidence_sidecar_for_plan_result(
     }
     """
     started = time.time()
+
+    # Once the V13 Metrics owner has claimed this request/source, any legacy
+    # sidecar re-entry must be a no-call reuse path.  The owner itself passes
+    # v13_owner_call=True and is allowed to invoke this lower infrastructure.
+    if not v13_owner_call:
+        try:
+            from netaiops.v13.production_integration import legacy_source_action
+            if legacy_source_action(request_id, "metrics") == "skip_duplicate":
+                return {
+                    "ok": True,
+                    "skipped": True,
+                    "request_id": request_id,
+                    "record": {
+                        "ok": True,
+                        "status": "v13_owner_fence_skip_duplicate",
+                        "request_id": request_id,
+                        "evidences": [],
+                        "created_at": now_utc_str(),
+                        "external_call_performed": False,
+                    },
+                    "plan_result": plan_result,
+                    "error": None,
+                    "v13_legacy_action": "skip_duplicate",
+                }
+        except Exception:
+            # Missing/inactive V13 state must not change legacy behavior.
+            pass
 
     try:
         plan_data = (plan_result or {}).get("plan_data") or {}

@@ -1,12 +1,12 @@
 # NetAIOps Webhook 当前状态
 
-> 更新时间：2026-08-19
-> 当前阶段：v12.0.1 Pipeline Resilience Hotfix 已部署；W0 Production Notification Canary 前置基线修复。
+> 更新时间：2026-09-03
+> 当前阶段：v13 Production Ownership 已完成；next=Logs Evidence W1。
 
 ## 当前版本
 
 ```text
-12.0.1-v12-pipeline-resilience-hotfix
+13.0.0-v13-production-ownership
 ```
 
 ## 固定信息
@@ -30,10 +30,51 @@
 | v11 Release Audit | `PASS` |
 | v11 专项测试 | `269 tests OK` |
 | v12 全量测试 | `827 tests OK` |
-| 全仓库测试 | `1376 tests OK` |
+| 全仓库测试 | `1449 tests OK` |
 | 历史遗留测试失败 | `0` |
 | 新增测试失败 | `0` |
-| 下一主版本 | `v13 Evidence Capability & Primary Entry Decoupling` |
+| 下一主版本 | `v14 Logs Evidence Agent Production（W1/W2/R1）` |
+
+<!-- v13-production-ownership:begin -->
+## v13 Production Ownership 正式状态
+
+```text
+VERSION=13.0.0-v13-production-ownership
+
+D0=COMPLETE
+D1=COMPLETE
+D2=COMPLETE
+D3=COMPLETE
+FINAL-A Production Cutover=COMPLETE
+
+Triage Owner=triage
+Metrics Owner=metrics_agent
+Device Owner=device_agent
+
+v13 families:
+- interface_status_or_flap
+- interface_or_link_utilization_high
+- interface_traffic_anomaly
+
+other families=legacy fallback
+fail_open_to_legacy=true
+notifications_use_v12=false
+Logs Agent=not_available
+Knowledge Agent=not_available
+Light Alert=unchanged
+```
+
+D3 首次真实 Device Canary 因手工 Canary Runtime 未继承
+`MCP_HELPER_CMD` 而失败，原 `FAILED_AMBIGUOUS_NO_RETRY` Evidence 保留；
+修复 Runtime binding 后使用新 request_id 的 Device-only Recovery Canary
+成功，Netmiko 真实调用 1 次、只读设备命令 1 条、第二次 Owner 调用复用
+checkpoint。
+
+FINAL-A Verify Offline V1 曾发现 `legacy_playbook_type` compatibility
+early-return 缺陷；精确修复后重新从 Verify Offline 续跑并通过。
+FINAL-A C1/C2/C3 Production Cutover、Release Acceptance、827 个 v12
+回归、1449 个全仓库测试以及 7/7 Health 均 PASS。
+<!-- v13-production-ownership:end -->
 
 ## 当前主链路
 
@@ -241,10 +282,10 @@ status = not_available
 ## 当前下一步
 
 ```text
-1. 完成 v12.0.1 Release Baseline 一致性修复
-2. 完成 v12.0.1 真实生产通知 Canary（W0）
-3. 进入 v13 Evidence Capability & Primary Entry Decoupling
-4. 阶段收口后增量同步项目 Markdown
+v13 = COMPLETE
+next = Logs Evidence W1
+then = W2 store-only Shadow
+then = R1 Review → RCA → Card 分阶段启用
 ```
 
 ## 历史失败说明

@@ -95,6 +95,49 @@ def load_version() -> str:
 APP_VERSION = load_version()
 
 
+def _v13_mount_triage_safe(
+    request_id: str,
+    source: str,
+    normalized_events: list,
+) -> dict:
+    """Mount deterministic V13 Triage without blocking legacy intake."""
+    try:
+        from netaiops.v13.production_integration import (
+            mount_triage_for_normalized_events,
+        )
+
+        result = mount_triage_for_normalized_events(
+            request_id=request_id,
+            source=source,
+            normalized_events=normalized_events,
+            project_root=BASE_DIR,
+        )
+        logger.info(
+            "v13 triage mount request_id=%s source=%s handled=%s family=%s reason=%s",
+            request_id,
+            source,
+            result.get("handled"),
+            result.get("family"),
+            result.get("reason"),
+        )
+        return result
+    except Exception as exc:
+        # V13 remains fail-open to the existing legacy pipeline.  Triage has
+        # no external side effect, so an early mount failure is safe to fall
+        # back before any Metrics/Device owner call can occur.
+        logger.exception(
+            "v13 triage mount failed-open request_id=%s source=%s",
+            request_id,
+            source,
+        )
+        return {
+            "handled": False,
+            "reason": "v13_triage_mount_exception_fail_open_legacy",
+            "exception_type": type(exc).__name__,
+            "external_calls_performed": False,
+        }
+
+
 def now_utc_str() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -1074,6 +1117,7 @@ async def webhook_alertmanager(request: Request, background_tasks: BackgroundTas
     normalized_events = normalize_alertmanager(payload)
     persist_result = persist_events("alertmanager", payload, normalized_events)
     request_id = persist_result["request_id"]
+    _v13_mount_triage_safe(request_id, "alertmanager", normalized_events)
 
     logger.info(
         "received alertmanager webhook request_id=%s event_count=%s",
@@ -1102,6 +1146,7 @@ async def webhook_elastic(request: Request, background_tasks: BackgroundTasks) -
     normalized_events = normalize_elastic(payload)
     persist_result = persist_events("elastic", payload, normalized_events)
     request_id = persist_result["request_id"]
+    _v13_mount_triage_safe(request_id, "elastic", normalized_events)
 
     logger.info(
         "received elastic webhook request_id=%s event_count=%s",

@@ -249,6 +249,7 @@ class TriageAgent:
                 "event_key": unified.event_key,
                 "correlation_hints": list(unified.correlation_hints),
                 "aggregation_performed": False,
+                "family_result": sanitize_sensitive_data(family_result),
             },
             warnings=tuple(warnings),
         )

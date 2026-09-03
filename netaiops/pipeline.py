@@ -100,6 +100,67 @@ def _run_local_runner_and_callback(request_id: str) -> Dict[str, Any]:
         return result
 
 
+def _run_v13_device_owner_and_callback(
+    request_id: str,
+    plan_data: Dict[str, Any],
+) -> Dict[str, Any] | None:
+    """Run the V13 Device owner and preserve the existing callback chain."""
+    try:
+        from netaiops.v13.production_integration import run_device_owner_for_plan
+
+        owner_result = run_device_owner_for_plan(
+            request_id=request_id,
+            plan=plan_data,
+            project_root=BASE_DIR,
+        )
+    except Exception as exc:
+        # An exception here happened before the integration could return its
+        # handled/attempt boundary.  Fail open to the unchanged legacy runner.
+        return {
+            "handled": False,
+            "reason": "v13_device_owner_integration_exception_fail_open_legacy",
+            "exception_type": type(exc).__name__,
+        }
+
+    if not owner_result.get("handled"):
+        return owner_result
+
+    callback_payload = owner_result.get("callback_payload")
+    if not isinstance(callback_payload, dict):
+        return {
+            **owner_result,
+            "callback_invoked": False,
+            "error": "v13_device_owner_has_no_reusable_callback_payload",
+        }
+
+    try:
+        cb_result = post_execution_result(
+            webhook_base_url=INTERNAL_WEBHOOK_BASE_URL,
+            request_id=request_id,
+            payload=callback_payload,
+            timeout=30,
+        )
+        return {
+            **owner_result,
+            "runner_invoked": False,
+            "callback_invoked": True,
+            "callback_result": cb_result,
+            "skipped_legacy_runner": True,
+            "error": None,
+        }
+    except Exception as exc:
+        # Device execution was already owner-claimed/attempted.  Never fall
+        # back to the legacy runner after this boundary, even if local callback
+        # delivery fails.
+        return {
+            **owner_result,
+            "runner_invoked": False,
+            "callback_invoked": False,
+            "skipped_legacy_runner": True,
+            "error": f"v13_owner_callback_failed:{type(exc).__name__}",
+        }
+
+
 def run_pipeline_for_request_id(
     request_id: str,
     auto_confirm: bool = True,
@@ -111,25 +172,47 @@ def run_pipeline_for_request_id(
     # 在 plan 生成后、confirm/dispatch 前执行 Prometheus Evidence 旁路取证。
     # 失败不得阻断原有 CLI 取证链路。
     prometheus_sidecar_result = None
+    v13_metrics_owner_result = None
     try:
-        from netaiops.prometheus_runtime_sidecar import run_prometheus_evidence_sidecar_for_plan_result
+        from netaiops.v13.production_integration import run_metrics_owner_for_plan_result
 
-        prometheus_sidecar_result = run_prometheus_evidence_sidecar_for_plan_result(
+        v13_metrics_owner_result = run_metrics_owner_for_plan_result(
             request_id=request_id,
             plan_result=plan_result,
-            write_record=True,
-            update_plan=True,
-            force=False,
+            project_root=BASE_DIR,
         )
-        if isinstance(prometheus_sidecar_result, dict) and isinstance(prometheus_sidecar_result.get("plan_result"), dict):
-            plan_result = prometheus_sidecar_result.get("plan_result") or plan_result
-    except Exception as _prom_exc:
-        prometheus_sidecar_result = {
-            "ok": False,
-            "skipped": False,
-            "request_id": request_id,
-            "error": f"{type(_prom_exc).__name__}: {_prom_exc}",
+    except Exception as _v13_metrics_exc:
+        v13_metrics_owner_result = {
+            "handled": False,
+            "reason": "v13_metrics_owner_integration_exception_fail_open_legacy",
+            "exception_type": type(_v13_metrics_exc).__name__,
         }
+
+    if isinstance(v13_metrics_owner_result, dict) and v13_metrics_owner_result.get("handled"):
+        owner_plan = v13_metrics_owner_result.get("plan_result")
+        if isinstance(owner_plan, dict):
+            plan_result = owner_plan
+        prometheus_sidecar_result = v13_metrics_owner_result.get("legacy_compatible_sidecar_result")
+    else:
+        try:
+            from netaiops.prometheus_runtime_sidecar import run_prometheus_evidence_sidecar_for_plan_result
+
+            prometheus_sidecar_result = run_prometheus_evidence_sidecar_for_plan_result(
+                request_id=request_id,
+                plan_result=plan_result,
+                write_record=True,
+                update_plan=True,
+                force=False,
+            )
+            if isinstance(prometheus_sidecar_result, dict) and isinstance(prometheus_sidecar_result.get("plan_result"), dict):
+                plan_result = prometheus_sidecar_result.get("plan_result") or plan_result
+        except Exception as _prom_exc:
+            prometheus_sidecar_result = {
+                "ok": False,
+                "skipped": False,
+                "request_id": request_id,
+                "error": f"{type(_prom_exc).__name__}: {_prom_exc}",
+            }
     # ===== v8 prometheus evidence sidecar end =====
     # ===== Disk/Flash safe dir readonly override begin =====
     # Disk/Flash playbook 需要使用 dir bootflash:/log:/crashinfo: 等只读目录查看命令。
@@ -172,7 +255,16 @@ def run_pipeline_for_request_id(
         dispatch_status = dispatch_data.get("dispatch_status")
 
         if dispatch_status == "accepted":
-            local_execution_result = _run_local_runner_and_callback(request_id)
+            v13_device_result = _run_v13_device_owner_and_callback(
+                request_id,
+                plan_data,
+            )
+            if isinstance(v13_device_result, dict) and v13_device_result.get("handled"):
+                local_execution_result = v13_device_result
+            else:
+                local_execution_result = _run_local_runner_and_callback(request_id)
+                if isinstance(local_execution_result, dict):
+                    local_execution_result["v13_device_owner_result"] = v13_device_result
 
     summary = get_request_summary(request_id)
 
@@ -180,6 +272,7 @@ def run_pipeline_for_request_id(
         "request_id": request_id,
         "plan_result": plan_result,
         "prometheus_sidecar_result": prometheus_sidecar_result,
+        "v13_metrics_owner_result": v13_metrics_owner_result,
         "confirm_result": confirm_result,
         "dispatch_result": dispatch_result,
         "local_execution_result": local_execution_result,

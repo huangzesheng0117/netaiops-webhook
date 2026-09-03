@@ -15,7 +15,7 @@ NetAIOps Webhook 是面向网络运维告警场景的 AI 分析与治理平台�
 | v11.1 Schema 兼容 commit | `9dfe1d76e7091912d1e21daca24a22122af7746b` |
 | v11.1 测试契约对齐 commit | `16924700d873c01136da9b6e37579f806d0bdd98` |
 | v11.1 流量 / DCI 修复 commit | `2aa7b77169c0150c2f32bd2652152cd3d756ede0` |
-| 服务版本 | `12.0.1-v12-pipeline-resilience-hotfix` |
+| 服务版本 | `13.0.0-v13-production-ownership` |
 | 生产 LLM | `glm-5.2` |
 | Netmiko MCP | 已接入，地址由生产配置管理 |
 | Prometheus MCP | 已接入，地址由生产配置管理 |
@@ -24,9 +24,53 @@ NetAIOps Webhook 是面向网络运维告警场景的 AI 分析与治理平台�
 | v11 Release Audit | `PASS` |
 | v11 专项测试 | `269 tests OK` |
 | v12 全量测试 | `827 tests OK` |
-| 全仓库测试 | `1376 tests OK` |
+| 全仓库测试 | `1449 tests OK` |
 | 历史遗留失败 | `0` |
-| 当前阶段 | `v12.0.1 Pipeline Resilience Hotfix 已部署；W0 Production Canary 待验收` |
+| 当前阶段 | `v13 Production Ownership 已完成；next=Logs Evidence W1` |
+
+<!-- v13-production-ownership:begin -->
+## v13 Production Ownership
+
+v13 已完成生产 Ownership 切换，保持 v12 的安全边界和 legacy-compatible 通知：
+
+```text
+Alertmanager / Elastic
+→ Raw / Normalized
+→ Triage Owner（唯一上层 Family 分类）
+→ 既有 GLM / Skill / Playbook
+→ Metrics Owner → Prometheus MCP
+→ Device Owner → Netmiko MCP（只读）
+→ 既有 Execution / Review / Evidence Hub / 通知
+```
+
+仅以下三个 Family 启用 v13 Production Owner：
+
+```text
+interface_status_or_flap
+interface_or_link_utilization_high
+interface_traffic_anomaly
+```
+
+冻结边界：
+
+```text
+Triage Owner=triage
+Metrics Owner=metrics_agent
+Device Owner=device_agent
+同 request Prometheus/Netmiko 去重并优先复用 Evidence
+other families=legacy fallback
+fail_open_to_legacy=true
+notifications_use_v12=false
+Logs Agent=not_available
+Knowledge Agent=not_available
+任意 PromQL/CLI/DSL=forbidden
+write commands=forbidden
+Light Alert=unchanged
+```
+
+v13 Release Acceptance、v12 回归、全仓库回归和 7/7 Health 均为发布门禁。
+下一阶段为 Logs Evidence W1。
+<!-- v13-production-ownership:end -->
 
 ## 当前两条链路
 
