@@ -2,6 +2,8 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlencode
+from urllib.request import urlopen
 
 import yaml
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
@@ -55,6 +57,15 @@ REVIEW_DIR = DATA_DIR / "reviews"
 LIGHT_ALERT_DIR = DATA_DIR / "light_alerts"
 LIGHT_ALERT_RAW_DIR = LIGHT_ALERT_DIR / "raw"
 LIGHT_ALERT_NOTIFY_DIR = LIGHT_ALERT_DIR / "notify"
+
+# Lightweight notification Silence guard.
+# Production evidence showed that a firing payload may still reach this
+# Webhook while Alertmanager already marks the alert as silenced.  Therefore
+# the DingDong lightweight path performs a second defensive check against
+# Alertmanager's own status.silencedBy result before sending.
+ALERTMANAGER_API_BASE = "http://10.191.96.43:9093"
+ALERTMANAGER_SILENCE_GUARD_TIMEOUT_SECONDS = 3.0
+
 CONFIG_FILE = BASE_DIR / "config.yaml"
 
 RAW_DIR.mkdir(parents=True, exist_ok=True)
@@ -93,6 +104,99 @@ def load_version() -> str:
 
 
 APP_VERSION = load_version()
+
+
+_v14_logs_worker_stop = None
+_v14_logs_worker_thread = None
+
+
+def _v14_logs_mount_safe(request_id: str, source: str, raw_payload: dict, normalized_events: list, webhook_received_at: str) -> dict:
+    try:
+        from netaiops.v14.logs_integration import mount_ingress_safe
+        result = mount_ingress_safe(
+            request_id=request_id,
+            source=source,
+            raw_payload=raw_payload,
+            normalized_events=normalized_events,
+            webhook_received_at=webhook_received_at,
+            project_root=BASE_DIR,
+            execute_initial=False,
+        )
+        logger.info(
+            "v14 logs ingress request_id=%s source=%s status=%s external_calls=%s",
+            request_id, source, result.get("status"), result.get("external_calls"),
+        )
+        return result
+    except Exception as exc:
+        logger.exception(
+            "v14 logs ingress failed-open request_id=%s source=%s",
+            request_id, source,
+        )
+        return {
+            "status": "failed_open",
+            "request_id": request_id,
+            "external_calls": 0,
+            "exception_type": type(exc).__name__,
+        }
+
+
+def _v14_logs_worker_main(stop_event) -> None:
+    from netaiops.v14.logs_integration import recover_due_jobs_safe
+    while not stop_event.is_set():
+        try:
+            result = recover_due_jobs_safe(project_root=BASE_DIR)
+            if result.get("recovered") or result.get("reconciled_ambiguous_jobs"):
+                logger.info(
+                    "v14 logs worker recovered=%s reconciled_ambiguous=%s external_calls=%s",
+                    result.get("recovered"),
+                    result.get("reconciled_ambiguous_jobs"),
+                    result.get("external_calls"),
+                )
+        except Exception:
+            logger.exception("v14 logs worker cycle failed-open")
+        if stop_event.wait(30):
+            break
+
+
+@app.on_event("startup")
+async def _v14_logs_startup_recovery_event() -> None:
+    global _v14_logs_worker_stop, _v14_logs_worker_thread
+    try:
+        import threading
+        from netaiops.v14.logs_integration import worker_should_start
+        if not worker_should_start(project_root=BASE_DIR):
+            logger.info("v14 logs worker disabled by runtime config")
+            return
+        if _v14_logs_worker_thread is not None and _v14_logs_worker_thread.is_alive():
+            return
+        stop_event = threading.Event()
+        worker = threading.Thread(
+            target=_v14_logs_worker_main,
+            args=(stop_event,),
+            name="v14-logs-recovery",
+            daemon=True,
+        )
+        _v14_logs_worker_stop = stop_event
+        _v14_logs_worker_thread = worker
+        worker.start()
+        logger.info("v14 logs persistent worker started")
+    except Exception:
+        logger.exception("v14 logs startup recovery failed-open")
+
+
+@app.on_event("shutdown")
+async def _v14_logs_shutdown_recovery_event() -> None:
+    global _v14_logs_worker_stop, _v14_logs_worker_thread
+    stop_event = _v14_logs_worker_stop
+    worker = _v14_logs_worker_thread
+    try:
+        if stop_event is not None:
+            stop_event.set()
+        if worker is not None and worker.is_alive():
+            worker.join(timeout=5)
+    finally:
+        _v14_logs_worker_stop = None
+        _v14_logs_worker_thread = None
 
 
 def _v13_mount_triage_safe(
@@ -150,6 +254,230 @@ def safe_write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def _alert_label_signature(labels: dict) -> str:
+    if not isinstance(labels, dict):
+        labels = {}
+    return json.dumps(
+        labels,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _fetch_alertmanager_silenced_firing_alerts() -> dict:
+    # Trust Alertmanager's own status.silencedBy result rather than
+    # reimplementing Silence matcher semantics in this service.
+    params = urlencode(
+        {
+            "silenced": "true",
+            "inhibited": "true",
+            "active": "true",
+            "unprocessed": "true",
+        }
+    )
+    url = f"{ALERTMANAGER_API_BASE}/api/v2/alerts?{params}"
+
+    try:
+        with urlopen(
+            url,
+            timeout=ALERTMANAGER_SILENCE_GUARD_TIMEOUT_SECONDS,
+        ) as response:
+            body = response.read().decode("utf-8")
+        alerts = json.loads(body)
+        if not isinstance(alerts, list):
+            raise ValueError(
+                "Alertmanager /api/v2/alerts did not return a list"
+            )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "fingerprints": {},
+            "label_signatures": {},
+            "error": f"{type(exc).__name__}: {exc}",
+            "url": url,
+        }
+
+    fingerprints = {}
+    label_signatures = {}
+
+    for alert in alerts:
+        if not isinstance(alert, dict):
+            continue
+
+        status = alert.get("status") or {}
+        silence_ids = status.get("silencedBy") or []
+        if not silence_ids:
+            continue
+
+        silence_ids = [
+            str(x)
+            for x in silence_ids
+            if str(x).strip()
+        ]
+
+        fingerprint = str(
+            alert.get("fingerprint") or ""
+        ).strip()
+        if fingerprint:
+            fingerprints[fingerprint] = silence_ids
+
+        labels = alert.get("labels") or {}
+        if isinstance(labels, dict) and labels:
+            label_signatures[
+                _alert_label_signature(labels)
+            ] = silence_ids
+
+    return {
+        "ok": True,
+        "fingerprints": fingerprints,
+        "label_signatures": label_signatures,
+        "error": "",
+        "url": url,
+        "silenced_firing_count": len(fingerprints),
+    }
+
+
+def filter_light_payload_by_alertmanager_silence(payload: dict):
+    # Only the lightweight DingDong path is filtered.
+    # Original AI/legacy processing remains unchanged.
+    # Only firing alerts are suppressed.
+    # Alertmanager API failure is fail-open.
+
+    if not isinstance(payload, dict):
+        return payload, {
+            "checked": False,
+            "fail_open": True,
+            "reason": "payload_not_dict",
+            "suppressed_count": 0,
+        }
+
+    alerts = payload.get("alerts")
+    if not isinstance(alerts, list) or not alerts:
+        return payload, {
+            "checked": False,
+            "fail_open": False,
+            "reason": "no_alerts",
+            "suppressed_count": 0,
+        }
+
+    state = _fetch_alertmanager_silenced_firing_alerts()
+
+    if not state.get("ok"):
+        logger.warning(
+            "light alert silence guard fail-open "
+            "alertmanager_api=%s error=%s",
+            state.get("url"),
+            state.get("error"),
+        )
+        return payload, {
+            "checked": False,
+            "fail_open": True,
+            "reason": "alertmanager_api_error",
+            "error": state.get("error"),
+            "suppressed_count": 0,
+        }
+
+    silenced_fingerprints = (
+        state.get("fingerprints") or {}
+    )
+    silenced_signatures = (
+        state.get("label_signatures") or {}
+    )
+
+    kept = []
+    suppressed = []
+
+    for index, alert in enumerate(alerts):
+        if not isinstance(alert, dict):
+            kept.append(alert)
+            continue
+
+        alert_status = str(
+            alert.get("status") or ""
+        ).strip().lower()
+
+        if alert_status != "firing":
+            kept.append(alert)
+            continue
+
+        fingerprint = str(
+            alert.get("fingerprint") or ""
+        ).strip()
+
+        labels = alert.get("labels") or {}
+        signature = _alert_label_signature(labels)
+
+        silence_ids = []
+        match_method = ""
+
+        if (
+            fingerprint
+            and fingerprint in silenced_fingerprints
+        ):
+            silence_ids = silenced_fingerprints[
+                fingerprint
+            ]
+            match_method = "fingerprint"
+        elif signature in silenced_signatures:
+            silence_ids = silenced_signatures[
+                signature
+            ]
+            match_method = "exact_labels"
+
+        if silence_ids:
+            suppressed.append(
+                {
+                    "index": index,
+                    "alertname": (
+                        labels.get("alertname")
+                        if isinstance(labels, dict)
+                        else None
+                    ),
+                    "ip": (
+                        labels.get("ip")
+                        if isinstance(labels, dict)
+                        else None
+                    ),
+                    "sysName": (
+                        labels.get("sysName")
+                        if isinstance(labels, dict)
+                        else None
+                    ),
+                    "ifName": (
+                        labels.get("ifName")
+                        if isinstance(labels, dict)
+                        else None
+                    ),
+                    "fingerprint": fingerprint,
+                    "silencedBy": silence_ids,
+                    "match_method": match_method,
+                }
+            )
+            continue
+
+        kept.append(alert)
+
+    filtered_payload = dict(payload)
+    filtered_payload["alerts"] = kept
+
+    return filtered_payload, {
+        "checked": True,
+        "fail_open": False,
+        "reason": (
+            "checked_against_alertmanager_"
+            "status_silencedBy"
+        ),
+        "input_alert_count": len(alerts),
+        "kept_alert_count": len(kept),
+        "suppressed_count": len(suppressed),
+        "suppressed": suppressed,
+        "alertmanager_silenced_firing_count": (
+            state.get("silenced_firing_count", 0)
+        ),
+    }
 
 
 def persist_events(source: str, raw_payload: dict, normalized_events: list) -> dict:
@@ -927,11 +1255,15 @@ def light_alert_mirror_should_send(payload: dict, item: dict, throttle_seconds: 
 
 def mirror_light_alert_payload_task(payload: dict) -> None:
     try:
-        result = build_light_notifications(payload)
+        guarded_payload, silence_guard = (
+            filter_light_payload_by_alertmanager_silence(payload)
+        )
+        result = build_light_notifications(guarded_payload)
         original_lite_request_id = result.get("lite_request_id", "unknown")
         lite_request_id = f"mirror_{original_lite_request_id}"
         result["lite_request_id"] = lite_request_id
         result["source"] = "mirror_from_webhook_alertmanager"
+        result["alertmanager_silence_guard"] = silence_guard
         result["mirror_rate_limit_policy"] = {
             "firing_throttle_seconds": 3600,
             "resolved_throttled": False,
@@ -947,6 +1279,7 @@ def mirror_light_alert_payload_task(payload: dict) -> None:
                 "lite_request_id": lite_request_id,
                 "source": "mirror_from_webhook_alertmanager",
                 "payload": payload,
+                "alertmanager_silence_guard": silence_guard,
                 "created_at": now_utc_str(),
             },
         )
@@ -956,7 +1289,7 @@ def mirror_light_alert_payload_task(payload: dict) -> None:
         rate_limit_decisions = []
 
         for item in result.get("notifications", []):
-            should_send, decision = light_alert_mirror_should_send(payload, item, throttle_seconds=3600)
+            should_send, decision = light_alert_mirror_should_send(guarded_payload, item, throttle_seconds=3600)
             decision["index"] = item.get("index")
             decision["title"] = item.get("title")
             decision["alert_name"] = item.get("alert_name")
@@ -1009,7 +1342,11 @@ async def light_alert_alertmanager(request: Request, background_tasks: Backgroun
     except Exception:
         raise HTTPException(status_code=400, detail="invalid json payload")
 
-    result = build_light_notifications(payload)
+    guarded_payload, silence_guard = (
+        filter_light_payload_by_alertmanager_silence(payload)
+    )
+    result = build_light_notifications(guarded_payload)
+    result["alertmanager_silence_guard"] = silence_guard
     lite_request_id = result["lite_request_id"]
 
     raw_file = LIGHT_ALERT_RAW_DIR / f"alertmanager_{lite_request_id}.json"
@@ -1021,6 +1358,7 @@ async def light_alert_alertmanager(request: Request, background_tasks: Backgroun
             "lite_request_id": lite_request_id,
             "source": "alertmanager_light",
             "payload": payload,
+            "alertmanager_silence_guard": silence_guard,
             "created_at": now_utc_str(),
         },
     )
@@ -1035,7 +1373,7 @@ async def light_alert_alertmanager(request: Request, background_tasks: Backgroun
 
     for item in result.get("notifications", []):
         should_send, decision = light_alert_mirror_should_send(
-            payload,
+            guarded_payload,
             item,
             throttle_seconds=3600,
         )
@@ -1108,6 +1446,7 @@ async def light_alert_alertmanager(request: Request, background_tasks: Backgroun
 
 @app.post("/webhook/alertmanager")
 async def webhook_alertmanager(request: Request, background_tasks: BackgroundTasks) -> dict:
+    webhook_received_at = now_utc_str()
     try:
         payload = await request.json()
         background_tasks.add_task(mirror_light_alert_payload_task, payload)
@@ -1118,6 +1457,13 @@ async def webhook_alertmanager(request: Request, background_tasks: BackgroundTas
     persist_result = persist_events("alertmanager", payload, normalized_events)
     request_id = persist_result["request_id"]
     _v13_mount_triage_safe(request_id, "alertmanager", normalized_events)
+    _v14_logs_mount_safe(
+        request_id,
+        "alertmanager",
+        payload,
+        normalized_events,
+        webhook_received_at,
+    )
 
     logger.info(
         "received alertmanager webhook request_id=%s event_count=%s",
@@ -1138,6 +1484,7 @@ async def webhook_alertmanager(request: Request, background_tasks: BackgroundTas
 
 @app.post("/webhook/elastic")
 async def webhook_elastic(request: Request, background_tasks: BackgroundTasks) -> dict:
+    webhook_received_at = now_utc_str()
     try:
         payload = await request.json()
     except Exception:
@@ -1147,6 +1494,13 @@ async def webhook_elastic(request: Request, background_tasks: BackgroundTasks) -
     persist_result = persist_events("elastic", payload, normalized_events)
     request_id = persist_result["request_id"]
     _v13_mount_triage_safe(request_id, "elastic", normalized_events)
+    _v14_logs_mount_safe(
+        request_id,
+        "elastic",
+        payload,
+        normalized_events,
+        webhook_received_at,
+    )
 
     logger.info(
         "received elastic webhook request_id=%s event_count=%s",
