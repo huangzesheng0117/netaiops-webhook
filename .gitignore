@@ -62,3 +62,6 @@ config/light_alert_dongdong.env
 
 # Local AI analysis DingDong card token config
 config/ai_analysis_dongdong.env
+
+# v14 Logs runtime activation (production-local, never commit)
+config/v14_logs_w1.yaml

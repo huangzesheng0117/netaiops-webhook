@@ -93,6 +93,60 @@ class LogsEvidenceAgent:
                 "EvidencePlan did not contain the fixed logs source",
             )
 
+        # W1/R1 may expose a persisted v14 Logs artifact, but only after the
+        # frozen EvidencePlan has already been validated for this request and
+        # contains the Logs source.  A malformed/missing plan must never be
+        # bypassed merely because an artifact happens to exist on disk.
+        try:
+            from netaiops.v14.logs_evidence_adapter import build_v12_logs_envelope
+            from netaiops.v14.runtime_config import load_runtime_settings
+            settings = load_runtime_settings()
+            active_envelope = build_v12_logs_envelope(
+                request_id=invocation.request_id,
+                project_root="/opt/netaiops-webhook",
+                settings=settings,
+            )
+        except Exception as exc:
+            return self._failed(
+                "v14_logs_adapter_failed",
+                "v14 persisted Logs Evidence could not be loaded safely",
+                details={"exception_type": type(exc).__name__},
+            )
+        if active_envelope is not None:
+            agent_status = AgentStatus.SUCCESS
+            if active_envelope.status in {
+                EvidenceStatus.PARTIAL,
+                EvidenceStatus.NO_DATA,
+                EvidenceStatus.FAILED,
+            }:
+                # The Agent successfully produced/reused a deterministic Logs
+                # contract even when the evidence itself is weak/failed.
+                # Keep the optional evidence failure for Judge semantics
+                # rather than aborting the whole Orchestrator as an Agent bug.
+                agent_status = AgentStatus.PARTIAL
+            elif active_envelope.status == EvidenceStatus.NOT_AVAILABLE:
+                agent_status = AgentStatus.NOT_AVAILABLE
+            envelope_ref = self._active_envelope_ref(
+                invocation.request_id,
+                active_envelope.evidence_refs,
+            )
+            return AgentOutcome(
+                status=agent_status,
+                output_refs=(envelope_ref,),
+                output={
+                    "logs_evidence": active_envelope.model_dump(mode="json"),
+                    "placeholder": False,
+                    "reused_v14_persisted_artifact": True,
+                    "fastmcp_called": False,
+                    "ops_es_api_called": False,
+                    "elasticsearch_called": False,
+                    "dsl_generation_performed": False,
+                    "no_data_interpreted_as_normal": False,
+                },
+                warnings=tuple(active_envelope.warnings),
+                external_calls=(),
+            )
+
         constraints = dict(source_plan.constraints)
         drift = self._constraint_drift(
             required=source_plan.required,
@@ -190,6 +244,14 @@ class LogsEvidenceAgent:
             status=AgentStatus.FAILED,
             errors=(notice,),
             external_calls=(),
+        )
+
+    @staticmethod
+    def _active_envelope_ref(request_id: str, evidence_refs: list[str]) -> str:
+        seed = "|".join(sorted(evidence_refs)) or "v14-logs-persisted"
+        identifier = "logs-v14-" + hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16]
+        return build_contract_ref(
+            "artifact", request_id, "logs_envelope", identifier
         )
 
     @staticmethod

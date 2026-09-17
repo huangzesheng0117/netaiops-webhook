@@ -133,6 +133,11 @@ def _evidence_refs(
         bundle.evidence.device,
         bundle.evidence.logs,
     ):
+        if (
+            envelope.source == EvidenceSource.LOGS
+            and envelope.facts.get("include_in_rca") is False
+        ):
+            continue
         refs.extend(envelope.evidence_refs)
     return _unique_refs(refs)
 
@@ -430,11 +435,25 @@ def evaluate_evidence(
             and source_plan[source].required
         )
         status = envelope.status
+        logs_has_v14_completeness = (
+            source == EvidenceSource.LOGS
+            and "window_complete" in envelope.facts
+            and "collection_state" in envelope.facts
+        )
+        logs_incomplete = (
+            logs_has_v14_completeness
+            and status == EvidenceStatus.SUCCESS
+            and (
+                envelope.facts.get("window_complete") is not True
+                or str(envelope.facts.get("collection_state") or "")
+                == "provisional"
+            )
+        )
 
-        if status == EvidenceStatus.SUCCESS:
+        if status == EvidenceStatus.SUCCESS and not logs_incomplete:
             if required:
                 required_usable += 1
-        elif status == EvidenceStatus.PARTIAL:
+        elif status == EvidenceStatus.PARTIAL or logs_incomplete:
             if required:
                 required_usable += 1
                 weak_required.add(source)

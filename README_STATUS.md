@@ -1,7 +1,7 @@
 # NetAIOps Webhook 当前状态
 
-> 更新时间：2026-09-03
-> 当前阶段：v13 Production Ownership 已完成；next=Logs Evidence W1。
+> 更新时间：2026-09-17
+> 当前阶段：v14 Logs Evidence W1/W2 已完成；W2 Store-only Shadow 已启用；next=R1。
 
 ## 当前版本
 
@@ -75,6 +75,53 @@ early-return 缺陷；精确修复后重新从 Verify Offline 续跑并通过。
 FINAL-A C1/C2/C3 Production Cutover、Release Acceptance、827 个 v12
 回归、1449 个全仓库测试以及 7/7 Health 均 PASS。
 <!-- v13-production-ownership:end -->
+
+<!-- v14-logs-w1-w2:begin -->
+## v14 Logs Evidence W1 / W2 正式状态
+
+```text
+W1=COMPLETE
+W2=COMPLETE
+W2 Store-only Shadow=ACTIVE
+R1=NEXT
+
+activation_id=w2-store-only-20260916-02
+request_id=w2shadow-20260916-02
+job_id=a8631ea949157fae9e3ee33876456d7d
+official_controller_id=w2-official-controller-20260916-02
+post_complete_recovery_id=w2-post-complete-recovery-20260916-01
+
+store_evidence_enabled=true
+real_query_enabled=true
+
+include_in_analysis=false
+include_in_review=false
+include_in_rca=false
+include_in_card=false
+
+INITIAL exactly-once=PASS
+COMPLETE exactly-once=PASS
+restart recovery=PASS
+recover_actions=0
+controlled request 10002 re-query=0
+```
+
+W2 唯一正式 Controller 已完成受控 INITIAL、持久 delayed job、第二次
+Webhook restart/recovery 与 COMPLETE。最终 `verify-complete` 曾因
+`legacy_named_paths()` 将合法的 V14 Evidence Hub request/index-lock 路径
+误判为 legacy path 而触发 false-positive Hard Stop；正式 rollback 保留全部
+job/checkpoint/Evidence，未重复已成功外部调用。
+
+随后执行 Post-Complete downstream-only Recovery，复用既有 INITIAL /
+COMPLETE checkpoint 与 Evidence，未重新提交 controlled payload，未重复
+INITIAL/COMPLETE 查询；恢复 Store-only Shadow 后再次确认
+INITIAL attempts=1、COMPLETE attempts=1、artifact/checkpoint immutable、
+`recover_actions=0`。
+
+当前 W2 只存储 Logs Evidence，不进入 Analysis / Review / RCA / Card。
+下一实施阶段为 R1，仍按 Store-only → Review → RCA → Card 分阶段启用；
+真实 GLM / Card Canary 需要独立批准。
+<!-- v14-logs-w1-w2:end -->
 
 ## 当前主链路
 

@@ -15,7 +15,7 @@ from pathlib import Path
 import json
 from typing import Any, Dict, Iterable, Mapping
 
-from .schema import DEFAULT_BASE_DIR, REQUIRED_SECTION_FILES, request_detail_dir, safe_request_id
+from .schema import DEFAULT_BASE_DIR, FUTURE_SECTION_FILES, REQUIRED_SECTION_FILES, request_detail_dir, safe_request_id
 
 JsonDict = Dict[str, Any]
 
@@ -32,6 +32,8 @@ SECTION_ALIASES: Dict[str, str] = {
     "metrics_evidence": "metrics_evidence",
     "device": "device_evidence",
     "device_evidence": "device_evidence",
+    "logs": "logs_evidence",
+    "logs_evidence": "logs_evidence",
     "review": "review",
     "analysis": "analysis_result",
     "analysis_result": "analysis_result",
@@ -79,7 +81,11 @@ def _safe_detail_dir(request_id: str, base_dir: Path) -> Path:
 
 def _section_filename(section_name: str) -> str:
     normalized = _normalize_section_name(section_name)
-    return REQUIRED_SECTION_FILES[normalized]
+    if normalized in REQUIRED_SECTION_FILES:
+        return REQUIRED_SECTION_FILES[normalized]
+    if normalized in FUTURE_SECTION_FILES:
+        return FUTURE_SECTION_FILES[normalized]
+    raise KeyError(f"unknown evidence section: {section_name!r}")
 
 
 def _sanitize_paths(value: Any, base_dir: Path) -> Any:
@@ -167,6 +173,12 @@ def get_evidence_detail(request_id: str, *, base_dir: Path = DEFAULT_BASE_DIR) -
         section_path = detail_dir / filename
         if not section_path.exists():
             missing_sections.append(section_name)
+            continue
+        sections[section_name] = _sanitize_paths(_read_json_file(section_path), base)
+        available_sections.append(section_name)
+    for section_name, filename in FUTURE_SECTION_FILES.items():
+        section_path = detail_dir / filename
+        if not section_path.exists():
             continue
         sections[section_name] = _sanitize_paths(_read_json_file(section_path), base)
         available_sections.append(section_name)
