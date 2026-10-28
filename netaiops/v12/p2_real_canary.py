@@ -1557,8 +1557,14 @@ def _compact_rca_prompt(
     judge: Mapping[str, Any],
 ) -> str:
     evidence = _mapping(bundle.get("evidence"))
+    logs_envelope = _mapping(evidence.get("logs"))
+    logs_facts = _mapping(logs_envelope.get("facts"))
+    rca_sources = ["metrics", "device"]
+    if logs_facts.get("include_in_rca") is True:
+        rca_sources.append("logs")
+
     compact_evidence: dict[str, Any] = {}
-    for source in ("metrics", "device", "logs"):
+    for source in rca_sources:
         envelope = _mapping(evidence.get(source))
         compact_evidence[source] = {
             "status": envelope.get("status"),
@@ -1572,7 +1578,7 @@ def _compact_rca_prompt(
     allowed_refs = sorted(
         set(
             ref
-            for source in ("metrics", "device", "logs")
+            for source in rca_sources
             for ref in (
                 _mapping(evidence.get(source)).get(
                     "evidence_refs"
@@ -1871,6 +1877,26 @@ class RealGLMRCACollector:
                     "call_status": metadata.get("call_status"),
                     "parse_status": metadata.get("parse_status"),
                     "total_attempts": metadata.get("total_attempts"),
+                    "finish_reason": metadata.get("finish_reason"),
+                    "status_code": metadata.get("status_code"),
+                    "raw_content_sha256": metadata.get(
+                        "raw_content_sha256"
+                    ),
+                    "raw_content_length": metadata.get(
+                        "raw_content_length"
+                    ),
+                    "raw_content_utf8_bytes": metadata.get(
+                        "raw_content_utf8_bytes"
+                    ),
+                    "json_open_brace_count": metadata.get(
+                        "json_open_brace_count"
+                    ),
+                    "json_close_brace_count": metadata.get(
+                        "json_close_brace_count"
+                    ),
+                    "parse_error_type": metadata.get(
+                        "parse_error_type"
+                    ),
                 },
             )
             external = _external_record(
@@ -1983,6 +2009,52 @@ def _one_ref(
     return matches[0]
 
 
+def _validate_r1_logs_boundary(
+    *,
+    logs: AgentOutcome,
+    knowledge: AgentOutcome,
+    logs_runtime: Any,
+) -> str:
+    """Validate the frozen Store-only/Review Logs boundary without side effects."""
+    if knowledge.status != AgentStatus.NOT_AVAILABLE:
+        raise P2RealCanaryError("P2 Knowledge boundary drifted")
+
+    logs_output = _mapping(logs.output)
+    logs_envelope = _mapping(logs_output.get("logs_evidence"))
+    logs_facts = _mapping(logs_envelope.get("facts"))
+    review_enabled = bool(
+        logs_runtime.enabled
+        and logs_runtime.include_in_analysis
+        and logs_runtime.include_in_review
+    )
+    if not review_enabled:
+        if (
+            logs.status != AgentStatus.NOT_AVAILABLE
+            or logs_output.get("placeholder") is not True
+        ):
+            raise P2RealCanaryError("P2 Store-only Logs boundary drifted")
+    else:
+        if logs.status not in {
+            AgentStatus.SUCCESS,
+            AgentStatus.PARTIAL,
+            AgentStatus.NOT_AVAILABLE,
+        }:
+            raise P2RealCanaryError("P2 R1 Logs Review status is not allowed")
+        if logs_output.get("placeholder") is True:
+            raise P2RealCanaryError(
+                "P2 R1 Logs Review unexpectedly used legacy placeholder"
+            )
+        if logs.external_calls:
+            raise P2RealCanaryError(
+                "P2 R1 Logs Review attempted a direct external call"
+            )
+        if logs_facts.get("include_in_rca") is not logs_runtime.include_in_rca:
+            raise P2RealCanaryError(
+                "P2 R1 Logs include_in_rca drifted from runtime control"
+            )
+    return str(logs_runtime.r1_stage)
+
+
 class P2RealCanaryRunner:
     def __init__(
         self,
@@ -2059,8 +2131,12 @@ class P2RealCanaryRunner:
                 event_index=0,
                 received_at=_aware_now(),
             ),
-            AgentName.STATIC_PLANNER: StaticPlannerAgent(),
-            AgentName.LOGS_EVIDENCE: LogsEvidenceAgent(),
+            AgentName.STATIC_PLANNER: StaticPlannerAgent(
+                project_root=self.project_root,
+            ),
+            AgentName.LOGS_EVIDENCE: LogsEvidenceAgent(
+                project_root=self.project_root,
+            ),
             AgentName.KNOWLEDGE_CONTEXT: KnowledgeContextAgent(),
             AgentName.EVIDENCE_JUDGE: EvidenceJudgeAgent(),
             AgentName.NOTIFICATION_REPORT: NotificationReportAgent(),
@@ -2198,13 +2274,21 @@ class P2RealCanaryRunner:
 
         logs = await invoke(AgentName.LOGS_EVIDENCE)
         knowledge = await invoke(AgentName.KNOWLEDGE_CONTEXT)
-        if (
-            logs.status != AgentStatus.NOT_AVAILABLE
-            or knowledge.status != AgentStatus.NOT_AVAILABLE
-        ):
+        if knowledge.status != AgentStatus.NOT_AVAILABLE:
             raise P2RealCanaryError(
-                "P2 Logs/Knowledge boundary drifted"
+                "P2 Knowledge boundary drifted"
             )
+
+        from netaiops.v14.runtime_config import load_runtime_settings
+
+        logs_runtime = load_runtime_settings(
+            self.project_root / "config" / "v14_logs_w1.yaml"
+        )
+        logs_r1_stage = _validate_r1_logs_boundary(
+            logs=logs,
+            knowledge=knowledge,
+            logs_runtime=logs_runtime,
+        )
 
         partial = OrchestrationResult(
             request_id=request_id,
@@ -2460,6 +2544,7 @@ class P2RealCanaryRunner:
             "second_card_sent": False,
             "production_card_replaced": False,
             "logs_status": logs.status.value,
+            "logs_r1_stage": logs_r1_stage,
             "knowledge_status": knowledge.status.value,
             "service_restart": False,
         }
@@ -2651,6 +2736,7 @@ def evaluate_real_canary_gate(
     *,
     state_dir: str | Path,
     project_root: str | Path = DEFAULT_PROJECT_ROOT,
+    expected_logs_stage: str = "store_only",
 ) -> dict[str, Any]:
     state = Path(state_dir)
     result = _safe_json_read(
@@ -2675,8 +2761,21 @@ def evaluate_real_canary_gate(
         violations.append("second_card_sent")
     if result.get("production_card_replaced") is not False:
         violations.append("production_card_replaced")
-    if result.get("logs_status") != "not_available":
-        violations.append("logs_agent_not_placeholder")
+    logs_status = _text(result.get("logs_status"))
+    if expected_logs_stage == "store_only":
+        if logs_status != "not_available":
+            violations.append("logs_agent_not_placeholder")
+    elif expected_logs_stage in {
+        "review",
+        "rca_build_only",
+        "card_store_only",
+    }:
+        if logs_status not in {"success", "partial", "not_available"}:
+            violations.append("logs_agent_status_not_r1_compatible")
+        if _text(result.get("logs_r1_stage")) != expected_logs_stage:
+            violations.append("logs_r1_stage_mismatch")
+    else:
+        violations.append("expected_logs_stage_invalid")
     if result.get("knowledge_status") != "not_available":
         violations.append("knowledge_agent_not_placeholder")
     if _text(result.get("judge_status")) not in {

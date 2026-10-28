@@ -99,6 +99,17 @@ class LogsRuntimeSettings(BaseModel):
             raise ValueError("include_in_card requires include_in_rca")
         return self
 
+    @property
+    def r1_stage(self) -> str:
+        """Return the frozen downstream exposure stage for v14 Logs Evidence."""
+        if self.include_in_card:
+            return "card_store_only"
+        if self.include_in_rca:
+            return "rca_build_only"
+        if self.include_in_review:
+            return "review"
+        return "store_only"
+
 
 def disabled_settings() -> LogsRuntimeSettings:
     return LogsRuntimeSettings()

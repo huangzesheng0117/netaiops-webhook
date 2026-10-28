@@ -16,7 +16,12 @@ def _now() -> datetime: return datetime.now(timezone.utc)
 
 def build_v12_logs_envelope(*, request_id: str, project_root: str | Path,
                             settings: LogsRuntimeSettings) -> EvidenceEnvelope | None:
-    if not (settings.enabled and settings.include_in_analysis): return None
+    if not (
+        settings.enabled
+        and settings.include_in_analysis
+        and settings.include_in_review
+    ):
+        return None
     store = LogsArtifactStore(Path(project_root) / "data/evidence_hub")
     index = store.read_request_index(request_id)
     if not isinstance(index, Mapping): return None
@@ -69,6 +74,7 @@ def build_v12_logs_envelope(*, request_id: str, project_root: str | Path,
         "result_truncated": any(bool(j.get("result_truncated")) for j in jobs if isinstance(j, Mapping)),
         "no_data_interpreted_as_normal": False,
         "include_in_rca": settings.include_in_rca,
+        "r1_stage": settings.r1_stage,
         "jobs": [{k: j.get(k) for k in ("job_id", "profile_id", "artifact_phase", "collection_state", "window_complete", "matched_total", "analyzed_total", "evidence_ref")} for j in jobs if isinstance(j, Mapping)],
     }
     scope = {"source": "v14_logs_evidence", "request_id": request_id, "ingestion_grace_seconds": settings.ingestion_grace_seconds}

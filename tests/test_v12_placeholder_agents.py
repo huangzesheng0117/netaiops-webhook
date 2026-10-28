@@ -148,7 +148,44 @@ def run_agent(agent, agent_name: AgentName, *, plan: dict | None = None):
     )
 
 
+
+
+def _frozen_v12_logs_runtime():
+    """Keep frozen v12 fixtures independent of active R1-C runtime settings."""
+    from contextlib import ExitStack
+    import importlib
+    from unittest import mock
+    from netaiops.v14 import runtime_config
+
+    original_loader = runtime_config.load_runtime_settings
+    disabled = runtime_config.disabled_settings()
+    stack = ExitStack()
+    targets = []
+    try:
+        for module_name in (
+            "netaiops.v14.runtime_config",
+            "netaiops.v12.agents.logs_evidence_agent",
+            "netaiops.v12.agents.static_planner_agent",
+            "netaiops.v14.logs_evidence_adapter",
+        ):
+            module = importlib.import_module(module_name)
+            if getattr(module, "load_runtime_settings", None) is original_loader:
+                stack.enter_context(mock.patch.object(
+                    module, "load_runtime_settings", return_value=disabled
+                ))
+                targets.append(module_name)
+        if "netaiops.v14.runtime_config" not in targets:
+            raise RuntimeError("V12_FIXTURE_LOADER_PATCH_MISSING")
+        return stack
+    except Exception:
+        stack.close()
+        raise
+
 class PlaceholderAgentTests(unittest.TestCase):
+    def setUp(self) -> None:
+        fixture = _frozen_v12_logs_runtime()
+        self.addCleanup(fixture.close)
+
     def logs_agent(self) -> LogsEvidenceAgent:
         return LogsEvidenceAgent(utcnow=lambda: NOW)
 
@@ -385,26 +422,41 @@ class PlaceholderAgentTests(unittest.TestCase):
         self.assertEqual(outcome.status, AgentStatus.NOT_AVAILABLE)
 
     def test_production_modules_have_no_external_client_imports(self) -> None:
-        paths = [
-            PROJECT_ROOT / "netaiops/v12/agents/logs_evidence_agent.py",
-            PROJECT_ROOT / "netaiops/v12/agents/knowledge_context_agent.py",
-        ]
-        text = chr(10).join(
-            path.read_text(encoding="utf-8") for path in paths
-        )
-        forbidden = (
+        logs_text = (
+            PROJECT_ROOT / "netaiops/v12/agents/logs_evidence_agent.py"
+        ).read_text(encoding="utf-8")
+        knowledge_text = (
+            PROJECT_ROOT / "netaiops/v12/agents/knowledge_context_agent.py"
+        ).read_text(encoding="utf-8")
+
+        external_client_forbidden = (
             "import requests",
             "import httpx",
             "import socket",
             "import subprocess",
-            "from pathlib import",
             "search_logs(",
             "Elasticsearch(",
             "FastMCP(",
-            "open(",
         )
-        for token in forbidden:
-            self.assertNotIn(token, text)
+        for token in external_client_forbidden:
+            self.assertNotIn(token, logs_text)
+            self.assertNotIn(token, knowledge_text)
+
+        # R1 Review is allowed to read the local, already-persisted v14 Logs
+        # artifact through the frozen adapter. It is still forbidden to make
+        # direct external queries from the v12 Logs Agent. Knowledge remains
+        # the legacy no-file-I/O placeholder until v15.
+        self.assertIn(
+            "from netaiops.v14.logs_evidence_adapter import build_v12_logs_envelope",
+            logs_text,
+        )
+        self.assertIn(
+            "from netaiops.v14.runtime_config import load_runtime_settings",
+            logs_text,
+        )
+        self.assertNotIn("open(", logs_text)
+        self.assertNotIn("from pathlib import", knowledge_text)
+        self.assertNotIn("open(", knowledge_text)
 
     def test_not_available_is_not_interpreted_as_normal(self) -> None:
         outcome = run_agent(self.logs_agent(), AgentName.LOGS_EVIDENCE)

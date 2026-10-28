@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 from typing import Any, Mapping
 
 from pydantic import ValidationError
@@ -146,9 +147,11 @@ class StaticPlannerAgent:
         *,
         skill_adapter: SkillAdapter | None = None,
         playbook_adapter: PlaybookAdapter | None = None,
+        project_root: str | Path = "/opt/netaiops-webhook",
     ) -> None:
         self.skill_adapter = skill_adapter or SkillAdapter()
         self.playbook_adapter = playbook_adapter or PlaybookAdapter()
+        self.project_root = Path(project_root)
 
     async def run(self, invocation: AgentInvocation) -> AgentOutcome:
         if invocation.agent_name != AgentName.STATIC_PLANNER:
@@ -336,6 +339,38 @@ class StaticPlannerAgent:
             device_ids or playbook.command_template_count > 0
         )
 
+        logs_constraints: dict[str, Any] = {
+            "enabled": False,
+            "reason": "logs_evidence_not_approved",
+            "dsl_generation_allowed": False,
+        }
+        logs_max_items = 0
+        try:
+            from netaiops.v14.runtime_config import load_runtime_settings
+
+            logs_settings = load_runtime_settings(
+                self.project_root / "config" / "v14_logs_w1.yaml"
+            )
+            logs_review_enabled = bool(
+                logs_settings.enabled
+                and logs_settings.include_in_analysis
+                and logs_settings.include_in_review
+            )
+            if logs_review_enabled:
+                logs_constraints = {
+                    "enabled": True,
+                    "reason": "v14_logs_r1_review_enabled",
+                    "persisted_evidence_only": True,
+                    "direct_mcp_allowed": False,
+                    "dsl_generation_allowed": False,
+                    "r1_stage": logs_settings.r1_stage,
+                }
+                logs_max_items = max(1, len(log_ids))
+        except Exception:
+            # Fail closed: runtime-control decode/import errors must never
+            # broaden the legacy Logs placeholder boundary.
+            pass
+
         return [
             EvidenceSourcePlan(
                 source=EvidenceSource.METRICS,
@@ -378,12 +413,8 @@ class StaticPlannerAgent:
                 source=EvidenceSource.LOGS,
                 required=False,
                 capability_ids=log_ids,
-                constraints={
-                    "enabled": False,
-                    "reason": "logs_evidence_not_approved",
-                    "dsl_generation_allowed": False,
-                },
-                max_items=0,
+                constraints=logs_constraints,
+                max_items=logs_max_items,
             ),
             EvidenceSourcePlan(
                 source=EvidenceSource.KNOWLEDGE,

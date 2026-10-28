@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Mapping
 
 from pydantic import ValidationError
@@ -44,8 +45,14 @@ def _notice(
 class LogsEvidenceAgent:
     """Return the frozen v12 Logs Evidence placeholder contract."""
 
-    def __init__(self, *, utcnow: Any | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        utcnow: Any | None = None,
+        project_root: str | Path = "/opt/netaiops-webhook",
+    ) -> None:
         self._utcnow = utcnow or (lambda: datetime.now(timezone.utc))
+        self.project_root = Path(project_root)
 
     async def run(self, invocation: AgentInvocation) -> AgentOutcome:
         if invocation.agent_name != AgentName.LOGS_EVIDENCE:
@@ -100,10 +107,12 @@ class LogsEvidenceAgent:
         try:
             from netaiops.v14.logs_evidence_adapter import build_v12_logs_envelope
             from netaiops.v14.runtime_config import load_runtime_settings
-            settings = load_runtime_settings()
+            settings = load_runtime_settings(
+                self.project_root / "config" / "v14_logs_w1.yaml"
+            )
             active_envelope = build_v12_logs_envelope(
                 request_id=invocation.request_id,
-                project_root="/opt/netaiops-webhook",
+                project_root=self.project_root,
                 settings=settings,
             )
         except Exception as exc:
@@ -144,6 +153,65 @@ class LogsEvidenceAgent:
                     "no_data_interpreted_as_normal": False,
                 },
                 warnings=tuple(active_envelope.warnings),
+                external_calls=(),
+            )
+
+        if (
+            settings.enabled
+            and settings.include_in_analysis
+            and settings.include_in_review
+        ):
+            notice = _notice(
+                "logs_persisted_artifact_not_available",
+                "R1 Review is enabled but no persisted v14 Logs Evidence artifact is available.",
+                details={
+                    "r1_stage": settings.r1_stage,
+                    "direct_mcp_allowed": False,
+                },
+            )
+            envelope = EvidenceEnvelope(
+                schema_version="v12.1",
+                request_id=invocation.request_id,
+                source=EvidenceSource.LOGS,
+                evidence_kind="evidence",
+                status=EvidenceStatus.NOT_AVAILABLE,
+                summary="Persisted v14 Logs Evidence is not available for Review.",
+                facts={
+                    "placeholder": False,
+                    "enabled": True,
+                    "r1_stage": settings.r1_stage,
+                    "include_in_rca": settings.include_in_rca,
+                    "fastmcp_called": False,
+                    "ops_es_api_called": False,
+                    "elasticsearch_called": False,
+                    "dsl_generation_performed": False,
+                    "no_data_interpreted_as_normal": False,
+                },
+                scope={
+                    "required": False,
+                    "persisted_evidence_only": True,
+                    "direct_mcp_allowed": False,
+                },
+                warnings=[notice],
+                evidence_refs=[],
+                collected_at=self._aware_now(),
+                reason="logs_persisted_artifact_not_available",
+            )
+            envelope_ref = self._envelope_ref(invocation.request_id)
+            return AgentOutcome(
+                status=AgentStatus.NOT_AVAILABLE,
+                output_refs=(envelope_ref,),
+                output={
+                    "logs_evidence": envelope.model_dump(mode="json"),
+                    "placeholder": False,
+                    "reused_v14_persisted_artifact": False,
+                    "fastmcp_called": False,
+                    "ops_es_api_called": False,
+                    "elasticsearch_called": False,
+                    "dsl_generation_performed": False,
+                    "no_data_interpreted_as_normal": False,
+                },
+                warnings=(notice,),
                 external_calls=(),
             )
 

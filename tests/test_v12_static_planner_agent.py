@@ -160,6 +160,39 @@ class FakePlaybookAdapter:
         }
 
 
+
+
+def _frozen_v12_logs_runtime():
+    """Keep frozen v12 fixtures independent of active R1-C runtime settings."""
+    from contextlib import ExitStack
+    import importlib
+    from unittest import mock
+    from netaiops.v14 import runtime_config
+
+    original_loader = runtime_config.load_runtime_settings
+    disabled = runtime_config.disabled_settings()
+    stack = ExitStack()
+    targets = []
+    try:
+        for module_name in (
+            "netaiops.v14.runtime_config",
+            "netaiops.v12.agents.logs_evidence_agent",
+            "netaiops.v12.agents.static_planner_agent",
+            "netaiops.v14.logs_evidence_adapter",
+        ):
+            module = importlib.import_module(module_name)
+            if getattr(module, "load_runtime_settings", None) is original_loader:
+                stack.enter_context(mock.patch.object(
+                    module, "load_runtime_settings", return_value=disabled
+                ))
+                targets.append(module_name)
+        if "netaiops.v14.runtime_config" not in targets:
+            raise RuntimeError("V12_FIXTURE_LOADER_PATCH_MISSING")
+        return stack
+    except Exception:
+        stack.close()
+        raise
+
 class StaticPlannerFixtureTests(unittest.TestCase):
     def test_fixture_set_is_complete(self) -> None:
         actual = {path.name for path in FIXTURE_ROOT.glob("*.json")}
@@ -216,7 +249,8 @@ class StaticPlannerFixtureTests(unittest.TestCase):
         )
 
     def test_logs_and_knowledge_are_optional_placeholders(self) -> None:
-        _, outcome = run_fixture("cisco_hardware.json")
+        with _frozen_v12_logs_runtime():
+            _, outcome = run_fixture("cisco_hardware.json")
         sources = {
             item["source"]: item
             for item in outcome.output["evidence_plan"]["sources"]

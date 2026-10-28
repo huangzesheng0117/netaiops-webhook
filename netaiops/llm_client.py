@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import re
@@ -45,21 +46,58 @@ def _extract_json_text(text: str) -> str:
         raise ValueError("empty model response text")
 
     text = text.strip()
+    decoder = json.JSONDecoder()
 
-    fenced = re.search(r"```json\s*(\{.*\})\s*```", text, re.DOTALL | re.IGNORECASE)
-    if fenced:
-        return fenced.group(1)
+    def _valid_object(segment: str) -> tuple[str, int] | None:
+        segment = segment.strip()
+        if not segment:
+            return None
+        try:
+            value, end = decoder.raw_decode(segment)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(value, dict):
+            return None
+        return segment[:end], end
 
-    fenced_generic = re.search(r"```\s*(\{.*\})\s*```", text, re.DOTALL)
-    if fenced_generic:
-        return fenced_generic.group(1)
+    fenced_blocks = re.findall(
+        r"```(?:json)?\s*(.*?)```",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    for block in fenced_blocks:
+        candidate = _valid_object(block)
+        if candidate is not None:
+            return candidate[0]
 
-    start = text.find("{")
-    end = text.rfind("}")
-    if start != -1 and end != -1 and end > start:
-        return text[start:end + 1]
+    candidates: list[tuple[int, int, str]] = []
+    for start, char in enumerate(text):
+        if char != "{":
+            continue
+        candidate = _valid_object(text[start:])
+        if candidate is None:
+            continue
+        json_text, length = candidate
+        candidates.append((length, start, json_text))
 
-    raise ValueError("no json object found in model response")
+    if candidates:
+        candidates.sort(key=lambda item: (item[0], item[1]))
+        return candidates[-1][2]
+
+    raise ValueError("no valid json object found in model response")
+
+
+def _parse_failure_diagnostics(text: str, exc: Exception) -> dict[str, Any]:
+    raw = text or ""
+    encoded = raw.encode("utf-8", errors="replace")
+    return {
+        "raw_content_sha256": hashlib.sha256(encoded).hexdigest(),
+        "raw_content_length": len(raw),
+        "raw_content_utf8_bytes": len(encoded),
+        "json_open_brace_count": raw.count("{"),
+        "json_close_brace_count": raw.count("}"),
+        "parse_error_type": type(exc).__name__,
+    }
 
 
 def _as_bool(value: Any, default: bool = False) -> bool:
@@ -351,7 +389,15 @@ def call_llm(prompt: str, config: dict | None = None) -> dict:
                     metadata["call_status"] = "success"
                     metadata["parse_status"] = "unexpected_response_format"
                     metadata["errors"] = [f"unexpected llm response format: {_short_error(exc)}"]
-                    metadata["raw_response_preview"] = _preview(json.dumps(data, ensure_ascii=False))
+                    raw_response_text = json.dumps(data, ensure_ascii=False)
+                    raw_response_bytes = raw_response_text.encode(
+                        "utf-8",
+                        errors="replace",
+                    )
+                    metadata["raw_response_sha256"] = hashlib.sha256(
+                        raw_response_bytes
+                    ).hexdigest()
+                    metadata["raw_response_length"] = len(raw_response_text)
                     return _fallback_analysis("unexpected_response_format", data.get("model", model), metadata)
 
                 try:
@@ -375,7 +421,7 @@ def call_llm(prompt: str, config: dict | None = None) -> dict:
                     metadata["call_status"] = "success"
                     metadata["parse_status"] = "json_parse_failed"
                     metadata["errors"] = [f"failed to parse model json: {_short_error(exc)}"]
-                    metadata["raw_content_preview"] = _preview(content)
+                    metadata.update(_parse_failure_diagnostics(content, exc))
                     return _fallback_analysis("json_parse_failed", data.get("model", model), metadata)
 
             except Exception as exc:

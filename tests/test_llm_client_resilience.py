@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest.mock import patch
 
@@ -40,6 +41,69 @@ class FakeClient:
 class TestLLMClientResilience(unittest.TestCase):
     def test_extract_json_from_fenced_text(self):
         self.assertEqual(_extract_json_text("```json\n{\"summary\":\"ok\"}\n```"), "{\"summary\":\"ok\"}")
+
+    def test_extract_json_prefers_valid_object_after_invalid_reasoning_braces(self):
+        text = (
+            '<think>{"not": invalid}</think>\n'
+            '{"candidates":[{"statement":"ok"}],"missing_evidence":[],"uncertainties":["u"]}'
+        )
+        parsed = json.loads(_extract_json_text(text))
+        self.assertIn("candidates", parsed)
+
+    def test_extract_json_handles_multiple_objects_by_selecting_largest_valid_object(self):
+        text = (
+            '{"note":"x"}\n'
+            '{"candidates":[{"statement":"ok","confidence":0.4}],'
+            '"missing_evidence":[],"uncertainties":["u"]}'
+        )
+        parsed = json.loads(_extract_json_text(text))
+        self.assertIn("candidates", parsed)
+
+    def test_extract_json_handles_fenced_json_with_surrounding_reasoning(self):
+        text = (
+            'reasoning {not-json}\n'
+            '```json\n{"summary":"ok","confidence":"high"}\n```\n'
+            'tail'
+        )
+        parsed = json.loads(_extract_json_text(text))
+        self.assertEqual(parsed["summary"], "ok")
+
+    def test_extract_json_rejects_truncated_only_object(self):
+        with self.assertRaises(ValueError):
+            _extract_json_text('prefix {"summary":"truncated"')
+
+    def test_call_llm_parse_failure_persists_fingerprint_not_raw_preview(self):
+        content = "this is not json and may contain sensitive text"
+        payload = {
+            "model": "qwen3-max",
+            "choices": [
+                {
+                    "message": {"content": content},
+                    "finish_reason": "stop",
+                }
+            ],
+        }
+        cfg = {
+            "llm": {
+                "enabled": True,
+                "provider": "openai_compatible",
+                "base_url": "http://llm/v1",
+                "model": "qwen3-max",
+                "timeout": 60,
+            }
+        }
+        fake = FakeClient(FakeResponse(payload=payload))
+        with patch("netaiops.llm_client.httpx.Client", return_value=fake):
+            result = call_llm("prompt", cfg)
+
+        metadata = result["llm_metadata"]
+        self.assertEqual(metadata["parse_status"], "json_parse_failed")
+        self.assertEqual(metadata["raw_content_length"], len(content))
+        self.assertEqual(metadata["json_open_brace_count"], 0)
+        self.assertEqual(metadata["json_close_brace_count"], 0)
+        self.assertEqual(metadata["parse_error_type"], "ValueError")
+        self.assertNotIn("raw_content_preview", metadata)
+        self.assertNotIn(content, json.dumps(metadata, ensure_ascii=False))
 
     def test_build_endpoint_configs_keeps_primary_model_endpoint(self):
         cfg = {

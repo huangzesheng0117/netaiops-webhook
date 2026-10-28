@@ -351,7 +351,7 @@ def _audit_payload(
         "second_card_sent": False,
         "production_card_replaced": False,
         "notifications_use_v12": False,
-        "logs_status": "not_available",
+        "logs_status": str(safe_result.get("logs_status") or "not_available"),
         "knowledge_status": "not_available",
         "prometheus_mcp_calls": int(call_counts.get("prometheus_mcp") or 0),
         "netmiko_mcp_calls": int(call_counts.get("netmiko_mcp") or 0),
